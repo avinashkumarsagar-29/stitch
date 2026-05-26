@@ -163,7 +163,7 @@ export default function Home() {
                 <ProtectedLink
                   key={link.label}
                   href={link.href}
-                  className="underline"
+                  className=""
                 >
                   {link.label}
                 </ProtectedLink>
@@ -189,7 +189,7 @@ export default function Home() {
               </p>
               <a
                 href="#booking"
-                className="mt-5 ml-4 w-fit rounded-[4px] bg-[#d779f4] px-8 py-3 text-sm font-medium text-[#151320] underline shadow-sm"
+                className="mt-5 ml-4 w-fit rounded-[4lpx] bg-[#d779f4] px-8 py-3 text-sm font-medium text-[#151320]  shadow-sm"
               >
                 Book Now
               </a>
@@ -269,7 +269,7 @@ export default function Home() {
           <div className="text-center">
             <a
               href="#booking"
-              className="inline-flex rounded-[10px] bg-[#d779f4] px-5 py-3 text-[24px] font-medium leading-none text-[#171d2a] underline shadow-sm"
+              className="inline-flex rounded-[10px] bg-[#d779f4] px-5 py-3 text-[24px] font-medium leading-none text-[#171d2a]  shadow-sm"
             >
               Book Now
             </a>
@@ -415,7 +415,7 @@ export default function Home() {
             <div className="mt-10 flex flex-col gap-6 border-t border-[#d22dff] pt-8 text-sm md:flex-row md:items-center md:justify-between">
               <p>
                 ©
-                <a href="#" className="underline">
+                <a href="#" className="">
                   Raviteja Sanka.
                 </a>{" "}
                 All rights reserved

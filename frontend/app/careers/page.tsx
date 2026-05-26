@@ -41,19 +41,19 @@ export default function CareersPage() {
             Stitch
           </Link>
           <nav className="flex flex-wrap items-center gap-4 text-xs font-medium sm:text-sm md:justify-end md:gap-8">
-            <Link href="/" className="underline">
+            <Link href="/" className="">
               Home
             </Link>
-            <Link href="/about" className="underline">
+            <Link href="/about" className="">
               About us
             </Link>
-            <Link href="/collection" className="underline">
+            <Link href="/collection" className="">
               Collection
             </Link>
             <Link href="/careers" className="text-[#121a28]">
               Careers
             </Link>
-            <Link href="/blog" className="underline">
+            <Link href="/blog" className="">
               Blog
             </Link>
             <AuthActions />
