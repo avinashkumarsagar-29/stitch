@@ -7,6 +7,7 @@ const { getSqlPool, sql } = require("./db");
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
+const otpExpiryMinutes = 5;
 
 app.use(
   cors({
@@ -22,7 +23,8 @@ app.get("/", (_request, response) => {
     endpoints: {
       health: "/health",
       register: "POST /api/auth/register",
-      login: "POST /api/auth/login",
+      requestOtp: "POST /api/auth/request-otp",
+      verifyOtp: "POST /api/auth/verify-otp",
       bookings: "POST /api/bookings",
     },
   });
@@ -69,15 +71,74 @@ async function ensureBookingsTable(pool) {
   `);
 }
 
+async function ensureAuthTables(pool) {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.Users', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.Users (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        fullName NVARCHAR(150) NOT NULL,
+        email NVARCHAR(255) NOT NULL UNIQUE,
+        phoneNumber NVARCHAR(20) NOT NULL UNIQUE,
+        passwordHash NVARCHAR(255) NOT NULL DEFAULT '',
+        createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+      );
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'phoneNumber') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD phoneNumber NVARCHAR(20) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.LoginOtps', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.LoginOtps (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        phoneNumber NVARCHAR(20) NOT NULL,
+        otpCode NVARCHAR(6) NOT NULL,
+        expiresAt DATETIME2 NOT NULL,
+        usedAt DATETIME2 NULL,
+        createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+      );
+    END
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.indexes
+      WHERE name = 'UX_Users_phoneNumber'
+      AND object_id = OBJECT_ID('dbo.Users')
+    )
+    BEGIN
+      CREATE UNIQUE INDEX UX_Users_phoneNumber
+      ON dbo.Users(phoneNumber)
+      WHERE phoneNumber IS NOT NULL;
+    END
+  `);
+}
+
+function normalizePhoneNumber(phoneNumber) {
+  return String(phoneNumber || "").replace(/[^\d+]/g, "").trim();
+}
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 app.post("/api/auth/register", async (request, response) => {
   try {
     const fullName = String(request.body.fullName || "").trim();
     const email = String(request.body.email || "").trim().toLowerCase();
+    const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
     const password = String(request.body.password || "");
 
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !phoneNumber || !password) {
       return response.status(400).json({
-        message: "Full name, email and password are required",
+        message: "Full name, email, phone number and password are required",
       });
     }
 
@@ -87,15 +148,23 @@ app.post("/api/auth/register", async (request, response) => {
       });
     }
 
+    if (phoneNumber.length < 10) {
+      return response.status(400).json({
+        message: "Please enter a valid phone number",
+      });
+    }
+
     const pool = await getSqlPool();
+    await ensureAuthTables(pool);
     const existingUser = await pool
       .request()
       .input("email", sql.NVarChar(255), email)
-      .query("SELECT id FROM Users WHERE email = @email");
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .query("SELECT id FROM Users WHERE email = @email OR phoneNumber = @phoneNumber");
 
     if (existingUser.recordset.length > 0) {
       return response.status(409).json({
-        message: "Email is already registered",
+        message: "Email or phone number is already registered",
       });
     }
 
@@ -104,11 +173,12 @@ app.post("/api/auth/register", async (request, response) => {
       .request()
       .input("fullName", sql.NVarChar(150), fullName)
       .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .input("passwordHash", sql.NVarChar(255), passwordHash)
       .query(`
-        INSERT INTO Users (fullName, email, passwordHash)
-        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email
-        VALUES (@fullName, @email, @passwordHash)
+        INSERT INTO Users (fullName, email, phoneNumber, passwordHash)
+        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber
+        VALUES (@fullName, @email, @phoneNumber, @passwordHash)
       `);
 
     return response.status(201).json({
@@ -127,42 +197,112 @@ app.post("/api/auth/register", async (request, response) => {
   }
 });
 
-app.post("/api/auth/login", async (request, response) => {
+app.post("/api/auth/request-otp", async (request, response) => {
   try {
-    const email = String(request.body.email || "").trim().toLowerCase();
-    const password = String(request.body.password || "");
+    const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
 
-    if (!email || !password) {
+    if (!phoneNumber) {
       return response.status(400).json({
-        message: "Email and password are required",
+        message: "Phone number is required",
       });
     }
 
     const pool = await getSqlPool();
-    const result = await pool
+    await ensureAuthTables(pool);
+    const userResult = await pool
       .request()
-      .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .query(`
-        SELECT id, fullName, email, passwordHash
+        SELECT id, fullName, email, phoneNumber
         FROM Users
-        WHERE email = @email
+        WHERE phoneNumber = @phoneNumber
       `);
 
-    const user = result.recordset[0];
+    const user = userResult.recordset[0];
 
     if (!user) {
-      return response.status(401).json({
-        message: "Invalid email or password",
+      return response.status(404).json({
+        message: "Phone number is not registered",
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    const otpCode = generateOtp();
+    await pool
+      .request()
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .input("otpCode", sql.NVarChar(6), otpCode)
+      .input("expiresAt", sql.DateTime2, new Date(Date.now() + otpExpiryMinutes * 60 * 1000))
+      .query(`
+        INSERT INTO LoginOtps (phoneNumber, otpCode, expiresAt)
+        VALUES (@phoneNumber, @otpCode, @expiresAt)
+      `);
 
-    if (!isPasswordValid) {
-      return response.status(401).json({
-        message: "Invalid email or password",
+    return response.json({
+      message: "OTP sent successfully",
+      devOtp: otpCode,
+    });
+  } catch (error) {
+    console.error("OTP request error:", error);
+    return response.status(500).json({
+      message: "Unable to send OTP",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.post("/api/auth/verify-otp", async (request, response) => {
+  try {
+    const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
+    const otpCode = String(request.body.otp || "").trim();
+
+    if (!phoneNumber || !otpCode) {
+      return response.status(400).json({
+        message: "Phone number and OTP are required",
       });
     }
+
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+    const otpResult = await pool
+      .request()
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .input("otpCode", sql.NVarChar(6), otpCode)
+      .query(`
+        SELECT TOP 1 id
+        FROM LoginOtps
+        WHERE phoneNumber = @phoneNumber
+          AND otpCode = @otpCode
+          AND usedAt IS NULL
+          AND expiresAt > SYSUTCDATETIME()
+        ORDER BY createdAt DESC
+      `);
+
+    const otp = otpResult.recordset[0];
+
+    if (!otp) {
+      return response.status(401).json({
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    await pool
+      .request()
+      .input("id", sql.Int, otp.id)
+      .query("UPDATE LoginOtps SET usedAt = SYSUTCDATETIME() WHERE id = @id");
+
+    const userResult = await pool
+      .request()
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .query(`
+        SELECT id, fullName, email, phoneNumber
+        FROM Users
+        WHERE phoneNumber = @phoneNumber
+      `);
+
+    const user = userResult.recordset[0];
 
     return response.json({
       message: "Login successful",
@@ -170,10 +310,11 @@ app.post("/api/auth/login", async (request, response) => {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
+        phoneNumber: user.phoneNumber,
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("OTP verify error:", error);
     return response.status(500).json({
       message: "Unable to login",
       detail:

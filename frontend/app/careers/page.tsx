@@ -34,9 +34,9 @@ const benefits = [
 export default function CareersPage() {
   return (
     <AuthGuard>
-    <main className="min-h-screen bg-[#f5f5f5] px-4 py-8 text-[#171d2a] md:px-12">
-      <section className="mx-auto min-h-[calc(100vh-64px)] max-w-[1174px] overflow-hidden bg-white shadow-sm">
-        <header className="flex min-h-[76px] flex-col gap-4 border-b border-[#c8d2df] bg-white px-5 py-4 md:flex-row md:items-center md:justify-between md:px-10">
+    <main className="min-h-screen bg-white text-[#171d2a]">
+      <section className="min-h-screen bg-white">
+        <header className="sticky top-0 z-50 flex min-h-[76px] flex-col gap-4 border-b border-[#c8d2df] bg-white px-5 py-4 md:flex-row md:items-center md:justify-between md:px-10">
           <Link href="/" className="text-[32px] font-black tracking-tight text-[#071720] sm:text-[38px]">
             Stitch
           </Link>

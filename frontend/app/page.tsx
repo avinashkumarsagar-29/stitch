@@ -130,9 +130,9 @@ const footerColumns = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#f5f5f5] px-4 py-0 text-[#171d2a] md:px-12">
-      <section className="mx-auto min-h-screen max-w-[1174px] overflow-hidden bg-white shadow-sm">
-        <header className="relative z-10 flex min-h-[76px] flex-col gap-4 border-b border-[#c8d2df] bg-white px-5 py-4 md:flex-row md:items-center md:justify-between md:px-10">
+    <main className="min-h-screen bg-white text-[#171d2a]">
+      <section className="min-h-screen bg-white">
+        <header className="sticky top-0 z-50 flex min-h-[76px] flex-col gap-4 border-b border-[#c8d2df] bg-white px-5 py-4 md:flex-row md:items-center md:justify-between md:px-10">
           <Link href="/" className="flex items-end gap-2" aria-label="Stitch home">
             <span className="relative flex h-16 w-12 items-center justify-center text-5xl font-black leading-none text-[#0c1b24]">
               S
@@ -416,7 +416,7 @@ export default function Home() {
               <p>
                 ©
                 <a href="#" className="">
-                  Raviteja Sanka.
+                  2026 Stitch.{" "}
                 </a>{" "}
                 All rights reserved
               </p>
@@ -545,4 +545,3 @@ function StepIcon({ icon }: { icon: string }) {
     </span>
   );
 }
-

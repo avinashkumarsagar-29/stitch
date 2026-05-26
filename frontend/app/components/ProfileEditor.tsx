@@ -2,42 +2,36 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import {
+  emptyProfile,
+  getProfileForCurrentUser,
+  getProfileStorageKey,
+  placeholderProfileImage,
+  type Profile,
+} from "./profileStorage";
 import { showToast } from "./Toast";
-
-type Profile = {
-  firstName: string;
-  lastName: string;
-  address: string;
-  phone: string;
-  image: string;
-};
-
-const defaultProfile: Profile = {
-  firstName: "Stitch",
-  lastName: "User",
-  address: "MG Road, Bangalore, Karnataka, India",
-  phone: "+91 98765 43210",
-  image:
-    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=320&q=80",
-};
 
 export default function ProfileEditor() {
   const [profile, setProfile] = useState<Profile>(() => {
     if (typeof window === "undefined") {
-      return defaultProfile;
+      return emptyProfile;
     }
 
-    const savedProfile = localStorage.getItem("stitch-profile");
-
-    if (savedProfile) {
-      return { ...defaultProfile, ...JSON.parse(savedProfile) };
-    }
-
-    return defaultProfile;
+    return getProfileForCurrentUser();
   });
+  const profileImage = profile.image || placeholderProfileImage;
+  const displayName = profile.fullName || "Your Profile";
 
   function updateProfile(field: keyof Profile, value: string) {
-    setProfile((current) => ({ ...current, [field]: value }));
+    setProfile((current) => {
+      const nextProfile = { ...current, [field]: value };
+
+      if (field === "firstName" || field === "lastName") {
+        nextProfile.fullName = `${nextProfile.firstName} ${nextProfile.lastName}`.trim();
+      }
+
+      return nextProfile;
+    });
   }
 
   function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -61,7 +55,7 @@ export default function ProfileEditor() {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    localStorage.setItem("stitch-profile", JSON.stringify(profile));
+    localStorage.setItem(getProfileStorageKey(), JSON.stringify(profile));
     window.dispatchEvent(new Event("stitch-profile-change"));
     showToast("Profile updated successfully", "success");
   }
@@ -70,11 +64,11 @@ export default function ProfileEditor() {
     <section className="grid gap-10 px-5 py-12 sm:px-8 md:grid-cols-[360px_1fr] md:px-14 md:py-20">
       <aside className="rounded-[8px] bg-[#f8f8f8] p-8 text-center">
         <Image
-          src={profile.image}
+          src={profileImage}
           alt="User profile"
           width={180}
           height={180}
-          unoptimized={profile.image.startsWith("data:")}
+          unoptimized={profileImage.startsWith("data:")}
           className="mx-auto h-[180px] w-[180px] rounded-full object-cover"
         />
         <label className="mt-6 inline-flex cursor-pointer rounded-[6px] bg-[#d779f4] px-6 py-3 text-sm font-bold text-[#151320] shadow-sm">
@@ -87,9 +81,10 @@ export default function ProfileEditor() {
           />
         </label>
         <h1 className="mt-6 text-[32px] font-extrabold tracking-tight text-[#202635]">
-          {profile.firstName} {profile.lastName}
+          {displayName}
         </h1>
-        <p className="mt-2 text-sm text-[#6b7280]">customer@stitch.com</p>
+        <p className="mt-2 text-sm text-[#6b7280]">{profile.email}</p>
+        <p className="mt-1 text-sm text-[#6b7280]">{profile.phone}</p>
       </aside>
 
       <form onSubmit={handleSubmit}>
@@ -117,10 +112,11 @@ export default function ProfileEditor() {
             placeholder="Enter last name"
           />
           <ProfileField
-            label="Address"
-            value={profile.address}
-            onChange={(value) => updateProfile("address", value)}
-            placeholder="Enter address"
+            label="Email"
+            value={profile.email}
+            onChange={(value) => updateProfile("email", value)}
+            placeholder="Enter email"
+            type="email"
           />
           <ProfileField
             label="Phone Number"
@@ -128,6 +124,12 @@ export default function ProfileEditor() {
             onChange={(value) => updateProfile("phone", value)}
             placeholder="Enter phone number"
             type="tel"
+          />
+          <ProfileField
+            label="Address"
+            value={profile.address}
+            onChange={(value) => updateProfile("address", value)}
+            placeholder="Enter address"
           />
         </div>
 

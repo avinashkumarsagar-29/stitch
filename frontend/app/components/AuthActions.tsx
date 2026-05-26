@@ -4,6 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
+import {
+  getProfileForCurrentUser,
+  placeholderProfileImage,
+} from "./profileStorage";
 import { showToast } from "./Toast";
 
 function subscribe(callback: () => void) {
@@ -23,13 +27,7 @@ function getSnapshot() {
 }
 
 function getProfileImageSnapshot() {
-  const savedProfile = localStorage.getItem("stitch-profile");
-
-  if (!savedProfile) {
-    return "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80";
-  }
-
-  return JSON.parse(savedProfile).image;
+  return getProfileForCurrentUser().image || placeholderProfileImage;
 }
 
 function getServerSnapshot() {
@@ -37,7 +35,7 @@ function getServerSnapshot() {
 }
 
 function getServerProfileImageSnapshot() {
-  return "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80";
+  return placeholderProfileImage;
 }
 
 export default function AuthActions() {
@@ -91,7 +89,7 @@ export default function AuthActions() {
 
   return (
     <>
-      <Link href="/register" className="underline">
+      <Link href="/register" className="">
         Register
       </Link>
       <Link
