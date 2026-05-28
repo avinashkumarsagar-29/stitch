@@ -15,14 +15,15 @@ BEGIN
     email NVARCHAR(255) NOT NULL UNIQUE,
     phoneNumber NVARCHAR(20) NOT NULL UNIQUE,
     passwordHash NVARCHAR(255) NOT NULL DEFAULT '',
+    role NVARCHAR(50) NOT NULL DEFAULT 'user',
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
   );
 END
 GO
 
-IF COL_LENGTH('dbo.Users', 'phoneNumber') IS NULL
+IF COL_LENGTH('dbo.Users', 'role') IS NULL
 BEGIN
-  ALTER TABLE dbo.Users ADD phoneNumber NVARCHAR(20) NULL;
+  ALTER TABLE dbo.Users ADD role NVARCHAR(50) NOT NULL DEFAULT 'user';
 END
 GO
 
@@ -67,7 +68,23 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('dbo.JoinApplications', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.JoinApplications (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    firstName NVARCHAR(100) NOT NULL,
+    lastName NVARCHAR(100) NOT NULL,
+    experience NVARCHAR(50) NOT NULL,
+    location NVARCHAR(255) NOT NULL,
+    image NVARCHAR(MAX) NULL,
+    status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+    createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+  );
+END
+GO
+
 SELECT * FROM dbo.Users ORDER BY createdAt DESC;
 SELECT * FROM dbo.LoginOtps ORDER BY createdAt DESC;
 SELECT * FROM dbo.Bookings ORDER BY createdAt DESC;
+SELECT * FROM dbo.JoinApplications ORDER BY createdAt DESC;
 GO

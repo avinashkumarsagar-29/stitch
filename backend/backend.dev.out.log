@@ -1,0 +1,5 @@
+◇ injected env (6) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+Stitch backend running at http://localhost:4000
+Restarting 'server.js'
+◇ injected env (6) from .env // tip: ⌘ override existing { override: true }
+Stitch backend running at http://localhost:4000

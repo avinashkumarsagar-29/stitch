@@ -1,16 +1,11 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import AuthActions from "./components/AuthActions";
 import BookingForm from "./components/BookingForm";
 import ProtectedLink from "./components/ProtectedLink";
-
-const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "About us", href: "/about" },
-  { label: "Collection", href: "/collection" },
-  { label: "Careers", href: "/careers" },
-  { label: "Blog", href: "/blog" },
-];
 
 const workSteps = [
   {
@@ -129,6 +124,43 @@ const footerColumns = [
 ];
 
 export default function Home() {
+  const getUserRole = () => {
+    if (typeof window === "undefined") return "user";
+    return localStorage.getItem("stitch-role") || "user";
+  };
+
+  const subscribe = (callback: () => void) => {
+    window.addEventListener("storage", callback);
+    window.addEventListener("stitch-auth-change", callback);
+    return () => {
+      window.removeEventListener("storage", callback);
+      window.removeEventListener("stitch-auth-change", callback);
+    };
+  };
+
+  const userRole = useSyncExternalStore(
+    subscribe,
+    getUserRole,
+    () => "user"
+  );
+
+  const isTailor = userRole === "tailor";
+
+  // User sees all pages, Tailor sees only Careers and Blog
+  const navLinksForRole = isTailor
+    ? [
+        { label: "Home", href: "/" },
+        { label: "Careers", href: "/careers" },
+        { label: "Blog", href: "/blog" },
+      ]
+    : [
+        { label: "Home", href: "/" },
+        { label: "About us", href: "/about" },
+        { label: "Collection", href: "/collection" },
+        { label: "Careers", href: "/careers" },
+        { label: "Blog", href: "/blog" },
+      ];
+
   return (
     <main className="min-h-screen bg-white text-[#171d2a]">
       <section className="min-h-screen bg-white">
@@ -150,7 +182,7 @@ export default function Home() {
           </Link>
 
           <nav className="flex flex-wrap items-center gap-4 text-xs font-medium sm:text-sm md:justify-end md:gap-8">
-            {navLinks.map((link, index) =>
+            {navLinksForRole.map((link, index) =>
               index === 0 ? (
                 <Link
                   key={link.label}
@@ -187,12 +219,12 @@ export default function Home() {
                 With Stitchy, you get access to fast and affordable styler at
                 your desire location.
               </p>
-              <a
-                href="#booking"
-                className="mt-5 ml-4 w-fit rounded-[4lpx] bg-[#d779f4] px-8 py-3 text-sm font-medium text-[#151320]  shadow-sm"
+              <Link
+                href="/booking"
+                className="mt-5 ml-4 w-fit rounded-[4px] bg-[#d779f4] px-8 py-3 text-sm font-medium text-[#151320] shadow-sm"
               >
                 Book Now
-              </a>
+              </Link>
             </div>
 
             <div className="relative min-h-[360px] overflow-hidden bg-[#d4d4d4] md:min-h-[470px]">
@@ -209,7 +241,16 @@ export default function Home() {
         </section>
 
         <section id="booking" className="relative bg-[#f7f7f7] px-4 pb-10 pt-2 sm:px-6">
-          <BookingForm />
+          {!isTailor ? (
+            <BookingForm />
+          ) : (
+            <div className="mx-auto max-w-[1068px] rounded-lg bg-white p-8 text-center">
+              <h2 className="text-2xl font-bold text-[#171d2a]">Welcome, Tailor!</h2>
+              <p className="mt-2 text-gray-600">
+                You have access to the Careers and Blog sections.
+              </p>
+            </div>
+          )}
         </section>
 
         <section className="bg-white px-5 pb-16 pt-14 sm:px-8 md:px-14 md:pb-24 md:pt-16">
@@ -267,12 +308,14 @@ export default function Home() {
 
         <section className="bg-white px-5 pb-16 pt-10 sm:px-8 md:px-24 md:pb-20 md:pt-12">
           <div className="text-center">
-            <a
-              href="#booking"
-              className="inline-flex rounded-[10px] bg-[#d779f4] px-5 py-3 text-[24px] font-medium leading-none text-[#171d2a]  shadow-sm"
-            >
-              Book Now
-            </a>
+            {!isTailor ? (
+              <Link
+                href="/booking"
+                className="inline-flex rounded-[10px] bg-[#d779f4] px-5 py-3 text-[24px] font-medium leading-none text-[#171d2a] shadow-sm"
+              >
+                Book Now
+              </Link>
+            ) : null}
           </div>
 
           <div className="mt-28 text-center">

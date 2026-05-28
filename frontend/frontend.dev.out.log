@@ -1,0 +1,23 @@
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.17:3000
+✓ Ready in 416ms
+Creating turbopack project {
+  dir: 'C:\\Users\\avina\\OneDrive\\Documents\\Desktop\\New folder (4)\\stitch\\frontend',
+  testMode: true
+}
+
+ GET / 200 in 493ms (next.js: 233ms, application-code: 260ms)
+ GET / 200 in 207ms (next.js: 7ms, application-code: 200ms)
+ GET / 200 in 296ms (next.js: 18ms, application-code: 278ms)
+ GET / 200 in 34ms (next.js: 11ms, application-code: 23ms)
+ GET / 200 in 98ms (next.js: 8ms, application-code: 90ms)
+ GET /login 200 in 169ms (next.js: 101ms, application-code: 67ms)
+ GET / 200 in 85ms (next.js: 5ms, application-code: 79ms)
+ GET /about 200 in 181ms (next.js: 110ms, application-code: 71ms)
+ GET /register 200 in 168ms (next.js: 108ms, application-code: 60ms)
+ GET /collection 200 in 177ms (next.js: 106ms, application-code: 71ms)
+ GET / 200 in 103ms (next.js: 8ms, application-code: 95ms)
+ GET /blog 200 in 169ms (next.js: 105ms, application-code: 64ms)
+ GET /profile 200 in 153ms (next.js: 96ms, application-code: 57ms)
+[?25h

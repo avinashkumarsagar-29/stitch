@@ -68,7 +68,7 @@ export default function AboutPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href="/register"
+                href="/join"
                 className="rounded-[6px] bg-[#d779f4] px-7 py-3 text-sm font-bold text-[#151320] shadow-sm"
               >
                 Join Stitch

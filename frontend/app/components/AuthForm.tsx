@@ -13,6 +13,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const isRegister = mode === "register";
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [role, setRole] = useState("user");
   const [phoneNumber, setPhoneNumber] = useState(() => {
     if (typeof window === "undefined" || isRegister) {
       return "";
@@ -49,6 +50,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       email: String(formData.get("email") || ""),
       phoneNumber: String(formData.get("phoneNumber") || ""),
       password: String(formData.get("password") || ""),
+      role: role,
     };
 
     try {
@@ -123,6 +125,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
       localStorage.setItem("stitch-auth", "true");
       localStorage.setItem("stitch-user", JSON.stringify(data.user));
+      localStorage.setItem("stitch-role", data.user.role || "user");
       showToast(data.message, "success");
       window.dispatchEvent(new Event("stitch-auth-change"));
       router.push("/");
@@ -170,6 +173,31 @@ export default function AuthForm({ mode }: AuthFormProps) {
           </label>
 
           <label className="mt-5 block text-sm font-bold">
+            I am a
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+              className="mt-2 h-12 w-full rounded-[6px] border border-[#c8d2df] px-4 text-sm font-normal outline-none focus:border-[#c322f4]"
+            >
+              <option value="user">User (Book Services)</option>
+              <option value="tailor">Tailor (Provide Services)</option>
+            </select>
+          </label>
+
+          <label className="mt-5 block text-sm font-bold">
+            Phone number
+            <input
+              name="phoneNumber"
+              type="tel"
+              value={phoneNumber}
+              onChange={(event) => setPhoneNumber(event.target.value)}
+              placeholder="+91 98765 43210"
+              required
+              className="mt-2 h-12 w-full rounded-[6px] border border-[#c8d2df] px-4 text-sm font-normal outline-none focus:border-[#c322f4]"
+            />
+          </label>
+
+          <label className="mt-5 block text-sm font-bold">
             Password
             <input
               name="password"
@@ -183,18 +211,20 @@ export default function AuthForm({ mode }: AuthFormProps) {
         </>
       ) : null}
 
-      <label className={isRegister ? "mt-5 block text-sm font-bold" : "mt-8 block text-sm font-bold"}>
-        Phone number
-        <input
-          name="phoneNumber"
-          type="tel"
-          value={phoneNumber}
-          onChange={(event) => setPhoneNumber(event.target.value)}
-          placeholder="+91 98765 43210"
-          required
-          className="mt-2 h-12 w-full rounded-[6px] border border-[#c8d2df] px-4 text-sm font-normal outline-none focus:border-[#c322f4]"
-        />
-      </label>
+      {!isRegister ? (
+        <label className="mt-8 block text-sm font-bold">
+          Phone number
+          <input
+            name="phoneNumber"
+            type="tel"
+            value={phoneNumber}
+            onChange={(event) => setPhoneNumber(event.target.value)}
+            placeholder="+91 98765 43210"
+            required
+            className="mt-2 h-12 w-full rounded-[6px] border border-[#c8d2df] px-4 text-sm font-normal outline-none focus:border-[#c322f4]"
+          />
+        </label>
+      ) : null}
 
       {!isRegister && isOtpSent ? (
         <label className="mt-5 block text-sm font-bold">
