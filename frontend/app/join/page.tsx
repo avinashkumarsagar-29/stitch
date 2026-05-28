@@ -3,12 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import RoleAwareNav from "../components/RoleAwareNav";
 import { showToast } from "../components/Toast";
 
 export default function JoinPage() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
+    email: "",
+    phoneNumber: "",
     experience: "",
     location: "",
     image: null as File | null,
@@ -41,6 +44,8 @@ export default function JoinPage() {
     if (
       !formData.firstName ||
       !formData.lastName ||
+      !formData.email ||
+      !formData.phoneNumber ||
       !formData.experience ||
       !formData.location
     ) {
@@ -75,6 +80,8 @@ export default function JoinPage() {
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
           experience: formData.experience,
           location: formData.location,
           image: imageData,
@@ -92,6 +99,8 @@ export default function JoinPage() {
       setFormData({
         firstName: "",
         lastName: "",
+        email: "",
+        phoneNumber: "",
         experience: "",
         location: "",
         image: null,
@@ -115,23 +124,7 @@ export default function JoinPage() {
           >
             Stitch
           </Link>
-          <nav className="flex flex-wrap items-center gap-4 text-xs font-medium sm:text-sm md:justify-end md:gap-8">
-            <Link href="/" className="">
-              Home
-            </Link>
-            <Link href="/about" className="">
-              About us
-            </Link>
-            <Link href="/collection" className="">
-              Collection
-            </Link>
-            <Link href="/careers" className="">
-              Careers
-            </Link>
-            <Link href="/blog" className="">
-              Blog
-            </Link>
-          </nav>
+          <RoleAwareNav showAuth={false} />
         </header>
 
         <section className="px-5 py-12 sm:px-8 md:px-14 md:py-16">
@@ -177,6 +170,34 @@ export default function JoinPage() {
                       value={formData.lastName}
                       onChange={handleInputChange}
                       placeholder="Enter your last name"
+                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#202635]">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="Enter your email address"
+                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#202635]">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      name="phoneNumber"
+                      value={formData.phoneNumber}
+                      onChange={handleInputChange}
+                      placeholder="+91 98765 43210"
                       className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
                     />
                   </div>
@@ -243,14 +264,14 @@ export default function JoinPage() {
               {/* Image Section */}
               <div className="flex flex-col">
                 {imagePreview ? (
-                  <div className="mb-4 h-64 overflow-hidden rounded-lg bg-[#f3f4f6]">
+                  <div className="relative mb-4 h-64 overflow-hidden rounded-lg bg-[#f3f4f6]">
                     <Image
                       src={imagePreview}
                       alt="Preview"
-                      width={500}
-                      height={500}
+                      fill
+                      sizes="(min-width: 768px) 50vw, 100vw"
                       unoptimized
-                      className="h-full w-full object-cover"
+                      className="object-cover"
                     />
                   </div>
                 ) : (

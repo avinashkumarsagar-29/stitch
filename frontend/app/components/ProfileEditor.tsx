@@ -63,14 +63,16 @@ export default function ProfileEditor() {
   return (
     <section className="grid gap-10 px-5 py-12 sm:px-8 md:grid-cols-[360px_1fr] md:px-14 md:py-20">
       <aside className="rounded-[8px] bg-[#f8f8f8] p-8 text-center">
-        <Image
-          src={profileImage}
-          alt="User profile"
-          width={180}
-          height={180}
-          unoptimized={profileImage.startsWith("data:")}
-          className="mx-auto h-[180px] w-[180px] rounded-full object-cover"
-        />
+        <div className="relative mx-auto h-[180px] w-[180px] overflow-hidden rounded-full">
+          <Image
+            src={profileImage}
+            alt="User profile"
+            fill
+            sizes="180px"
+            unoptimized={profileImage.startsWith("data:")}
+            className="object-cover"
+          />
+        </div>
         <label className="mt-6 inline-flex cursor-pointer rounded-[6px] bg-[#d779f4] px-6 py-3 text-sm font-bold text-[#151320] shadow-sm">
           Add Image
           <input

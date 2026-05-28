@@ -1,11 +1,24 @@
+import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
 import BookingForm from "../components/BookingForm";
+import BookingHistory from "../components/BookingHistory";
+import RoleAwareNav from "../components/RoleAwareNav";
 
 export default function BookingPage() {
   return (
     <AuthGuard>
-      <main className="min-h-screen bg-[#f5f5f5] px-4 py-16">
-        <div className="mx-auto max-w-[1200px]">
+      <main className="min-h-screen bg-[#f5f5f5] text-[#171d2a]">
+        <header className="sticky top-0 z-50 flex min-h-[76px] flex-col gap-4 border-b border-[#c8d2df] bg-white px-5 py-4 md:flex-row md:items-center md:justify-between md:px-10">
+          <Link
+            href="/"
+            className="text-[32px] font-black tracking-tight text-[#071720] sm:text-[38px]"
+          >
+            Stitch
+          </Link>
+          <RoleAwareNav />
+        </header>
+
+        <div className="mx-auto max-w-[1200px] px-4 py-16">
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-4xl font-bold text-[#171d2a]">
               Book Your Service
@@ -18,6 +31,8 @@ export default function BookingPage() {
           <div className="rounded-lg bg-white p-8 shadow-md">
             <BookingForm />
           </div>
+
+          <BookingHistory />
 
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             <div className="rounded-lg bg-white p-6 shadow-sm">

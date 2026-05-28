@@ -54,6 +54,8 @@ export default function AuthActions() {
   function handleLogout() {
     sessionStorage.setItem("stitch-logout", "true");
     localStorage.removeItem("stitch-auth");
+    localStorage.removeItem("stitch-role");
+    localStorage.removeItem("stitch-user");
     showToast("Logout successfully", "success");
     window.dispatchEvent(new Event("stitch-auth-change"));
     router.push("/");
@@ -67,14 +69,16 @@ export default function AuthActions() {
           aria-label="Open profile"
           className="flex h-11 w-11 items-center justify-center rounded-full border border-[#c8d2df] bg-white p-1 shadow-sm"
         >
-          <Image
-            src={profileImage}
-            alt="User profile"
-            width={36}
-            height={36}
-            unoptimized={profileImage.startsWith("data:")}
-            className="h-9 w-9 rounded-full object-cover"
-          />
+          <span className="relative h-9 w-9 overflow-hidden rounded-full">
+            <Image
+              src={profileImage}
+              alt="User profile"
+              fill
+              sizes="36px"
+              unoptimized={profileImage.startsWith("data:")}
+              className="object-cover"
+            />
+          </span>
         </Link>
         <button
           type="button"

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import AuthActions from "../components/AuthActions";
 import AuthGuard from "../components/AuthGuard";
+import RoleAwareNav from "../components/RoleAwareNav";
 
 const posts = [
   {
@@ -33,24 +33,7 @@ export default function BlogPage() {
           <Link href="/" className="text-[32px] font-black tracking-tight text-[#071720] sm:text-[38px]">
             Stitch
           </Link>
-          <nav className="flex flex-wrap items-center gap-4 text-xs font-medium sm:text-sm md:justify-end md:gap-8">
-            <Link href="/" className="">
-              Home
-            </Link>
-            <Link href="/about" className="">
-              About us
-            </Link>
-            <Link href="/collection" className="">
-              Collection
-            </Link>
-            <Link href="/careers" className="">
-              Careers
-            </Link>
-            <Link href="/blog" className="text-[#121a28]">
-              Blog
-            </Link>
-            <AuthActions />
-          </nav>
+          <RoleAwareNav activeHref="/blog" />
         </header>
 
         <section className="px-5 py-12 text-center sm:px-8 md:px-14 md:py-18">

@@ -25,6 +25,7 @@ Backend:
 - mssql
 - msnodesqlv8 for Windows Authentication
 - bcryptjs
+- Twilio SMS API for OTP delivery
 
 ## Main Features
 
@@ -81,6 +82,7 @@ Backend routes:
 | `/api/bookings` | GET | List pickup/drop-off bookings |
 | `/api/join` | POST | Submit join application |
 | `/api/join` | GET | List all join applications |
+| `/api/tailors?location=...` | GET | Search available tailors by pickup location |
 
 ## Important Files
 
@@ -120,6 +122,9 @@ For your SSMS connection `SAGAR\SQLEXPRESS` with Integrated Security, use:
 ```text
 PORT=4000
 FRONTEND_URL=http://localhost:3000
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=+15551234567
 SQL_SERVER=localhost
 SQL_AUTH_TYPE=windows
 SQL_SERVER=SAGAR\SQLEXPRESS
@@ -195,11 +200,14 @@ npm run start
 ## Notes
 
 - The frontend stores a simple `stitch-auth` flag after successful backend login/register.
+- Login OTPs are sent by SMS when Twilio environment variables are configured.
+- Without Twilio settings, the backend logs the OTP and returns `devOtp` for local development.
 - User role is stored in `stitch-role` localStorage (user or tailor).
 - User data is stored in `stitch-user` localStorage.
 - SQL Server stores registered users in the `Users` table with role column.
 - SQL Server stores pickup/drop-off requests in the `Bookings` table.
 - SQL Server stores join applications in the `JoinApplications` table.
+- Booking search shows available tailor cards from matching join applications.
 - Passwords are stored as bcrypt hashes, not plain text.
 - Profile information is still stored in browser localStorage.
 - Join application images are stored as base64 data in the database.

@@ -146,10 +146,11 @@ export default function Home() {
 
   const isTailor = userRole === "tailor";
 
-  // User sees all pages, Tailor sees only Careers and Blog
+  // Users see all pages. Tailors see Home, About, Careers, and Blog.
   const navLinksForRole = isTailor
     ? [
         { label: "Home", href: "/" },
+        { label: "About us", href: "/about" },
         { label: "Careers", href: "/careers" },
         { label: "Blog", href: "/blog" },
       ]
@@ -219,12 +220,14 @@ export default function Home() {
                 With Stitchy, you get access to fast and affordable styler at
                 your desire location.
               </p>
-              <Link
-                href="/booking"
-                className="mt-5 ml-4 w-fit rounded-[4px] bg-[#d779f4] px-8 py-3 text-sm font-medium text-[#151320] shadow-sm"
-              >
-                Book Now
-              </Link>
+              {!isTailor ? (
+                <Link
+                  href="/booking"
+                  className="mt-5 ml-4 w-fit rounded-[4px] bg-[#d779f4] px-8 py-3 text-sm font-medium text-[#151320] shadow-sm"
+                >
+                  Book Now
+                </Link>
+              ) : null}
             </div>
 
             <div className="relative min-h-[360px] overflow-hidden bg-[#d4d4d4] md:min-h-[470px]">
@@ -242,7 +245,7 @@ export default function Home() {
 
         <section id="booking" className="relative bg-[#f7f7f7] px-4 pb-10 pt-2 sm:px-6">
           {!isTailor ? (
-            <BookingForm />
+            <BookingForm readOnly />
           ) : (
             <div className="mx-auto max-w-[1068px] rounded-lg bg-white p-8 text-center">
               <h2 className="text-2xl font-bold text-[#171d2a]">Welcome, Tailor!</h2>

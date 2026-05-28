@@ -61,10 +61,38 @@ BEGIN
     dropoffLocation NVARCHAR(255) NOT NULL,
     bookingDate DATE NOT NULL,
     bookingTime TIME NOT NULL,
+    tailorApplicationId INT NULL,
+    tailorName NVARCHAR(201) NULL,
+    tailorEmail NVARCHAR(255) NULL,
+    tailorPhoneNumber NVARCHAR(20) NULL,
     status NVARCHAR(50) NOT NULL DEFAULT 'pending',
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_Bookings_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
   );
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'tailorApplicationId') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD tailorApplicationId INT NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'tailorName') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD tailorName NVARCHAR(201) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'tailorEmail') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD tailorEmail NVARCHAR(255) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'tailorPhoneNumber') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD tailorPhoneNumber NVARCHAR(20) NULL;
 END
 GO
 
@@ -74,12 +102,26 @@ BEGIN
     id INT IDENTITY(1,1) PRIMARY KEY,
     firstName NVARCHAR(100) NOT NULL,
     lastName NVARCHAR(100) NOT NULL,
+    email NVARCHAR(255) NOT NULL DEFAULT '',
+    phoneNumber NVARCHAR(20) NOT NULL DEFAULT '',
     experience NVARCHAR(50) NOT NULL,
     location NVARCHAR(255) NOT NULL,
     image NVARCHAR(MAX) NULL,
     status NVARCHAR(50) NOT NULL DEFAULT 'pending',
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
   );
+END
+GO
+
+IF COL_LENGTH('dbo.JoinApplications', 'email') IS NULL
+BEGIN
+  ALTER TABLE dbo.JoinApplications ADD email NVARCHAR(255) NOT NULL DEFAULT '';
+END
+GO
+
+IF COL_LENGTH('dbo.JoinApplications', 'phoneNumber') IS NULL
+BEGIN
+  ALTER TABLE dbo.JoinApplications ADD phoneNumber NVARCHAR(20) NOT NULL DEFAULT '';
 END
 GO
 

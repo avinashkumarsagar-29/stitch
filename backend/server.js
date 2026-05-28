@@ -3,6 +3,7 @@ require("dotenv").config();
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
 const express = require("express");
+const https = require("https");
 const { getSqlPool, sql } = require("./db");
 
 const app = express();
@@ -14,7 +15,7 @@ app.use(
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
   }),
 );
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.get("/", (_request, response) => {
@@ -27,6 +28,7 @@ app.get("/", (_request, response) => {
       requestOtp: "POST /api/auth/request-otp",
       verifyOtp: "POST /api/auth/verify-otp",
       bookings: "POST /api/bookings",
+      tailors: "GET /api/tailors?location=pickup",
     },
   });
 });
@@ -64,10 +66,42 @@ async function ensureBookingsTable(pool) {
         dropoffLocation NVARCHAR(255) NOT NULL,
         bookingDate DATE NOT NULL,
         bookingTime TIME NOT NULL,
+        tailorApplicationId INT NULL,
+        tailorName NVARCHAR(201) NULL,
+        tailorEmail NVARCHAR(255) NULL,
+        tailorPhoneNumber NVARCHAR(20) NULL,
         status NVARCHAR(50) NOT NULL DEFAULT 'pending',
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_Bookings_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
       );
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'tailorApplicationId') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD tailorApplicationId INT NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'tailorName') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD tailorName NVARCHAR(201) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'tailorEmail') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD tailorEmail NVARCHAR(255) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'tailorPhoneNumber') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD tailorPhoneNumber NVARCHAR(20) NULL;
     END
   `);
 }
@@ -80,12 +114,28 @@ async function ensureJoinTable(pool) {
         id INT IDENTITY(1,1) PRIMARY KEY,
         firstName NVARCHAR(100) NOT NULL,
         lastName NVARCHAR(100) NOT NULL,
+        email NVARCHAR(255) NOT NULL DEFAULT '',
+        phoneNumber NVARCHAR(20) NOT NULL DEFAULT '',
         experience NVARCHAR(50) NOT NULL,
         location NVARCHAR(255) NOT NULL,
         image NVARCHAR(MAX) NULL,
         status NVARCHAR(50) NOT NULL DEFAULT 'pending',
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
       );
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.JoinApplications', 'email') IS NULL
+    BEGIN
+      ALTER TABLE dbo.JoinApplications ADD email NVARCHAR(255) NOT NULL DEFAULT '';
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.JoinApplications', 'phoneNumber') IS NULL
+    BEGIN
+      ALTER TABLE dbo.JoinApplications ADD phoneNumber NVARCHAR(20) NOT NULL DEFAULT '';
     END
   `);
 }
@@ -147,6 +197,86 @@ function normalizePhoneNumber(phoneNumber) {
 
 function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function formatSmsPhoneNumber(phoneNumber) {
+  const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+
+  if (normalizedPhoneNumber.startsWith("+")) {
+    return normalizedPhoneNumber;
+  }
+
+  if (/^\d{10}$/.test(normalizedPhoneNumber)) {
+    return `+91${normalizedPhoneNumber}`;
+  }
+
+  return normalizedPhoneNumber;
+}
+
+function postForm(url, body, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(body),
+          ...headers,
+        },
+      },
+      (response) => {
+        let responseBody = "";
+
+        response.on("data", (chunk) => {
+          responseBody += chunk;
+        });
+
+        response.on("end", () => {
+          resolve({
+            ok: response.statusCode >= 200 && response.statusCode < 300,
+            statusCode: response.statusCode,
+            body: responseBody,
+          });
+        });
+      },
+    );
+
+    request.on("error", reject);
+    request.write(body);
+    request.end();
+  });
+}
+
+async function sendOtpSms(phoneNumber, otpCode) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !fromPhoneNumber) {
+    console.log(`SMS not configured. OTP for ${phoneNumber}: ${otpCode}`);
+    return { sent: false };
+  }
+
+  const smsBody = new URLSearchParams({
+    To: formatSmsPhoneNumber(phoneNumber),
+    From: fromPhoneNumber,
+    Body: `Your Stitch login OTP is ${otpCode}. It expires in ${otpExpiryMinutes} minutes.`,
+  }).toString();
+  const authHeader = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+  const result = await postForm(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    smsBody,
+    {
+      Authorization: `Basic ${authHeader}`,
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(`Twilio SMS failed with status ${result.statusCode}: ${result.body}`);
+  }
+
+  return { sent: true };
 }
 
 app.post("/api/auth/register", async (request, response) => {
@@ -265,9 +395,13 @@ app.post("/api/auth/request-otp", async (request, response) => {
         VALUES (@phoneNumber, @otpCode, @expiresAt)
       `);
 
+    const smsResult = await sendOtpSms(phoneNumber, otpCode);
+
     return response.json({
-      message: "OTP sent successfully",
-      devOtp: otpCode,
+      message: smsResult.sent
+        ? "OTP sent successfully"
+        : "OTP generated successfully. Configure SMS settings to send it to the phone.",
+      devOtp: smsResult.sent ? undefined : otpCode,
     });
   } catch (error) {
     console.error("OTP request error:", error);
@@ -392,6 +526,10 @@ app.post("/api/bookings", async (request, response) => {
           INSERTED.dropoffLocation,
           INSERTED.bookingDate,
           INSERTED.bookingTime,
+          INSERTED.tailorApplicationId,
+          INSERTED.tailorName,
+          INSERTED.tailorEmail,
+          INSERTED.tailorPhoneNumber,
           INSERTED.status,
           INSERTED.createdAt
         VALUES (
@@ -433,6 +571,10 @@ app.get("/api/bookings", async (_request, response) => {
         b.dropoffLocation,
         b.bookingDate,
         b.bookingTime,
+        b.tailorApplicationId,
+        b.tailorName,
+        b.tailorEmail,
+        b.tailorPhoneNumber,
         b.status,
         b.createdAt
       FROM Bookings b
@@ -455,17 +597,110 @@ app.get("/api/bookings", async (_request, response) => {
   }
 });
 
+app.post("/api/bookings/:bookingId/tailor", async (request, response) => {
+  try {
+    const bookingId = Number(request.params.bookingId);
+    const tailorApplicationId = Number(request.body.tailorApplicationId);
+
+    if (!bookingId || !tailorApplicationId) {
+      return response.status(400).json({
+        message: "Booking id and tailor id are required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBookingsTable(pool);
+    await ensureJoinTable(pool);
+
+    const tailorResult = await pool
+      .request()
+      .input("tailorApplicationId", sql.Int, tailorApplicationId)
+      .query(`
+        SELECT TOP 1
+          id,
+          firstName,
+          lastName,
+          email,
+          phoneNumber
+        FROM JoinApplications
+        WHERE id = @tailorApplicationId
+      `);
+    const tailor = tailorResult.recordset[0];
+
+    if (!tailor) {
+      return response.status(404).json({
+        message: "Tailor not found",
+      });
+    }
+
+    const tailorName = `${tailor.firstName} ${tailor.lastName}`.trim();
+    const bookingResult = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .input("tailorApplicationId", sql.Int, tailor.id)
+      .input("tailorName", sql.NVarChar(201), tailorName)
+      .input("tailorEmail", sql.NVarChar(255), tailor.email)
+      .input("tailorPhoneNumber", sql.NVarChar(20), tailor.phoneNumber)
+      .query(`
+        UPDATE Bookings
+        SET
+          tailorApplicationId = @tailorApplicationId,
+          tailorName = @tailorName,
+          tailorEmail = @tailorEmail,
+          tailorPhoneNumber = @tailorPhoneNumber,
+          status = 'booked'
+        OUTPUT
+          INSERTED.id,
+          INSERTED.userId,
+          INSERTED.pickupLocation,
+          INSERTED.dropoffLocation,
+          INSERTED.bookingDate,
+          INSERTED.bookingTime,
+          INSERTED.tailorApplicationId,
+          INSERTED.tailorName,
+          INSERTED.tailorEmail,
+          INSERTED.tailorPhoneNumber,
+          INSERTED.status,
+          INSERTED.createdAt
+        WHERE id = @bookingId
+      `);
+    const booking = bookingResult.recordset[0];
+
+    if (!booking) {
+      return response.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    return response.json({
+      message: "Tailor booked successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Tailor booking error:", error);
+    return response.status(500).json({
+      message: "Unable to book tailor",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
 app.post("/api/join", async (request, response) => {
   try {
     const firstName = String(request.body.firstName || "").trim();
     const lastName = String(request.body.lastName || "").trim();
+    const email = String(request.body.email || "").trim().toLowerCase();
+    const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
     const experience = String(request.body.experience || "").trim();
     const location = String(request.body.location || "").trim();
     const image = request.body.image || null;
 
-    if (!firstName || !lastName || !experience || !location) {
+    if (!firstName || !lastName || !email || !phoneNumber || !experience || !location) {
       return response.status(400).json({
-        message: "First name, last name, experience, and location are required",
+        message: "First name, last name, email, phone number, experience, and location are required",
       });
     }
 
@@ -476,6 +711,8 @@ app.post("/api/join", async (request, response) => {
       .request()
       .input("firstName", sql.NVarChar(100), firstName)
       .input("lastName", sql.NVarChar(100), lastName)
+      .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .input("experience", sql.NVarChar(50), experience)
       .input("location", sql.NVarChar(255), location)
       .input("image", sql.NVarChar(sql.MAX), image)
@@ -483,6 +720,8 @@ app.post("/api/join", async (request, response) => {
         INSERT INTO JoinApplications (
           firstName,
           lastName,
+          email,
+          phoneNumber,
           experience,
           location,
           image
@@ -491,6 +730,8 @@ app.post("/api/join", async (request, response) => {
           INSERTED.id,
           INSERTED.firstName,
           INSERTED.lastName,
+          INSERTED.email,
+          INSERTED.phoneNumber,
           INSERTED.experience,
           INSERTED.location,
           INSERTED.status,
@@ -498,6 +739,8 @@ app.post("/api/join", async (request, response) => {
         VALUES (
           @firstName,
           @lastName,
+          @email,
+          @phoneNumber,
           @experience,
           @location,
           @image
@@ -529,8 +772,11 @@ app.get("/api/join", async (_request, response) => {
         id,
         firstName,
         lastName,
+        email,
+        phoneNumber,
         experience,
         location,
+        image,
         status,
         createdAt
       FROM JoinApplications
@@ -544,6 +790,73 @@ app.get("/api/join", async (_request, response) => {
     console.error("Join list error:", error);
     return response.status(500).json({
       message: "Unable to load applications",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.get("/api/tailors", async (request, response) => {
+  try {
+    const location = String(request.query.location || "").trim().toLowerCase();
+
+    if (!location) {
+      return response.status(400).json({
+        message: "Pickup location is required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureJoinTable(pool);
+    const result = await pool.request().query(`
+      SELECT
+        id,
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        experience,
+        location,
+        image,
+        status,
+        createdAt
+      FROM JoinApplications
+      WHERE status = 'pending'
+      ORDER BY createdAt DESC
+    `);
+    const searchWords = location
+      .split(/[\s,.-]+/)
+      .map((word) => word.trim())
+      .filter((word) => word.length >= 3);
+    const tailors = result.recordset
+      .filter((tailor) => {
+        const tailorLocation = String(tailor.location || "").toLowerCase();
+
+        return (
+          tailorLocation.includes(location) ||
+          location.includes(tailorLocation) ||
+          searchWords.some((word) => tailorLocation.includes(word))
+        );
+      })
+      .map((tailor) => ({
+        id: tailor.id,
+        name: `${tailor.firstName} ${tailor.lastName}`.trim(),
+        email: tailor.email,
+        phoneNumber: tailor.phoneNumber,
+        experience: tailor.experience,
+        location: tailor.location,
+        image: tailor.image,
+      }));
+
+    return response.json({
+      tailors,
+    });
+  } catch (error) {
+    console.error("Tailor search error:", error);
+    return response.status(500).json({
+      message: "Unable to search tailors",
       detail:
         process.env.NODE_ENV === "production"
           ? undefined
