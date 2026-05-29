@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
 import RoleAwareNav from "../components/RoleAwareNav";
+import RoleRestrictedJoinButton from "../components/RoleRestrictedJoinButton";
 
 const values = [
   {
@@ -49,20 +50,7 @@ export default function AboutPage() {
               clothing care easier for customers while creating better earning
               opportunities for skilled makers.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/join"
-                className="rounded-[6px] bg-[#d779f4] px-7 py-3 text-sm font-bold text-[#151320] shadow-sm"
-              >
-                Join Stitch
-              </Link>
-              <Link
-                href="/"
-                className="rounded-[6px] border border-[#c8d2df] px-7 py-3 text-sm font-bold text-[#202635]"
-              >
-                Back Home
-              </Link>
-            </div>
+            <RoleRestrictedJoinButton />
           </div>
 
           <div className="h-[420px] overflow-hidden rounded-[8px] bg-[#d9d9d9]">

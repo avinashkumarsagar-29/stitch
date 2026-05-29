@@ -124,7 +124,7 @@ export default function JoinPage() {
           >
             Stitch
           </Link>
-          <RoleAwareNav showAuth={false} />
+          <RoleAwareNav />
         </header>
 
         <section className="px-5 py-12 sm:px-8 md:px-14 md:py-16">

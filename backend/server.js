@@ -280,12 +280,21 @@ function postForm(url, body, headers = {}) {
   });
 }
 
+function isConfiguredSecret(value, placeholder) {
+  return Boolean(value && value.trim() && value !== placeholder);
+}
+
 async function sendOtpSms(phoneNumber, otpCode) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const fromPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-  if (!accountSid || !authToken || !fromPhoneNumber) {
+  const isSmsConfigured =
+    isConfiguredSecret(accountSid, "your_twilio_account_sid") &&
+    isConfiguredSecret(authToken, "your_twilio_auth_token") &&
+    isConfiguredSecret(fromPhoneNumber, "+15551234567");
+
+  if (!isSmsConfigured) {
     console.log(`SMS not configured. OTP for ${phoneNumber}: ${otpCode}`);
     return { sent: false };
   }

@@ -248,9 +248,9 @@ export default function Home() {
             <BookingForm readOnly />
           ) : (
             <div className="mx-auto max-w-[1068px] rounded-lg bg-white p-8 text-center">
-              <h2 className="text-2xl font-bold text-[#171d2a]">Welcome, Tailor!</h2>
+              <h2 className="text-2xl font-bold text-[#171d2a]">Welcome</h2>
               <p className="mt-2 text-gray-600">
-                You have access to the Careers and Blog sections.
+                Just Join the Stitch for Earn More Money.
               </p>
             </div>
           )}
