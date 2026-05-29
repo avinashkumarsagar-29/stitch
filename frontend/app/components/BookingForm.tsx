@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { showToast } from "./Toast";
 
@@ -22,6 +23,7 @@ type Tailor = {
 };
 
 export default function BookingForm({ readOnly = false }: { readOnly?: boolean }) {
+  const router = useRouter();
   const [booking, setBooking] = useState<BookingState>({
     pickup: "",
     dropoff: "",
@@ -29,11 +31,9 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
     time: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBookingTailor, setIsBookingTailor] = useState(false);
   const [tailors, setTailors] = useState<Tailor[]>([]);
   const [searchedLocation, setSearchedLocation] = useState("");
   const [currentBookingId, setCurrentBookingId] = useState<number | null>(null);
-  const [bookedTailorId, setBookedTailorId] = useState<number | null>(null);
 
   function updateField(field: keyof BookingState, value: string) {
     setBooking((current) => ({ ...current, [field]: value }));
@@ -89,7 +89,6 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
       setTailors(matchedTailors);
       setSearchedLocation(booking.pickup);
       setCurrentBookingId(data.booking?.id || null);
-      setBookedTailorId(null);
       showToast(
         matchedTailors.length
           ? "Available tailors found"
@@ -103,42 +102,13 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
     }
   }
 
-  async function handleBookTailor(tailor: Tailor) {
+  function handleBookTailor(tailor: Tailor) {
     if (!currentBookingId) {
       showToast("Search first before booking a tailor", "error");
       return;
     }
 
-    setIsBookingTailor(true);
-
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(
-        `${apiUrl}/api/bookings/${currentBookingId}/tailor`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            tailorApplicationId: tailor.id,
-          }),
-        },
-      );
-      const data = await response.json();
-
-      if (!response.ok) {
-        showToast(data.message || "Unable to book tailor", "error");
-        return;
-      }
-
-      setBookedTailorId(tailor.id);
-      showToast(data.message, "success");
-    } catch {
-      showToast("Unable to connect to backend server", "error");
-    } finally {
-      setIsBookingTailor(false);
-    }
+    router.push(`/booking/${currentBookingId}/details?tailorId=${tailor.id}`);
   }
 
   return (
@@ -192,8 +162,6 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
                 <TailorCard
                   key={tailor.id}
                   tailor={tailor}
-                  isBooked={bookedTailorId === tailor.id}
-                  isBooking={isBookingTailor}
                   onBook={handleBookTailor}
                 />
               ))}
@@ -211,13 +179,9 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
 
 function TailorCard({
   tailor,
-  isBooked,
-  isBooking,
   onBook,
 }: {
   tailor: Tailor;
-  isBooked: boolean;
-  isBooking: boolean;
   onBook: (tailor: Tailor) => void;
 }) {
   return (
@@ -264,11 +228,10 @@ function TailorCard({
         </dl>
         <button
           type="button"
-          disabled={isBooking || isBooked}
           onClick={() => onBook(tailor)}
-          className="mt-5 h-11 w-full rounded-[6px] bg-[#d779f4] text-sm font-bold text-[#151320] shadow-sm disabled:cursor-not-allowed disabled:opacity-70"
+          className="mt-5 h-11 w-full rounded-[6px] bg-[#d779f4] text-sm font-bold text-[#151320] shadow-sm"
         >
-          {isBooked ? "Booked" : isBooking ? "Booking..." : "Book"}
+          Book
         </button>
       </div>
     </article>

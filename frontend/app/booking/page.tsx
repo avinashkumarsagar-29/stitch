@@ -1,7 +1,6 @@
 import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
 import BookingForm from "../components/BookingForm";
-import BookingHistory from "../components/BookingHistory";
 import RoleAwareNav from "../components/RoleAwareNav";
 
 export default function BookingPage() {
@@ -31,8 +30,6 @@ export default function BookingPage() {
           <div className="rounded-lg bg-white p-8 shadow-md">
             <BookingForm />
           </div>
-
-          <BookingHistory />
 
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             <div className="rounded-lg bg-white p-6 shadow-sm">

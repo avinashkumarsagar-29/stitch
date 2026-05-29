@@ -70,6 +70,10 @@ async function ensureBookingsTable(pool) {
         tailorName NVARCHAR(201) NULL,
         tailorEmail NVARCHAR(255) NULL,
         tailorPhoneNumber NVARCHAR(20) NULL,
+        clothCategory NVARCHAR(100) NULL,
+        clothImage NVARCHAR(MAX) NULL,
+        material NVARCHAR(100) NULL,
+        approxPrice DECIMAL(10,2) NULL,
         status NVARCHAR(50) NOT NULL DEFAULT 'pending',
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_Bookings_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
@@ -102,6 +106,34 @@ async function ensureBookingsTable(pool) {
     IF COL_LENGTH('dbo.Bookings', 'tailorPhoneNumber') IS NULL
     BEGIN
       ALTER TABLE dbo.Bookings ADD tailorPhoneNumber NVARCHAR(20) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'clothCategory') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD clothCategory NVARCHAR(100) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'clothImage') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD clothImage NVARCHAR(MAX) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'material') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD material NVARCHAR(100) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'approxPrice') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD approxPrice DECIMAL(10,2) NULL;
     END
   `);
 }
@@ -530,6 +562,10 @@ app.post("/api/bookings", async (request, response) => {
           INSERTED.tailorName,
           INSERTED.tailorEmail,
           INSERTED.tailorPhoneNumber,
+          INSERTED.clothCategory,
+          INSERTED.clothImage,
+          INSERTED.material,
+          INSERTED.approxPrice,
           INSERTED.status,
           INSERTED.createdAt
         VALUES (
@@ -575,6 +611,10 @@ app.get("/api/bookings", async (_request, response) => {
         b.tailorName,
         b.tailorEmail,
         b.tailorPhoneNumber,
+        b.clothCategory,
+        b.clothImage,
+        b.material,
+        b.approxPrice,
         b.status,
         b.createdAt
       FROM Bookings b
@@ -589,6 +629,179 @@ app.get("/api/bookings", async (_request, response) => {
     console.error("Booking list error:", error);
     return response.status(500).json({
       message: "Unable to load bookings",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.get("/api/bookings/:bookingId", async (request, response) => {
+  try {
+    const bookingId = Number(request.params.bookingId);
+
+    if (!bookingId) {
+      return response.status(400).json({
+        message: "Booking id is required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBookingsTable(pool);
+    const result = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .query(`
+        SELECT TOP 1
+          b.id,
+          b.userId,
+          u.fullName,
+          u.email,
+          b.pickupLocation,
+          b.dropoffLocation,
+          b.bookingDate,
+          b.bookingTime,
+          b.tailorApplicationId,
+          b.tailorName,
+          b.tailorEmail,
+          b.tailorPhoneNumber,
+          b.clothCategory,
+          b.clothImage,
+          b.material,
+          b.approxPrice,
+          b.status,
+          b.createdAt
+        FROM Bookings b
+        LEFT JOIN Users u ON u.id = b.userId
+        WHERE b.id = @bookingId
+      `);
+    const booking = result.recordset[0];
+
+    if (!booking) {
+      return response.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    return response.json({ booking });
+  } catch (error) {
+    console.error("Booking detail error:", error);
+    return response.status(500).json({
+      message: "Unable to load booking",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.post("/api/bookings/:bookingId/details", async (request, response) => {
+  try {
+    const bookingId = Number(request.params.bookingId);
+    const tailorApplicationId = Number(request.body.tailorApplicationId);
+    const clothCategory = String(request.body.clothCategory || "").trim();
+    const material = String(request.body.material || "").trim();
+    const approxPrice = Number(request.body.approxPrice);
+    const clothImage = request.body.clothImage || null;
+
+    if (!bookingId || !tailorApplicationId) {
+      return response.status(400).json({
+        message: "Booking id and tailor id are required",
+      });
+    }
+
+    if (!clothCategory || !material || !Number.isFinite(approxPrice) || approxPrice <= 0) {
+      return response.status(400).json({
+        message: "Cloth category, material, and approximate price are required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBookingsTable(pool);
+    await ensureJoinTable(pool);
+
+    const tailorResult = await pool
+      .request()
+      .input("tailorApplicationId", sql.Int, tailorApplicationId)
+      .query(`
+        SELECT TOP 1
+          id,
+          firstName,
+          lastName,
+          email,
+          phoneNumber
+        FROM JoinApplications
+        WHERE id = @tailorApplicationId
+      `);
+    const tailor = tailorResult.recordset[0];
+
+    if (!tailor) {
+      return response.status(404).json({
+        message: "Tailor not found",
+      });
+    }
+
+    const tailorName = `${tailor.firstName} ${tailor.lastName}`.trim();
+    const bookingResult = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .input("tailorApplicationId", sql.Int, tailor.id)
+      .input("tailorName", sql.NVarChar(201), tailorName)
+      .input("tailorEmail", sql.NVarChar(255), tailor.email)
+      .input("tailorPhoneNumber", sql.NVarChar(20), tailor.phoneNumber)
+      .input("clothCategory", sql.NVarChar(100), clothCategory)
+      .input("clothImage", sql.NVarChar(sql.MAX), clothImage)
+      .input("material", sql.NVarChar(100), material)
+      .input("approxPrice", sql.Decimal(10, 2), approxPrice)
+      .query(`
+        UPDATE Bookings
+        SET
+          tailorApplicationId = @tailorApplicationId,
+          tailorName = @tailorName,
+          tailorEmail = @tailorEmail,
+          tailorPhoneNumber = @tailorPhoneNumber,
+          clothCategory = @clothCategory,
+          clothImage = @clothImage,
+          material = @material,
+          approxPrice = @approxPrice,
+          status = 'booked'
+        OUTPUT
+          INSERTED.id,
+          INSERTED.userId,
+          INSERTED.pickupLocation,
+          INSERTED.dropoffLocation,
+          INSERTED.bookingDate,
+          INSERTED.bookingTime,
+          INSERTED.tailorApplicationId,
+          INSERTED.tailorName,
+          INSERTED.tailorEmail,
+          INSERTED.tailorPhoneNumber,
+          INSERTED.clothCategory,
+          INSERTED.clothImage,
+          INSERTED.material,
+          INSERTED.approxPrice,
+          INSERTED.status,
+          INSERTED.createdAt
+        WHERE id = @bookingId
+      `);
+    const booking = bookingResult.recordset[0];
+
+    if (!booking) {
+      return response.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    return response.json({
+      message: "Order details saved successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Booking details error:", error);
+    return response.status(500).json({
+      message: "Unable to save order details",
       detail:
         process.env.NODE_ENV === "production"
           ? undefined
@@ -660,6 +873,10 @@ app.post("/api/bookings/:bookingId/tailor", async (request, response) => {
           INSERTED.tailorName,
           INSERTED.tailorEmail,
           INSERTED.tailorPhoneNumber,
+          INSERTED.clothCategory,
+          INSERTED.clothImage,
+          INSERTED.material,
+          INSERTED.approxPrice,
           INSERTED.status,
           INSERTED.createdAt
         WHERE id = @bookingId
@@ -857,6 +1074,67 @@ app.get("/api/tailors", async (request, response) => {
     console.error("Tailor search error:", error);
     return response.status(500).json({
       message: "Unable to search tailors",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.get("/api/tailors/:tailorId", async (request, response) => {
+  try {
+    const tailorId = Number(request.params.tailorId);
+
+    if (!tailorId) {
+      return response.status(400).json({
+        message: "Tailor id is required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureJoinTable(pool);
+    const result = await pool
+      .request()
+      .input("tailorId", sql.Int, tailorId)
+      .query(`
+        SELECT TOP 1
+          id,
+          firstName,
+          lastName,
+          email,
+          phoneNumber,
+          experience,
+          location,
+          image,
+          status,
+          createdAt
+        FROM JoinApplications
+        WHERE id = @tailorId
+      `);
+    const tailor = result.recordset[0];
+
+    if (!tailor) {
+      return response.status(404).json({
+        message: "Tailor not found",
+      });
+    }
+
+    return response.json({
+      tailor: {
+        id: tailor.id,
+        name: `${tailor.firstName} ${tailor.lastName}`.trim(),
+        email: tailor.email,
+        phoneNumber: tailor.phoneNumber,
+        experience: tailor.experience,
+        location: tailor.location,
+        image: tailor.image,
+      },
+    });
+  } catch (error) {
+    console.error("Tailor detail error:", error);
+    return response.status(500).json({
+      message: "Unable to load tailor",
       detail:
         process.env.NODE_ENV === "production"
           ? undefined

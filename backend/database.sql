@@ -65,6 +65,10 @@ BEGIN
     tailorName NVARCHAR(201) NULL,
     tailorEmail NVARCHAR(255) NULL,
     tailorPhoneNumber NVARCHAR(20) NULL,
+    clothCategory NVARCHAR(100) NULL,
+    clothImage NVARCHAR(MAX) NULL,
+    material NVARCHAR(100) NULL,
+    approxPrice DECIMAL(10,2) NULL,
     status NVARCHAR(50) NOT NULL DEFAULT 'pending',
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_Bookings_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
@@ -93,6 +97,30 @@ GO
 IF COL_LENGTH('dbo.Bookings', 'tailorPhoneNumber') IS NULL
 BEGIN
   ALTER TABLE dbo.Bookings ADD tailorPhoneNumber NVARCHAR(20) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'clothCategory') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD clothCategory NVARCHAR(100) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'clothImage') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD clothImage NVARCHAR(MAX) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'material') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD material NVARCHAR(100) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'approxPrice') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD approxPrice DECIMAL(10,2) NULL;
 END
 GO
 
