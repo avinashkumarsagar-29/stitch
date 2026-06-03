@@ -7,6 +7,9 @@ import { useSyncExternalStore } from "react";
 import {
   getProfileForCurrentUser,
   placeholderProfileImage,
+  emptyProfile,
+  getCurrentUser,
+  getProfileStorageKey,
 } from "./profileStorage";
 import { showToast } from "./Toast";
 
@@ -26,30 +29,62 @@ function getSnapshot() {
   return localStorage.getItem("stitch-auth") === "true";
 }
 
-function getProfileImageSnapshot() {
-  return getProfileForCurrentUser().image || placeholderProfileImage;
+let cachedProfile = emptyProfile;
+let lastProfileCacheKey = "";
+
+function getProfileSnapshot() {
+  if (typeof window === "undefined") {
+    return emptyProfile;
+  }
+  const user = getCurrentUser();
+  const key = getProfileStorageKey(user);
+  const profileVal = localStorage.getItem(key) || "";
+  const authVal = localStorage.getItem("stitch-auth") || "";
+  const userVal = localStorage.getItem("stitch-user") || "";
+  const cacheKey = `${key}:${profileVal}:${authVal}:${userVal}`;
+
+  if (cacheKey !== lastProfileCacheKey) {
+    lastProfileCacheKey = cacheKey;
+    cachedProfile = getProfileForCurrentUser();
+  }
+  return cachedProfile;
+}
+
+function getUserRole() {
+  return localStorage.getItem("stitch-role") || "user";
 }
 
 function getServerSnapshot() {
   return false;
 }
 
-function getServerProfileImageSnapshot() {
-  return placeholderProfileImage;
+function getServerProfileSnapshot() {
+  return emptyProfile;
 }
 
-export default function AuthActions() {
+function getServerUserRole() {
+  return "user";
+}
+
+export default function AuthActions({ isMobile = false }: { isMobile?: boolean }) {
   const router = useRouter();
   const isLoggedIn = useSyncExternalStore(
     subscribe,
     getSnapshot,
-    getServerSnapshot,
+    getServerSnapshot
   );
-  const profileImage = useSyncExternalStore(
+  const profile = useSyncExternalStore(
     subscribe,
-    getProfileImageSnapshot,
-    getServerProfileImageSnapshot,
+    getProfileSnapshot,
+    getServerProfileSnapshot
   );
+  const userRole = useSyncExternalStore(
+    subscribe,
+    getUserRole,
+    getServerUserRole
+  );
+
+  const profileImage = profile.image || placeholderProfileImage;
 
   function handleLogout() {
     sessionStorage.setItem("stitch-logout", "true");
@@ -62,12 +97,53 @@ export default function AuthActions() {
   }
 
   if (isLoggedIn) {
+    if (isMobile) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 pb-4 border-b border-gray-50">
+            <Link
+              href="/profile"
+              aria-label="Open profile"
+              className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white p-0.5 shadow-sm"
+            >
+              <Image
+                src={profileImage}
+                alt="User profile"
+                fill
+                sizes="48px"
+                unoptimized={profileImage.startsWith("data:")}
+                className="object-cover rounded-full"
+              />
+            </Link>
+            <div className="flex flex-col min-w-0">
+              <Link
+                href="/profile"
+                className="text-sm font-bold text-gray-900 hover:text-[#c322f4] transition-colors truncate"
+              >
+                {profile.fullName || "My Profile"}
+              </Link>
+              <span className="text-[10px] font-semibold text-[#c322f4] bg-purple-50 border border-purple-100 rounded-full px-2 py-0.5 w-fit uppercase tracking-wider mt-1">
+                {userRole === "tailor" ? "✂️ Tailor" : "👔 Customer"}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full rounded-xl bg-gradient-to-r from-red-500 to-rose-600 py-3.5 text-center text-sm font-bold text-white shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer"
+          >
+            Logout
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/profile"
           aria-label="Open profile"
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-[#c8d2df] bg-white p-1 shadow-sm"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-[#c8d2df] bg-white p-1 shadow-sm hover:border-[#c322f4] transition-colors"
         >
           <span className="relative h-9 w-9 overflow-hidden rounded-full">
             <Image
@@ -76,14 +152,14 @@ export default function AuthActions() {
               fill
               sizes="36px"
               unoptimized={profileImage.startsWith("data:")}
-              className="object-cover"
+              className="object-cover rounded-full"
             />
           </span>
         </Link>
         <button
           type="button"
           onClick={handleLogout}
-          className="rounded-[4px] bg-[#d978f2] px-6 py-3 text-sm font-medium text-[#151320] shadow-sm"
+          className="rounded-xl bg-gradient-to-r from-red-500 to-rose-600 px-6 py-3 text-sm font-bold text-white shadow-md shadow-red-500/10 hover:shadow-lg hover:shadow-red-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer"
         >
           Logout
         </button>
@@ -91,17 +167,36 @@ export default function AuthActions() {
     );
   }
 
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Link
+          href="/register"
+          className="w-full text-center py-3.5 text-sm font-bold text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-gray-950 transition-colors"
+        >
+          Register
+        </Link>
+        <Link
+          href="/login"
+          className="w-full text-center bg-gradient-to-r from-[#d779f4] to-[#c322f4] py-3.5 text-sm font-bold text-white rounded-xl shadow-md shadow-[#c322f4]/15 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+        >
+          Log In
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <>
-      <Link href="/register" className="">
+    <div className="flex items-center gap-4">
+      <Link href="/register" className="text-gray-600 hover:text-gray-950 transition-colors">
         Register
       </Link>
       <Link
         href="/login"
-        className="rounded-[4px] bg-[#d978f2] px-6 py-3 text-sm font-medium text-[#151320] shadow-sm"
+        className="rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-6 py-3 text-sm font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:shadow-[#c322f4]/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
       >
         Log In
       </Link>
-    </>
+    </div>
   );
 }

@@ -36,13 +36,13 @@ export default function RoleRestrictedJoinButton() {
     <div className="mt-8 flex flex-wrap gap-4">
       <Link
         href="/join"
-        className="rounded-[6px] bg-[#d779f4] px-7 py-3 text-sm font-bold text-[#151320] shadow-sm"
+        className="rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-8 py-3.5 text-sm font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-xl hover:shadow-[#c322f4]/35 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
       >
         Join Stitch
       </Link>
       <Link
         href="/"
-        className="rounded-[6px] border border-[#c8d2df] px-7 py-3 text-sm font-bold text-[#202635]"
+        className="rounded-xl border border-gray-200 bg-white px-8 py-3.5 text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 shadow-sm"
       >
         Back Home
       </Link>

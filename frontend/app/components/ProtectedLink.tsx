@@ -31,30 +31,9 @@ export default function ProtectedLink({
   className?: string;
   children: React.ReactNode;
 }) {
-  const isLoggedIn = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot,
-  );
-
-  if (isLoggedIn) {
-    return (
-      <Link href={href} className={className}>
-        {children}
-      </Link>
-    );
-  }
-
   return (
-    <a
-      href={href}
-      className={className}
-      onClick={(event) => {
-        event.preventDefault();
-        showToast("Please login first", "error");
-      }}
-    >
+    <Link href={href} className={className}>
       {children}
-    </a>
+    </Link>
   );
 }
