@@ -2,13 +2,54 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9fafb;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-hover: #f1f5f9;
+  --card-border: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+}
+
+.dark {
+  --background: #0a1128;
+  --foreground: #e2eafc;
+  --card: #141f36;
+  --card-hover: #1f2d4d;
+  --card-border: #243557;
+  --text-primary: #e2eafc;
+  --text-secondary: #8da9c4;
+  --text-muted: #607b96;
+}
+
+.classic {
+  --background: #fcf9f2;
+  --foreground: #473a2b;
+  --card: #f9f4e8;
+  --card-hover: #efe6d2;
+  --card-border: #e8dec9;
+  --text-primary: #473a2b;
+  --text-secondary: #7a6855;
+  --text-muted: #a3907c;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-white: var(--card);
+  --color-gray-50: var(--background);
+  --color-slate-50: var(--card-hover);
+  --color-gray-900: var(--text-primary);
+  --color-gray-800: var(--text-primary);
+  --color-gray-700: var(--text-primary);
+  --color-gray-600: var(--text-secondary);
+  --color-gray-500: var(--text-secondary);
+  --color-gray-400: var(--text-muted);
+  --color-gray-100: var(--card-border);
+  --color-gray-200: var(--card-border);
+  --color-slate-100: var(--card-border);
+  --color-slate-200: var(--card-border);
   --font-sans: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif;
   --font-serif: 'Playfair Display', Georgia, serif;
   --font-mono: "Courier New", monospace;
@@ -19,6 +60,10 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   overflow-x: hidden;
+}
+
+body, div, header, aside, main, section, nav, a, button, h1, h2, h3, h4, h5, h6, p, span, label, input, select, textarea {
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {

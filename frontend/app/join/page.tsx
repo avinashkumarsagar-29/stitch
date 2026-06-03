@@ -1,9 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
-import RoleAwareNav from "../components/RoleAwareNav";
 import { showToast } from "../components/Toast";
 
 export default function JoinPage() {
@@ -114,203 +112,218 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50/50 text-[#171d2a] font-sans">
-      <section className="min-h-screen bg-white">
-        <header className="sticky top-0 z-50 flex h-[76px] items-center justify-between border-b border-gray-100 bg-white/90 backdrop-blur-md px-5 py-4 md:px-10">
-          <Link href="/" className="flex items-end gap-1.5 sm:gap-2" aria-label="Stitch home">
-            <span className="relative flex h-12 w-10 items-center justify-center text-4xl font-black leading-none text-[#0c1b24] sm:h-16 sm:w-12 sm:text-5xl">
-              S
-              <span className="absolute left-[24px] top-0 h-7 w-[2.5px] rounded-full bg-[#d2a22e] sm:left-[29px] sm:h-9 sm:w-[3px]" />
-              <span className="absolute left-[20px] top-0 h-7 w-4.5 rounded-full border-2 border-[#0c1b24] border-l-0 sm:left-[25px] sm:h-9 sm:w-5" />
-            </span>
-            <span className="-ml-2.5 flex flex-col sm:-ml-3">
-              <span className="text-[30px] font-black leading-7 tracking-tight text-[#071720] sm:text-[38px] sm:leading-8">
-                titch
-              </span>
-              <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.15em] text-[#7d8791] sm:mt-1 sm:text-[10px] sm:tracking-[0.18em]">
-                Tailoring & Design
-              </span>
-            </span>
-          </Link>
-          <RoleAwareNav />
-        </header>
+    <main className="p-4 md:p-8 lg:p-10 bg-gray-50/50 min-h-screen font-sans">
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm animate-fade-in">
+        {/* Top color accent bar */}
+        <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e]" />
 
-        <section className="px-5 py-12 sm:px-8 md:px-14 md:py-16 bg-gradient-to-tr from-purple-50/20 via-white to-amber-50/10">
-          <div className="mx-auto max-w-4xl">
-            <div className="mb-10 text-center">
-              <h1 className="text-[40px] font-bold text-[#202635] sm:text-[48px]">
-                Join Stitch
-              </h1>
-              <p className="mt-4 text-lg text-[#4b5563]">
-                Become part of our community of skilled tailors and designers
-              </p>
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-10 text-center md:text-left space-y-3">
+            <div className="flex items-center gap-2 justify-center md:justify-start">
+              <span className="h-2 w-2 rounded-full bg-[#c322f4] animate-pulse" />
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#c322f4]">
+                ✨ Career Center
+              </span>
             </div>
+            <h1 className="font-serif text-[30px] font-extrabold tracking-tight text-gray-900 sm:text-[38px]">
+              Join Stitch
+            </h1>
+            <p className="text-xs text-gray-500 max-w-[540px]">
+              Become part of our community of skilled tailors and designers. Grow your business and reach more clients.
+            </p>
+          </div>
 
-            <div className="grid gap-8 md:grid-cols-2">
-              {/* Form Section */}
-              <div className="rounded-lg border border-[#e5e7eb] bg-white p-8 shadow-sm">
-                <h2 className="mb-6 text-2xl font-bold text-[#202635]">
-                  Tell us about yourself
-                </h2>
+          <div className="grid gap-8 lg:grid-cols-2">
+            {/* Form Section */}
+            <div className="rounded-xl border border-gray-100 bg-gray-50/30 p-6 md:p-8">
+              <h2 className="text-lg font-bold text-gray-900 mb-6">
+                Tell us about yourself
+              </h2>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormInput
+                    label="First Name"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    placeholder="First name"
+                    required
+                  />
+                  <FormInput
+                    label="Last Name"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    placeholder="Last name"
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormInput
+                    label="Email Address"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="Email address"
+                    required
+                  />
+                  <FormInput
+                    label="Phone Number"
+                    name="phoneNumber"
+                    type="tel"
+                    value={formData.phoneNumber}
+                    onChange={handleInputChange}
+                    placeholder="+91 98765 43210"
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-semibold text-[#202635]">
-                      First Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      placeholder="Enter your first name"
-                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[#202635]">
-                      Last Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      placeholder="Enter your last name"
-                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[#202635]">
-                      Email Address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="Enter your email address"
-                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[#202635]">
-                      Phone Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      name="phoneNumber"
-                      value={formData.phoneNumber}
-                      onChange={handleInputChange}
-                      placeholder="+91 98765 43210"
-                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[#202635]">
+                    <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest block mb-2">
                       Experience Level <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="experience"
                       value={formData.experience}
                       onChange={handleInputChange}
-                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] focus:border-[#d779f4] focus:outline-none"
+                      required
+                      className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none focus:border-[#c322f4] focus:ring-4 focus:ring-[#c322f4]/10 transition-all duration-200"
                     >
-                      <option value="">Select experience level</option>
+                      <option value="">Select level</option>
                       <option value="beginner">Beginner (0-2 years)</option>
-                      <option value="intermediate">
-                        Intermediate (2-5 years)
-                      </option>
+                      <option value="intermediate">Intermediate (2-5 years)</option>
                       <option value="advanced">Advanced (5-10 years)</option>
                       <option value="expert">Expert (10+ years)</option>
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-[#202635]">
-                      Location <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
-                      placeholder="Enter your city/location"
-                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] placeholder:text-[#9ca3af] focus:border-[#d779f4] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[#202635]">
-                      Upload Your Work Image
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="mt-2 w-full rounded-lg border border-[#d1d5db] bg-white px-4 py-2 text-[#171d2a] file:rounded file:border-0 file:bg-[#d779f4] file:px-4 file:py-1 file:text-white file:font-medium"
-                    />
-                    <p className="mt-1 text-xs text-[#6b7280]">
-                      PNG, JPG or GIF (max. 5MB)
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="mt-6 w-full rounded-lg bg-[#d779f4] px-6 py-3 font-semibold text-[#151320] shadow-sm hover:bg-[#c65fe5] disabled:opacity-60 cursor-pointer"
-                  >
-                    {isSubmitting ? "Submitting..." : "Submit Application"}
-                  </button>
-                </form>
-              </div>
-
-              {/* Image Section */}
-              <div className="flex flex-col">
-                {imagePreview ? (
-                  <div className="relative mb-4 h-64 overflow-hidden rounded-lg bg-[#f3f4f6]">
-                    <Image
-                      src={imagePreview}
-                      alt="Preview"
-                      fill
-                      sizes="(min-width: 768px) 50vw, 100vw"
-                      unoptimized
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="mb-4 h-64 overflow-hidden rounded-lg bg-[#f3f4f6]">
-                    <Image
-                      src="https://images.unsplash.com/photo-1517840545241-b491010a8af4?auto=format&fit=crop&w=500&q=80"
-                      alt="Tailor working"
-                      width={500}
-                      height={500}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                )}
-
-                <div className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-6">
-                  <h3 className="font-semibold text-[#202635]">
-                    Why join Stitch?
-                  </h3>
-                  <ul className="mt-4 space-y-2 text-sm text-[#4b5563]">
-                    <li>✓ Steady stream of bookings</li>
-                    <li>✓ Flexible working schedule</li>
-                    <li>✓ Competitive earnings</li>
-                    <li>✓ Professional support team</li>
-                    <li>✓ Grow your customer base</li>
-                  </ul>
+                  <FormInput
+                    label="Location"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    placeholder="City/location"
+                    required
+                  />
                 </div>
+
+                <div>
+                  <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest block mb-2">
+                    Upload Your Work Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-[#d779f4] file:px-4 file:py-1 file:text-white file:font-semibold cursor-pointer"
+                  />
+                  <p className="mt-1.5 text-[10px] text-gray-400">
+                    PNG, JPG or GIF (max. 5MB)
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full h-12 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-6 py-3 font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:shadow-[#c322f4]/35 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Application"}
+                </button>
+              </form>
+            </div>
+
+            {/* Image & Perks Section */}
+            <div className="flex flex-col space-y-6">
+              {imagePreview ? (
+                <div className="relative h-[280px] overflow-hidden rounded-xl bg-gray-50 border border-gray-100 shadow-inner">
+                  <Image
+                    src={imagePreview}
+                    alt="Preview"
+                    fill
+                    sizes="(min-width: 768px) 50vw, 100vw"
+                    unoptimized
+                    className="object-cover rounded-xl"
+                  />
+                </div>
+              ) : (
+                <div className="relative h-[280px] overflow-hidden rounded-xl bg-gray-50 border border-gray-100 shadow-inner">
+                  <Image
+                    src="https://images.unsplash.com/photo-1517840545241-b491010a8af4?auto=format&fit=crop&w=500&q=80"
+                    alt="Tailor working"
+                    fill
+                    sizes="(min-width: 768px) 50vw, 100vw"
+                    className="object-cover rounded-xl"
+                  />
+                </div>
+              )}
+
+              <div className="rounded-xl border border-gray-100 bg-[#f9fafb] p-6 shadow-sm">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#d2a22e]" />
+                  Why join Stitch?
+                </h3>
+                <ul className="mt-4 space-y-3 text-xs text-gray-500">
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#c322f4] font-bold">✓</span> Steady stream of bookings
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#c322f4] font-bold">✓</span> Flexible working schedule
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#c322f4] font-bold">✓</span> Competitive earnings
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#c322f4] font-bold">✓</span> Professional support team
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#c322f4] font-bold">✓</span> Grow your customer base
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
-        </section>
-      </section>
+        </div>
+      </div>
     </main>
+  );
+}
+
+function FormInput({
+  label,
+  name,
+  value,
+  placeholder,
+  type = "text",
+  required = false,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  placeholder: string;
+  type?: string;
+  required?: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div>
+      <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest block mb-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        suppressHydrationWarning
+        className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm placeholder-gray-400 outline-none focus:border-[#c322f4] focus:ring-4 focus:ring-[#c322f4]/10 transition-all duration-200"
+      />
+    </div>
   );
 }

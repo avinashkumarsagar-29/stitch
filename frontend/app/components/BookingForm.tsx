@@ -300,38 +300,42 @@ function BookingPanel({
           Locations
           <input
             type="text"
-          value={location}
-          onChange={(event) => onLocationChange(event.target.value)}
-          placeholder={isDark ? "Enter drop-off" : "Enter pickup"}
-          readOnly={readOnly}
-          className={inputClass}
-        />
+            value={location}
+            onChange={(event) => onLocationChange(event.target.value)}
+            placeholder={isDark ? "Enter drop-off" : "Enter pickup"}
+            readOnly={readOnly}
+            className={inputClass}
+            suppressHydrationWarning
+          />
         </label>
         <label className="text-sm font-bold">
           Date
           <input
-          type="date"
-          value={date}
-          onChange={(event) => onDateChange(event.target.value)}
-          readOnly={readOnly}
-          className={inputClass}
-        />
+            type="date"
+            value={date}
+            onChange={(event) => onDateChange(event.target.value)}
+            readOnly={readOnly}
+            className={inputClass}
+            suppressHydrationWarning
+          />
         </label>
         <label className="text-sm font-bold">
           Time
           <input
-          type="time"
-          value={time}
-          onChange={(event) => onTimeChange(event.target.value)}
-          readOnly={readOnly}
-          className={inputClass}
-        />
+            type="time"
+            value={time}
+            onChange={(event) => onTimeChange(event.target.value)}
+            readOnly={readOnly}
+            className={inputClass}
+            suppressHydrationWarning
+          />
         </label>
         {isDark ? (
           <button
             type="submit"
             disabled={isSubmitting || readOnly}
             className="h-10 rounded-[4px] bg-white px-8 text-sm font-medium text-[#111827] disabled:opacity-70"
+            suppressHydrationWarning
           >
             {isSubmitting ? "Searching..." : "Search"}
           </button>

@@ -109,6 +109,7 @@ export default function RegisterPage() {
                 <button
                   key={idx}
                   onClick={() => setCurrentSlide(idx)}
+                  suppressHydrationWarning
                   className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
                     idx === currentSlide ? "w-8 bg-[#c322f4]" : "w-1.5 bg-white/40 hover:bg-white/70"
                   }`}

@@ -141,7 +141,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         {isRegister ? "Start your journey" : "Welcome back"}
       </p>
       <h1 className="mt-2.5 font-serif text-[38px] font-bold leading-tight tracking-tight text-[#071720]">
-        {isRegister ? "Create Account" : "Log In"}
+        {isRegister ? "Create Account" : "Sign In"}
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-gray-500">
         {isRegister
@@ -168,6 +168,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   type="text"
                   placeholder="Enter your full name"
                   required
+                  suppressHydrationWarning
                   className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                 />
               </div>
@@ -189,6 +190,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   type="email"
                   placeholder="you@example.com"
                   required
+                  suppressHydrationWarning
                   className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                 />
               </div>
@@ -245,6 +247,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   onChange={(event) => setPhoneNumber(event.target.value)}
                   placeholder="+91 98765 43210"
                   required
+                  suppressHydrationWarning
                   className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                 />
               </div>
@@ -267,6 +270,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   placeholder="Create password (min 6 chars)"
                   required
                   minLength={6}
+                  suppressHydrationWarning
                   className="block w-full h-12 pl-10 pr-12 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                 />
                 <button
@@ -309,6 +313,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   onChange={(event) => setPhoneNumber(event.target.value)}
                   placeholder="+91 98765 43210"
                   required
+                  suppressHydrationWarning
                   className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 disabled:opacity-60"
                 />
               </div>
@@ -334,6 +339,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                     placeholder="Enter 6-digit OTP"
                     required
                     maxLength={6}
+                    suppressHydrationWarning
                     className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 tracking-widest text-center font-mono text-lg"
                   />
                 </div>
@@ -352,6 +358,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       <button
         type="submit"
         disabled={isSubmitting}
+        suppressHydrationWarning
         className="relative mt-8 h-12 w-full overflow-hidden rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-sm font-bold text-white shadow-md shadow-[#c322f4]/20 transition-all duration-300 hover:from-[#c322f4] hover:to-[#a81bd4] hover:scale-[1.02] hover:shadow-[#c322f4]/35 active:scale-[0.98] disabled:opacity-75 disabled:pointer-events-none cursor-pointer"
       >
         {isSubmitting ? (

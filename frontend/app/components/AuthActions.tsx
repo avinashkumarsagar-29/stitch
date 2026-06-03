@@ -169,33 +169,24 @@ export default function AuthActions({ isMobile = false }: { isMobile?: boolean }
 
   if (isMobile) {
     return (
-      <div className="flex flex-col gap-3">
-        <Link
-          href="/register"
-          className="w-full text-center py-3.5 text-sm font-bold text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-gray-950 transition-colors"
-        >
-          Register
-        </Link>
+      <div className="flex flex-col">
         <Link
           href="/login"
           className="w-full text-center bg-gradient-to-r from-[#d779f4] to-[#c322f4] py-3.5 text-sm font-bold text-white rounded-xl shadow-md shadow-[#c322f4]/15 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
         >
-          Log In
+          Sign In
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-4">
-      <Link href="/register" className="text-gray-600 hover:text-gray-950 transition-colors">
-        Register
-      </Link>
+    <div className="flex items-center">
       <Link
         href="/login"
         className="rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-6 py-3 text-sm font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:shadow-[#c322f4]/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
       >
-        Log In
+        Sign In
       </Link>
     </div>
   );

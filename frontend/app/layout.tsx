@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Toast from "./components/Toast";
+import LayoutWrapper from "./components/LayoutWrapper";
 
 export const metadata: Metadata = {
   title: "Stitch | Tailoring & Design",
@@ -21,7 +22,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        {children}
+        <LayoutWrapper>{children}</LayoutWrapper>
         <Toast />
       </body>
     </html>

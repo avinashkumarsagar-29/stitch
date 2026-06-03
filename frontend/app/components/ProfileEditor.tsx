@@ -260,6 +260,7 @@ function ProfileField({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           required
+          suppressHydrationWarning
           className={`block w-full h-12 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 ${icon ? 'pl-10' : 'pl-4'}`}
         />
       </div>

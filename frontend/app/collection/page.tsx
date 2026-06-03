@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import RoleAwareNav from "../components/RoleAwareNav";
 
 const collectionItems = [
   {
@@ -86,123 +85,109 @@ export default function CollectionPage() {
   const bookingHref = isLoggedIn ? "/booking" : "/login";
 
   return (
-    <>
-      <main className="min-h-screen bg-gray-50/50 text-[#171d2a] font-sans">
-        <section className="min-h-screen bg-white">
-          <header className="sticky top-0 z-50 flex min-h-[76px] flex-col gap-4 border-b border-gray-100 bg-white/90 backdrop-blur-md px-5 py-4 md:flex-row md:items-center md:justify-between md:px-10">
-            <Link href="/" className="flex items-end gap-1.5 sm:gap-2" aria-label="Stitch home">
-              <span className="relative flex h-12 w-10 items-center justify-center text-4xl font-black leading-none text-[#0c1b24] sm:h-16 sm:w-12 sm:text-5xl">
-                S
-                <span className="absolute left-[24px] top-0 h-7 w-[2.5px] rounded-full bg-[#d2a22e] sm:left-[29px] sm:h-9 sm:w-[3px]" />
-                <span className="absolute left-[20px] top-0 h-7 w-4.5 rounded-full border-2 border-[#0c1b24] border-l-0 sm:left-[25px] sm:h-9 sm:w-5" />
-              </span>
-              <span className="-ml-2.5 flex flex-col sm:-ml-3">
-                <span className="text-[30px] font-black leading-7 tracking-tight text-[#071720] sm:text-[38px] sm:leading-8">
-                  titch
-                </span>
-                <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.15em] text-[#7d8791] sm:mt-1 sm:text-[10px] sm:tracking-[0.18em]">
-                  Tailoring & Design
-                </span>
-              </span>
-            </Link>
-            <RoleAwareNav activeHref="/collection" />
-          </header>
+    <main className="p-4 md:p-8 lg:p-10 space-y-10 bg-gray-50/50 min-h-screen font-sans">
+      {/* Intro Card */}
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm animate-fade-in">
+        {/* Top border color bar */}
+        <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e]" />
 
-          {/* Collection Intro Section */}
-          <section className="grid gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1fr_minmax(300px,500px)] md:px-14 md:py-18 bg-gradient-to-tr from-purple-50/20 via-white to-amber-50/10">
-            <div className="flex flex-col justify-center animate-fade-in-up">
-              <span className="inline-flex items-center w-fit gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-[#c322f4]/10 text-[#c322f4] border border-[#c322f4]/20 uppercase tracking-widest mb-4">
+        <div className="grid gap-10 md:grid-cols-[1.2fr_1fr] items-center">
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#c322f4] animate-pulse" />
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#c322f4]">
                 ✨ Our Collection
               </span>
-              <h1 className="mt-2 font-serif text-[34px] font-extrabold uppercase leading-[1.2] tracking-wide text-gray-900 sm:text-[42px] md:text-[50px]">
-                Working pieces from <span className="bg-gradient-to-r from-[#c322f4] to-[#d2a22e] bg-clip-text text-transparent">real tailoring craft.</span>
-              </h1>
-              <p className="mt-6 max-w-[580px] text-sm leading-relaxed text-gray-600 pl-4 border-l-2 border-[#c322f4]">
-                Explore custom sewing, garment repair, fabric styling, cloth selection, and design studio works that show how Stitch brings <span className="text-[#c322f4] font-semibold">premium clothing care</span> directly to your doorstep.
-              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-[260px] overflow-hidden rounded-2xl bg-gray-100 shadow-md sm:h-[360px]">
-                <Image
-                  src={collectionItems[0].image}
-                  alt={collectionItems[0].title}
-                  width={900}
-                  height={900}
-                  className="h-full w-full object-cover"
-                  priority
-                />
-              </div>
-              <div className="mt-8 h-[260px] overflow-hidden rounded-2xl bg-gray-100 shadow-md sm:mt-12 sm:h-[360px]">
-                <Image
-                  src={collectionItems[1].image}
-                  alt={collectionItems[1].title}
-                  width={900}
-                  height={900}
-                  className="h-full w-full object-cover"
-                  priority
-                />
-              </div>
-            </div>
-          </section>
+            <h1 className="font-serif text-[30px] font-extrabold uppercase leading-[1.2] tracking-wide text-gray-900 sm:text-[38px] lg:text-[44px]">
+              Working pieces from <span className="bg-gradient-to-r from-[#c322f4] to-[#d2a22e] bg-clip-text text-transparent">real tailoring craft.</span>
+            </h1>
 
-          {/* Collection Showcase Grid */}
-          <section className="bg-gray-50/50 border-y border-gray-100 px-5 py-14 sm:px-8 md:px-14 md:py-16">
-            <div className="text-center">
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[10px] font-extrabold bg-[#d2a22e]/10 text-[#d2a22e] border border-[#d2a22e]/20 uppercase tracking-widest mb-3.5">
-                🧵 Real Craft
-              </span>
-              <h2 className="font-serif text-[30px] font-extrabold uppercase leading-none tracking-wider text-gray-900 sm:text-[38px]">
-                Studio Showpieces
-              </h2>
-              <div className="mx-auto mt-4 h-1 w-20 bg-gradient-to-r from-[#c322f4] to-[#d2a22e] rounded-full" />
-            </div>
-
-            <div className="mt-12 grid gap-8 md:grid-cols-3">
-              {collectionItems.map((item) => (
-                <article
-                  key={item.title}
-                  className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300"
-                >
-                  <div className="h-[235px] overflow-hidden bg-gray-100">
-                    <Image
-                      src={item.image}
-                      alt={item.title}
-                      width={900}
-                      height={620}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-[20px] font-bold tracking-tight text-gray-950">
-                      {item.title}
-                    </h3>
-                    <p className="mt-3.5 text-xs leading-relaxed text-gray-500">
-                      {item.text}
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          {/* Booking Call to Action */}
-          <section className="px-5 py-16 text-center bg-white sm:px-8 md:px-14">
-            <h2 className="font-serif text-[32px] font-extrabold tracking-tight text-gray-950 sm:text-[38px]">
-              Ready to book your own piece?
-            </h2>
-            <p className="mt-2.5 text-sm text-gray-500 max-w-[400px] mx-auto leading-relaxed">
-              Book a picking slot now. Our stylist partners will handle the rest.
+            <p className="max-w-[540px] pl-4 border-l-2 border-[#c322f4] text-xs leading-relaxed text-gray-500">
+              Explore custom sewing, garment repair, fabric styling, cloth selection, and design studio works that show how Stitch brings <span className="text-[#c322f4] font-semibold">premium clothing care</span> directly to your doorstep.
             </p>
-            <Link
-              href={bookingHref}
-              className="mt-8 inline-flex rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-10 py-4 text-sm font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-xl hover:shadow-[#c322f4]/35 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-[220px] overflow-hidden rounded-2xl bg-gray-100 shadow-md">
+              <Image
+                src={collectionItems[0].image}
+                alt={collectionItems[0].title}
+                width={900}
+                height={900}
+                className="h-full w-full object-cover"
+                priority
+              />
+            </div>
+            <div className="mt-6 h-[220px] overflow-hidden rounded-2xl bg-gray-100 shadow-md">
+              <Image
+                src={collectionItems[1].image}
+                alt={collectionItems[1].title}
+                width={900}
+                height={900}
+                className="h-full w-full object-cover"
+                priority
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid of Items Card */}
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm space-y-10">
+        <div className="text-center">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[10px] font-extrabold bg-[#d2a22e]/10 text-[#d2a22e] border border-[#d2a22e]/20 uppercase tracking-widest mb-3.5">
+            🧵 Real Craft
+          </span>
+          <h2 className="font-serif text-[28px] font-extrabold uppercase leading-none tracking-wider text-gray-900">
+            Studio Showpieces
+          </h2>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {collectionItems.map((item) => (
+            <article
+              key={item.title}
+              className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-300"
             >
-              Book Now
-            </Link>
-          </section>
-        </section>
-      </main>
-    </>
+              <div className="h-[180px] overflow-hidden bg-gray-100">
+                <Image
+                  src={item.image}
+                  alt={item.title}
+                  width={900}
+                  height={620}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="p-5">
+                <h3 className="text-base font-bold text-gray-950">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                  {item.text}
+                </p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      {/* Booking CTA Card */}
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-8 text-center shadow-sm">
+        <h2 className="font-serif text-2xl font-extrabold tracking-tight text-gray-950">
+          Ready to book your own piece?
+        </h2>
+        <p className="mt-2 text-xs text-gray-500 max-w-[360px] mx-auto leading-relaxed">
+          Book a picking slot now. Our stylist partners will handle the rest.
+        </p>
+        <Link
+          href={bookingHref}
+          className="mt-6 inline-flex rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-8 py-3.5 text-xs font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:shadow-[#c322f4]/35 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+        >
+          Book Now
+        </Link>
+      </div>
+    </main>
   );
 }

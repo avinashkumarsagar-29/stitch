@@ -1,75 +1,71 @@
-import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
 import BookingForm from "../components/BookingForm";
-import RoleAwareNav from "../components/RoleAwareNav";
 
 export default function BookingPage() {
   return (
     <AuthGuard>
-      <main className="min-h-screen bg-gray-50/50 text-[#171d2a] font-sans">
-        <header className="sticky top-0 z-50 flex h-[76px] items-center justify-between border-b border-gray-100 bg-white/90 backdrop-blur-md px-5 py-4 md:px-10">
-          <Link href="/" className="flex items-end gap-1.5 sm:gap-2" aria-label="Stitch home">
-            <span className="relative flex h-12 w-10 items-center justify-center text-4xl font-black leading-none text-[#0c1b24] sm:h-16 sm:w-12 sm:text-5xl">
-              S
-              <span className="absolute left-[24px] top-0 h-7 w-[2.5px] rounded-full bg-[#d2a22e] sm:left-[29px] sm:h-9 sm:w-[3px]" />
-              <span className="absolute left-[20px] top-0 h-7 w-4.5 rounded-full border-2 border-[#0c1b24] border-l-0 sm:left-[25px] sm:h-9 sm:w-5" />
-            </span>
-            <span className="-ml-2.5 flex flex-col sm:-ml-3">
-              <span className="text-[30px] font-black leading-7 tracking-tight text-[#071720] sm:text-[38px] sm:leading-8">
-                titch
-              </span>
-              <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-[0.15em] text-[#7d8791] sm:mt-1 sm:text-[10px] sm:tracking-[0.18em]">
-                Tailoring & Design
-              </span>
-            </span>
-          </Link>
-          <RoleAwareNav activeHref="/booking" />
-        </header>
+      <main className="p-4 md:p-8 lg:p-10 space-y-10 bg-gray-50/50 min-h-screen font-sans">
+        {/* Book Service Dashboard Card */}
+        <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm animate-fade-in">
+          {/* Top color accent bar */}
+          <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e]" />
 
-        <div className="mx-auto max-w-[1200px] px-4 py-16">
-          <div className="mb-8 text-center">
-            <h1 className="mb-2 text-4xl font-bold text-[#171d2a]">
+          <div className="mb-8 text-center md:text-left space-y-3">
+            <div className="flex items-center gap-2 justify-center md:justify-start">
+              <span className="h-2 w-2 rounded-full bg-[#c322f4] animate-pulse" />
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#c322f4]">
+                ✂️ Booking Panel
+              </span>
+            </div>
+            <h1 className="font-serif text-[30px] font-extrabold tracking-tight text-gray-900 sm:text-[38px]">
               Book Your Service
             </h1>
-            <p className="text-lg text-gray-600">
-              Enter your pick-up and drop-off locations to get started
+            <p className="text-xs text-gray-500 max-w-[540px]">
+              Enter your pick-up and drop-off locations to get started with our tailor booking platform.
             </p>
           </div>
 
-          <div className="rounded-lg bg-white p-8 shadow-md">
+          <div className="rounded-xl border border-gray-100 bg-gray-50/30 p-6 md:p-8">
             <BookingForm />
           </div>
+        </div>
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            <div className="rounded-lg bg-white p-6 shadow-sm">
-              <div className="mb-2 text-2xl">📍</div>
-              <h3 className="mb-2 font-bold text-[#171d2a]">
-                Pick-up Location
-              </h3>
-              <p className="text-sm text-gray-600">
-                Enter the location where we should pick up your clothes
-              </p>
+        {/* Steps Cards Grid */}
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-xl shadow-inner">
+              📍
             </div>
+            <h3 className="mb-2 font-bold text-gray-900">
+              Pick-up Location
+            </h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Enter the location where we should pick up your clothes.
+            </p>
+          </div>
 
-            <div className="rounded-lg bg-white p-6 shadow-sm">
-              <div className="mb-2 text-2xl">📅</div>
-              <h3 className="mb-2 font-bold text-[#171d2a]">
-                Choose Date & Time
-              </h3>
-              <p className="text-sm text-gray-600">
-                Select when you want the pick-up to happen
-              </p>
+          <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-xl shadow-inner">
+              📅
             </div>
+            <h3 className="mb-2 font-bold text-gray-900">
+              Choose Date & Time
+            </h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Select when you want the pick-up to happen.
+            </p>
+          </div>
 
-            <div className="rounded-lg bg-white p-6 shadow-sm">
-              <div className="mb-2 text-2xl">🎯</div>
-              <h3 className="mb-2 font-bold text-[#171d2a]">
-                Drop-off Location
-              </h3>
-              <p className="text-sm text-gray-600">
-                Specify where we should deliver your finished clothes
-              </p>
+          <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-xl shadow-inner">
+              🎯
             </div>
+            <h3 className="mb-2 font-bold text-gray-900">
+              Drop-off Location
+            </h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Specify where we should deliver your finished clothes.
+            </p>
           </div>
         </div>
       </main>
