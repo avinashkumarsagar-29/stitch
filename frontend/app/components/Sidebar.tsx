@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, useEffect } from "react";
 import {
   getProfileForCurrentUser,
   placeholderProfileImage,
@@ -17,13 +17,19 @@ import { showToast } from "./Toast";
 const userLinks = [
   { label: "Home", href: "/", icon: "🏠" },
   { label: "Book Now", href: "/booking", icon: "✂️" },
+  { label: "Track Order", href: "/track", icon: "📦" },
   { label: "Collection", href: "/collection", icon: "🧵" },
   { label: "About us", href: "/about", icon: "✨" },
+  { label: "Pricing", href: "/pricing", icon: "🏷️ ️" }
 ];
 
 const tailorLinks = [
   { label: "Home", href: "/", icon: "🏠" },
+  { label: "Update Order", href: "/track", icon: "📦" },
+  { label: "Notifications", href: "/notifications", icon: "🔔" },
+  { label: "Join Stitch", href: "/join", icon: "🤝" },
   { label: "About us", href: "/about", icon: "✨" },
+  { label: "Pricing", href: "/pricing", icon: "🏷️" }
 ];
 
 const communityLinks = [
@@ -87,13 +93,85 @@ export default function Sidebar({
   const userRole = useSyncExternalStore(subscribe, getUserRole, () => "user");
   const profile = useSyncExternalStore(subscribe, getProfileSnapshot, () => emptyProfile);
 
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    if (!isLoggedIn || userRole !== "tailor") {
+      setNotificationCount(0);
+      return;
+    }
+
+    async function checkNotifications() {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const currentUser = getCurrentUser();
+        const currentUserEmail = currentUser?.email || "";
+        const currentUserPhone = currentUser?.phoneNumber || "";
+
+        let dbLocation = "";
+        try {
+          const joinRes = await fetch(`${apiUrl}/api/join`);
+          const joinData = await joinRes.json();
+          if (joinRes.ok && joinData.applications) {
+            const matchedApp = joinData.applications.find(
+              (app: any) =>
+                (currentUserEmail && app.email?.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()) ||
+                (currentUserPhone && app.phoneNumber?.trim() === currentUserPhone.trim())
+            );
+            if (matchedApp) {
+              dbLocation = matchedApp.location || "";
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching join applications in Sidebar:", e);
+        }
+
+        const tailorAddress = (profile.address || dbLocation || "").toLowerCase().trim();
+        if (!tailorAddress) {
+          setNotificationCount(0);
+          return;
+        }
+
+        const response = await fetch(`${apiUrl}/api/bookings`);
+        const data = await response.json();
+
+        if (response.ok && data.bookings) {
+          const matching = data.bookings.filter((b: any) => {
+            if (b.status !== "pending") return false;
+            if (b.tailorEmail || b.tailorPhoneNumber) return false;
+            
+            const pickup = String(b.pickupLocation || "").toLowerCase().trim();
+            return (
+              pickup === tailorAddress ||
+              pickup.includes(tailorAddress) ||
+              tailorAddress.includes(pickup)
+            );
+          });
+          setNotificationCount(matching.length);
+        }
+      } catch (error) {
+        console.error("Failed to check notifications:", error);
+      }
+    }
+
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn, userRole, profile.address]);
+
   const isTailor = userRole === "tailor";
   const links = isTailor
     ? tailorLinks
     : isLoggedIn
-    ? userLinks
-    : userLinks.filter((link) => link.label !== "Book Now");
+      ? userLinks
+      : userLinks.filter((link) => link.label !== "Book Now");
   const profileImage = profile.image || placeholderProfileImage;
+
+  const handleLinkClick = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      onClose();
+    }
+  };
 
   function handleLogout() {
     sessionStorage.setItem("stitch-logout", "true");
@@ -102,7 +180,7 @@ export default function Sidebar({
     localStorage.removeItem("stitch-user");
     showToast("Logout successfully", "success");
     window.dispatchEvent(new Event("stitch-auth-change"));
-    onClose();
+    handleLinkClick();
     router.push("/");
   }
 
@@ -117,13 +195,12 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         {/* Top Brand Header */}
         <div className="flex h-[76px] items-center justify-between border-b border-gray-100 px-6">
-          <Link href="/" className="flex items-end gap-1.5" onClick={onClose}>
+          <Link href="/" className="flex items-end gap-1.5" onClick={handleLinkClick}>
             <span className="relative flex h-10 w-8 items-center justify-center text-3xl font-black leading-none text-[#0c1b24]">
               S
               <span className="absolute left-[19px] top-0 h-6 w-[2px] rounded-full bg-[#d2a22e]" />
@@ -188,12 +265,11 @@ export default function Sidebar({
                 <div className="mt-3 pt-3 border-t border-gray-100/70 flex flex-col gap-1 text-xs">
                   <Link
                     href="/profile"
-                    onClick={onClose}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${
-                      pathname === "/profile"
+                    onClick={handleLinkClick}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${pathname === "/profile"
                         ? "bg-purple-50 text-[#c322f4]"
                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     <span>👤</span> Profile Settings
                   </Link>
@@ -213,7 +289,7 @@ export default function Sidebar({
               <div className="mt-3">
                 <Link
                   href="/login"
-                  onClick={onClose}
+                  onClick={handleLinkClick}
                   className="w-full block rounded-lg bg-gradient-to-r from-[#d779f4] to-[#c322f4] py-2 text-center text-xs font-bold text-white shadow-sm hover:scale-[1.01]"
                 >
                   Sign In
@@ -230,19 +306,26 @@ export default function Sidebar({
             <nav className="flex flex-col gap-1 text-xs font-bold">
               {links.map((link) => {
                 const active = pathname === link.href;
+                const isNotif = link.href === "/notifications";
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    onClick={onClose}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                      active
+                    onClick={handleLinkClick}
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${active
                         ? "bg-[#c322f4]/10 text-[#c322f4] border-l-4 border-[#c322f4]"
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
-                    <span className="text-base">{link.icon}</span>
-                    {link.label}
+                    <div className="flex items-center gap-3">
+                      <span className="text-base">{link.icon}</span>
+                      <span>{link.label}</span>
+                    </div>
+                    {isNotif && notificationCount > 0 && (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-pulse">
+                        {notificationCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -261,12 +344,11 @@ export default function Sidebar({
                   <Link
                     key={link.href}
                     href={link.href}
-                    onClick={onClose}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                      active
+                    onClick={handleLinkClick}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${active
                         ? "bg-[#c322f4]/10 text-[#c322f4] border-l-4 border-[#c322f4]"
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     <span className="text-base">{link.icon}</span>
                     {link.label}

@@ -204,6 +204,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 <button
                   type="button"
                   onClick={() => setRole("user")}
+                  suppressHydrationWarning
                   className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${
                     role === "user"
                       ? "border-[#c322f4] bg-[#c322f4]/5 text-[#c322f4] shadow-[0_0_12px_rgba(195,34,244,0.12)]"
@@ -217,6 +218,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 <button
                   type="button"
                   onClick={() => setRole("tailor")}
+                  suppressHydrationWarning
                   className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${
                     role === "tailor"
                       ? "border-[#c322f4] bg-[#c322f4]/5 text-[#c322f4] shadow-[0_0_12px_rgba(195,34,244,0.12)]"
@@ -276,6 +278,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  suppressHydrationWarning
                   className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPassword ? (
@@ -380,14 +383,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
       {!isRegister && isOtpSent ? (
         <button
-          type="button"
-          onClick={() => {
-            setIsOtpSent(false);
-            setOtp("");
-            setDevOtp("");
-          }}
-          className="mt-4 w-full text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors uppercase tracking-wider text-center cursor-pointer"
-        >
+                  type="button"
+                  onClick={() => {
+                    setIsOtpSent(false);
+                    setOtp("");
+                    setDevOtp("");
+                  }}
+                  suppressHydrationWarning
+                  className="mt-4 w-full text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors uppercase tracking-wider text-center cursor-pointer"
+                >
           ← Change phone number
         </button>
       ) : null}

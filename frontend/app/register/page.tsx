@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import AuthActions from "../components/AuthActions";
 import AuthForm from "../components/AuthForm";
 
 const slides = [
@@ -55,9 +54,6 @@ export default function RegisterPage() {
             </span>
           </span>
         </Link>
-        <div className="flex items-center gap-6 text-sm font-medium">
-          <AuthActions />
-        </div>
       </header>
 
       <section className="grid flex-1 md:grid-cols-[500px_1fr] lg:grid-cols-[560px_1fr]">

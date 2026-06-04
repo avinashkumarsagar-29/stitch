@@ -151,6 +151,7 @@ async function ensureJoinTable(pool) {
         experience NVARCHAR(50) NOT NULL,
         location NVARCHAR(255) NOT NULL,
         image NVARCHAR(MAX) NULL,
+        [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free',
         status NVARCHAR(50) NOT NULL DEFAULT 'pending',
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
       );
@@ -168,6 +169,13 @@ async function ensureJoinTable(pool) {
     IF COL_LENGTH('dbo.JoinApplications', 'phoneNumber') IS NULL
     BEGIN
       ALTER TABLE dbo.JoinApplications ADD phoneNumber NVARCHAR(20) NOT NULL DEFAULT '';
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.JoinApplications', 'plan') IS NULL
+    BEGIN
+      ALTER TABLE dbo.JoinApplications ADD [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free';
     END
   `);
 }
@@ -192,6 +200,13 @@ async function ensureAuthTables(pool) {
     IF COL_LENGTH('dbo.Users', 'role') IS NULL
     BEGIN
       ALTER TABLE dbo.Users ADD role NVARCHAR(50) NOT NULL DEFAULT 'user';
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'plan') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free';
     END
   `);
 
@@ -376,13 +391,16 @@ app.post("/api/auth/register", async (request, response) => {
       .input("role", sql.NVarChar(50), role)
       .query(`
         INSERT INTO Users (fullName, email, phoneNumber, passwordHash, role)
-        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role
+        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan]
         VALUES (@fullName, @email, @phoneNumber, @passwordHash, @role)
       `);
 
     return response.status(201).json({
       message: "Registration successful",
-      user: result.recordset[0],
+      user: {
+        ...result.recordset[0],
+        plan: result.recordset[0].plan || "Free"
+      },
     });
   } catch (error) {
     console.error("Register error:", error);
@@ -500,7 +518,7 @@ app.post("/api/auth/verify-otp", async (request, response) => {
       .request()
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .query(`
-        SELECT id, fullName, email, phoneNumber, role
+        SELECT id, fullName, email, phoneNumber, role, [plan]
         FROM Users
         WHERE phoneNumber = @phoneNumber
       `);
@@ -515,6 +533,7 @@ app.post("/api/auth/verify-otp", async (request, response) => {
         email: user.email,
         phoneNumber: user.phoneNumber,
         role: user.role,
+        plan: user.plan || "Free",
       },
     });
   } catch (error) {
@@ -752,14 +771,9 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
       });
     }
 
-    const tailorName = `${tailor.firstName} ${tailor.lastName}`.trim();
     const bookingResult = await pool
       .request()
       .input("bookingId", sql.Int, bookingId)
-      .input("tailorApplicationId", sql.Int, tailor.id)
-      .input("tailorName", sql.NVarChar(201), tailorName)
-      .input("tailorEmail", sql.NVarChar(255), tailor.email)
-      .input("tailorPhoneNumber", sql.NVarChar(20), tailor.phoneNumber)
       .input("clothCategory", sql.NVarChar(100), clothCategory)
       .input("clothImage", sql.NVarChar(sql.MAX), clothImage)
       .input("material", sql.NVarChar(100), material)
@@ -767,15 +781,11 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
       .query(`
         UPDATE Bookings
         SET
-          tailorApplicationId = @tailorApplicationId,
-          tailorName = @tailorName,
-          tailorEmail = @tailorEmail,
-          tailorPhoneNumber = @tailorPhoneNumber,
           clothCategory = @clothCategory,
           clothImage = @clothImage,
           material = @material,
           approxPrice = @approxPrice,
-          status = 'booked'
+          status = 'pending'
         OUTPUT
           INSERTED.id,
           INSERTED.userId,
@@ -923,6 +933,7 @@ app.post("/api/join", async (request, response) => {
     const experience = String(request.body.experience || "").trim();
     const location = String(request.body.location || "").trim();
     const image = request.body.image || null;
+    const plan = String(request.body.plan || "Free").trim();
 
     if (!firstName || !lastName || !email || !phoneNumber || !experience || !location) {
       return response.status(400).json({
@@ -942,6 +953,7 @@ app.post("/api/join", async (request, response) => {
       .input("experience", sql.NVarChar(50), experience)
       .input("location", sql.NVarChar(255), location)
       .input("image", sql.NVarChar(sql.MAX), image)
+      .input("plan", sql.NVarChar(50), plan)
       .query(`
         INSERT INTO JoinApplications (
           firstName,
@@ -950,7 +962,8 @@ app.post("/api/join", async (request, response) => {
           phoneNumber,
           experience,
           location,
-          image
+          image,
+          [plan]
         )
         OUTPUT
           INSERTED.id,
@@ -960,6 +973,7 @@ app.post("/api/join", async (request, response) => {
           INSERTED.phoneNumber,
           INSERTED.experience,
           INSERTED.location,
+          INSERTED.[plan],
           INSERTED.status,
           INSERTED.createdAt
         VALUES (
@@ -969,7 +983,8 @@ app.post("/api/join", async (request, response) => {
           @phoneNumber,
           @experience,
           @location,
-          @image
+          @image,
+          @plan
         )
       `);
 
@@ -1003,6 +1018,7 @@ app.get("/api/join", async (_request, response) => {
         experience,
         location,
         image,
+        [plan],
         status,
         createdAt
       FROM JoinApplications
@@ -1046,6 +1062,7 @@ app.get("/api/tailors", async (request, response) => {
         experience,
         location,
         image,
+        [plan],
         status,
         createdAt
       FROM JoinApplications
@@ -1056,6 +1073,11 @@ app.get("/api/tailors", async (request, response) => {
       .split(/[\s,.-]+/)
       .map((word) => word.trim())
       .filter((word) => word.length >= 3);
+    const planWeights = {
+      'Pro': 3,
+      'Plus': 2,
+      'Free': 1
+    };
     const tailors = result.recordset
       .filter((tailor) => {
         const tailorLocation = String(tailor.location || "").toLowerCase();
@@ -1074,7 +1096,13 @@ app.get("/api/tailors", async (request, response) => {
         experience: tailor.experience,
         location: tailor.location,
         image: tailor.image,
-      }));
+        plan: tailor.plan || "Free",
+      }))
+      .sort((a, b) => {
+        const weightA = planWeights[a.plan] || 1;
+        const weightB = planWeights[b.plan] || 1;
+        return weightB - weightA;
+      });
 
     return response.json({
       tailors,
@@ -1116,6 +1144,7 @@ app.get("/api/tailors/:tailorId", async (request, response) => {
           experience,
           location,
           image,
+          [plan],
           status,
           createdAt
         FROM JoinApplications
@@ -1138,6 +1167,7 @@ app.get("/api/tailors/:tailorId", async (request, response) => {
         experience: tailor.experience,
         location: tailor.location,
         image: tailor.image,
+        plan: tailor.plan || "Free",
       },
     });
   } catch (error) {
@@ -1148,6 +1178,301 @@ app.get("/api/tailors/:tailorId", async (request, response) => {
         process.env.NODE_ENV === "production"
           ? undefined
           : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.post("/api/payments/create-order", async (request, response) => {
+  try {
+    const planId = String(request.body.planId || "").trim();
+    const price = Number(request.body.price);
+    const userId = Number(request.body.userId);
+    const billingCycle = String(request.body.billingCycle || "monthly").trim();
+
+    if (!planId || !Number.isFinite(price) || price <= 0 || !userId) {
+      return response.status(400).json({
+        message: "Plan ID, price, and User ID are required",
+      });
+    }
+
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    const isRazorpayConfigured = keyId && keyId.trim() && keySecret && keySecret.trim();
+
+    if (!isRazorpayConfigured) {
+      // Return a Mock Order for developer testing
+      return response.json({
+        id: "order_mock_" + Math.random().toString(36).substring(2, 11),
+        amount: Math.round(price * 100),
+        currency: "INR",
+        isMock: true,
+        key: "rzp_test_mockkey",
+        planId,
+        billingCycle,
+      });
+    }
+
+    const authHeader = "Basic " + Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+    const orderRes = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": authHeader
+      },
+      body: JSON.stringify({
+        amount: Math.round(price * 100),
+        currency: "INR",
+        receipt: "receipt_order_" + Date.now()
+      })
+    });
+
+    const orderData = await orderRes.json();
+
+    if (!orderRes.ok) {
+      return response.status(orderRes.status).json({
+        message: orderData.error?.description || "Failed to create Razorpay order",
+        detail: orderData.error,
+      });
+    }
+
+    return response.json({
+      id: orderData.id,
+      amount: orderData.amount,
+      currency: orderData.currency,
+      isMock: false,
+      key: keyId,
+      planId,
+      billingCycle,
+    });
+  } catch (error) {
+    console.error("Create order error:", error);
+    return response.status(500).json({
+      message: "Unable to create payment order",
+      detail: error.message,
+    });
+  }
+});
+
+app.post("/api/payments/verify-payment", async (request, response) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      planId,
+      userId,
+      isMock,
+    } = request.body;
+
+    if (!planId || !userId) {
+      return response.status(400).json({
+        message: "Plan ID and User ID are required",
+      });
+    }
+
+    const pool = await getSqlPool();
+
+    if (isMock) {
+      const keyId = process.env.RAZORPAY_KEY_ID;
+      if (keyId && keyId.trim()) {
+        return response.status(400).json({
+          message: "Mock payments are disabled because real Razorpay keys are configured",
+        });
+      }
+
+      // Update plan in Users table
+      await pool
+        .request()
+        .input("plan", sql.NVarChar(50), planId)
+        .input("userId", sql.Int, userId)
+        .query("UPDATE Users SET [plan] = @plan WHERE id = @userId");
+
+      // Sync user subscription details to JoinApplications if they are a Tailor
+      const userResult = await pool
+        .request()
+        .input("userId", sql.Int, userId)
+        .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
+      const user = userResult.recordset[0];
+
+      if (user && user.role === "tailor") {
+        await pool
+          .request()
+          .input("plan", sql.NVarChar(50), planId)
+          .input("email", sql.NVarChar(255), user.email)
+          .input("phoneNumber", sql.NVarChar(20), user.phoneNumber)
+          .query(`
+            UPDATE JoinApplications
+            SET [plan] = @plan
+            WHERE email = @email OR phoneNumber = @phoneNumber
+          `);
+      }
+
+      return response.json({
+        success: true,
+        message: "Mock payment verified and subscription activated",
+        plan: planId,
+      });
+    }
+
+    // Real signature verification using crypto
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+      return response.status(500).json({
+        message: "Razorpay keys are not configured on the server",
+      });
+    }
+
+    const crypto = require("crypto");
+    const hmac = crypto.createHmac("sha256", keySecret);
+    hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
+    const generated_signature = hmac.digest("hex");
+
+    if (generated_signature !== razorpay_signature) {
+      return response.status(400).json({
+        message: "Invalid payment signature. Payment verification failed.",
+      });
+    }
+
+    // Signature matches, update plan in Users table
+    await pool
+      .request()
+      .input("plan", sql.NVarChar(50), planId)
+      .input("userId", sql.Int, userId)
+      .query("UPDATE Users SET [plan] = @plan WHERE id = @userId");
+
+    // Sync to JoinApplications if tailor
+    const userResult = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
+    const user = userResult.recordset[0];
+
+    if (user && user.role === "tailor") {
+      await pool
+        .request()
+        .input("plan", sql.NVarChar(50), planId)
+        .input("email", sql.NVarChar(255), user.email)
+        .input("phoneNumber", sql.NVarChar(20), user.phoneNumber)
+        .query(`
+          UPDATE JoinApplications
+          SET [plan] = @plan
+          WHERE email = @email OR phoneNumber = @phoneNumber
+        `);
+    }
+
+    return response.json({
+      success: true,
+      message: "Payment verified and subscription activated successfully",
+      plan: planId,
+    });
+  } catch (error) {
+    console.error("Verify payment error:", error);
+    return response.status(500).json({
+      message: "Unable to verify payment signature",
+      detail: error.message,
+    });
+  }
+});
+
+app.post("/api/payments/activate-free-plan", async (request, response) => {
+  try {
+    const { planId, userId } = request.body;
+
+    if (!userId) {
+      return response.status(400).json({
+        message: "User ID is required",
+      });
+    }
+
+    const planToActivate = planId || "Free";
+    const pool = await getSqlPool();
+
+    // Update plan in Users table
+    await pool
+      .request()
+      .input("plan", sql.NVarChar(50), planToActivate)
+      .input("userId", sql.Int, userId)
+      .query("UPDATE Users SET [plan] = @plan WHERE id = @userId");
+
+    // Sync to JoinApplications if tailor
+    const userResult = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
+    const user = userResult.recordset[0];
+
+    if (user && user.role === "tailor") {
+      await pool
+        .request()
+        .input("plan", sql.NVarChar(50), planToActivate)
+        .input("email", sql.NVarChar(255), user.email)
+        .input("phoneNumber", sql.NVarChar(20), user.phoneNumber)
+        .query(`
+          UPDATE JoinApplications
+          SET [plan] = @plan
+          WHERE email = @email OR phoneNumber = @phoneNumber
+        `);
+    }
+
+    return response.json({
+      success: true,
+      message: "Free tier plan activated successfully",
+      plan: planToActivate,
+    });
+  } catch (error) {
+    console.error("Activate free plan error:", error);
+    return response.status(500).json({
+      message: "Unable to activate free plan",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/bookings/:bookingId/status", async (request, response) => {
+  try {
+    const bookingId = Number(request.params.bookingId);
+    const { status } = request.body;
+
+    if (!bookingId || !status) {
+      return response.status(400).json({
+        message: "Booking ID and status are required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBookingsTable(pool);
+
+    const result = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .input("status", sql.NVarChar(50), status)
+      .query(`
+        UPDATE Bookings
+        SET [status] = @status
+        OUTPUT
+          INSERTED.id,
+          INSERTED.status
+        WHERE id = @bookingId
+      `);
+
+    const booking = result.recordset[0];
+
+    if (!booking) {
+      return response.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    return response.json({
+      message: "Booking status updated successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Booking status update error:", error);
+    return response.status(500).json({
+      message: "Unable to update booking status",
+      detail: error.message,
     });
   }
 });

@@ -14,13 +14,18 @@ import {
 
 const customerLinks = [
   { label: "Book Now", href: "/booking" },
+  { label: "Track Order", href: "/track" },
   { label: "Collection", href: "/collection" },
+  { label: "Pricing", href: "/pricing" },
   { label: "About us", href: "/about" },
   { label: "Careers", href: "/careers" },
   { label: "Blog", href: "/blog" },
 ];
 
 const tailorLinks = [
+  { label: "Update Order", href: "/track" },
+  { label: "Join Stitch", href: "/join" },
+  { label: "Pricing", href: "/pricing" },
   { label: "About us", href: "/about" },
   { label: "Careers", href: "/careers" },
   { label: "Blog", href: "/blog" },
@@ -82,6 +87,72 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const profile = useSyncExternalStore(subscribe, getProfileSnapshot, () => emptyProfile);
 
   const isTailor = userRole === "tailor";
+
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    if (!isLoggedIn || !isTailor) {
+      setNotificationCount(0);
+      return;
+    }
+
+    async function checkNotifications() {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const currentUser = getCurrentUser();
+        const currentUserEmail = currentUser?.email || "";
+        const currentUserPhone = currentUser?.phoneNumber || "";
+
+        let dbLocation = "";
+        try {
+          const joinRes = await fetch(`${apiUrl}/api/join`);
+          const joinData = await joinRes.json();
+          if (joinRes.ok && joinData.applications) {
+            const matchedApp = joinData.applications.find(
+              (app: any) =>
+                (currentUserEmail && app.email?.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()) ||
+                (currentUserPhone && app.phoneNumber?.trim() === currentUserPhone.trim())
+            );
+            if (matchedApp) {
+              dbLocation = matchedApp.location || "";
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching join applications in LayoutWrapper:", e);
+        }
+
+        const tailorAddress = (profile.address || dbLocation || "").toLowerCase().trim();
+        if (!tailorAddress) {
+          setNotificationCount(0);
+          return;
+        }
+
+        const response = await fetch(`${apiUrl}/api/bookings`);
+        const data = await response.json();
+
+        if (response.ok && data.bookings) {
+          const matching = data.bookings.filter((b: any) => {
+            if (b.status !== "pending") return false;
+            if (b.tailorEmail || b.tailorPhoneNumber) return false;
+            
+            const pickup = String(b.pickupLocation || "").toLowerCase().trim();
+            return (
+              pickup === tailorAddress ||
+              pickup.includes(tailorAddress) ||
+              tailorAddress.includes(pickup)
+            );
+          });
+          setNotificationCount(matching.length);
+        }
+      } catch (error) {
+        console.error("Failed to check notifications:", error);
+      }
+    }
+
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn, isTailor, profile.address]);
   const links = isTailor
     ? tailorLinks
     : isLoggedIn
@@ -166,6 +237,20 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           <div className="flex items-center gap-2">
             {/* Desktop Capsule Button */}
             <div className="hidden md:flex items-center gap-3">
+              {isLoggedIn && isTailor && (
+                <Link
+                  href="/notifications"
+                  className="relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:border-slate-200 transition-all"
+                  aria-label="Notifications"
+                >
+                  <span className="text-base">🔔</span>
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white animate-pulse">
+                      {notificationCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {isLoggedIn ? (
                 <Link
                   href="/profile"
@@ -187,6 +272,20 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
             {/* Mobile Profile Icon/Key Button */}
             <div className="md:hidden flex items-center gap-2">
+              {isLoggedIn && isTailor && (
+                <Link
+                  href="/notifications"
+                  className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 transition-colors"
+                  aria-label="Notifications"
+                >
+                  <span className="text-base">🔔</span>
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white animate-pulse">
+                      {notificationCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {isLoggedIn ? (
                 <Link
                   href="/profile"
