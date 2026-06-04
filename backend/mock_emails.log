@@ -1,0 +1,292 @@
+
+========================================
+TIMESTAMP: 2026-06-04T09:54:38.867Z
+TO: sagar@gmail.com
+FROM: no-reply@stitch.com
+SUBJECT: Booking Confirmation - Stitch Order #44
+BODY:
+
+    <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Greeting from Stitch!</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        Thank you for booking your custom tailoring service with Stitch. We have successfully received and confirmed your order details.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Your Order Tracking Code</p>
+        <p style="margin: 8px 0 0 0; font-size: 32px; font-weight: 900; color: #c322f4; letter-spacing: 2px;">2026258</p>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Use this 7-digit code to track your order progress anytime.</p>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-top: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">Order Details</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px;">
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af; width: 40%;">Order ID:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">#44</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Cloth Category:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">Shirt</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Material:</td>
+          <td style="padding: 6px 0; color: #1f2937;">Cotton</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Approximate Price:</td>
+          <td style="padding: 6px 0; color: #c322f4; font-weight: 700;">₹850</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Pickup Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">rajpura</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Drop-off Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">rajpura</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Date:</td>
+          <td style="padding: 6px 0; color: #1f2937;">10/6/2026</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Time:</td>
+          <td style="padding: 6px 0; color: #1f2937;">Thu J</td>
+        </tr>
+      </table>
+
+      <div style="text-align: center; margin-top: 32px;">
+        <a href="http://localhost:3000/track?id=2026258" style="display: inline-block; background-color: #c322f4; color: #ffffff; padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(195, 34, 244, 0.2); transition: all 0.2s;">Track Order Now</a>
+      </div>
+
+      <div style="margin-top: 40px; border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">&copy; 2026 Stitch Inc. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">You are receiving this email because you registered on Stitch.</p>
+      </div>
+    </div>
+  
+========================================
+
+
+========================================
+TIMESTAMP: 2026-06-04T09:55:20.513Z
+TO: sagar@gmail.com
+FROM: no-reply@stitch.com
+SUBJECT: Booking Confirmation - Stitch Order #45
+BODY:
+
+    <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Greeting from Stitch!</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        Thank you for booking your custom tailoring service with Stitch. We have successfully received and confirmed your order details.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Your Order Tracking Code</p>
+        <p style="margin: 8px 0 0 0; font-size: 32px; font-weight: 900; color: #c322f4; letter-spacing: 2px;">1251576</p>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Use this 7-digit code to track your order progress anytime.</p>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-top: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">Order Details</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px;">
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af; width: 40%;">Order ID:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">#45</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Cloth Category:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">Pant</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Material:</td>
+          <td style="padding: 6px 0; color: #1f2937;">Linen</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Approximate Price:</td>
+          <td style="padding: 6px 0; color: #c322f4; font-weight: 700;">₹1250</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Pickup Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">rajpura</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Drop-off Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">rajpura</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Date:</td>
+          <td style="padding: 6px 0; color: #1f2937;">11/6/2026</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Time:</td>
+          <td style="padding: 6px 0; color: #1f2937;">20:00</td>
+        </tr>
+      </table>
+
+      <div style="text-align: center; margin-top: 32px;">
+        <a href="http://localhost:3000/track?id=1251576" style="display: inline-block; background-color: #c322f4; color: #ffffff; padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(195, 34, 244, 0.2); transition: all 0.2s;">Track Order Now</a>
+      </div>
+
+      <div style="margin-top: 40px; border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">&copy; 2026 Stitch Inc. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">You are receiving this email because you registered on Stitch.</p>
+      </div>
+    </div>
+  
+========================================
+
+
+========================================
+TIMESTAMP: 2026-06-04T09:55:53.216Z
+TO: sagar@gmail.com
+FROM: no-reply@stitch.com
+SUBJECT: Booking Confirmation - Stitch Order #46
+BODY:
+
+    <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Greeting from Stitch!</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        Thank you for booking your custom tailoring service with Stitch. We have successfully received and confirmed your order details.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Your Order Tracking Code</p>
+        <p style="margin: 8px 0 0 0; font-size: 32px; font-weight: 900; color: #c322f4; letter-spacing: 2px;">7515322</p>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Use this 7-digit code to track your order progress anytime.</p>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-top: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">Order Details</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px;">
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af; width: 40%;">Order ID:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">#46</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Cloth Category:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">Suit</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Material:</td>
+          <td style="padding: 6px 0; color: #1f2937;">Wool</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Approximate Price:</td>
+          <td style="padding: 6px 0; color: #c322f4; font-weight: 700;">₹4500</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Pickup Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">rajpura</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Drop-off Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">rajpura</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Date:</td>
+          <td style="padding: 6px 0; color: #1f2937;">12/6/2026</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Time:</td>
+          <td style="padding: 6px 0; color: #1f2937;">16:15</td>
+        </tr>
+      </table>
+
+      <div style="text-align: center; margin-top: 32px;">
+        <a href="http://localhost:3000/track?id=7515322" style="display: inline-block; background-color: #c322f4; color: #ffffff; padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(195, 34, 244, 0.2); transition: all 0.2s;">Track Order Now</a>
+      </div>
+
+      <div style="margin-top: 40px; border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">&copy; 2026 Stitch Inc. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">You are receiving this email because you registered on Stitch.</p>
+      </div>
+    </div>
+  
+========================================
+
+
+========================================
+TIMESTAMP: 2026-06-04T09:59:07.154Z
+TO: sagarcode29@gmail.com
+FROM: no-reply@stitch.com
+SUBJECT: Booking Confirmation - Stitch Order #47
+BODY:
+
+    <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Greeting from Stitch!</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        Thank you for booking your custom tailoring service with Stitch. We have successfully received and confirmed your order details.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Your Order Tracking Code</p>
+        <p style="margin: 8px 0 0 0; font-size: 32px; font-weight: 900; color: #c322f4; letter-spacing: 2px;">7172443</p>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Use this 7-digit code to track your order progress anytime.</p>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-top: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">Order Details</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px;">
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af; width: 40%;">Order ID:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">#47</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Cloth Category:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">Suit</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Material:</td>
+          <td style="padding: 6px 0; color: #1f2937;">Rayon</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Approximate Price:</td>
+          <td style="padding: 6px 0; color: #c322f4; font-weight: 700;">₹2500</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Pickup Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">sas nagar</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Drop-off Location:</td>
+          <td style="padding: 6px 0; color: #1f2937;">sector 75sas nagar</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Date:</td>
+          <td style="padding: 6px 0; color: #1f2937;">9/6/2026</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Time:</td>
+          <td style="padding: 6px 0; color: #1f2937;">17:28</td>
+        </tr>
+      </table>
+
+      <div style="text-align: center; margin-top: 32px;">
+        <a href="http://localhost:3000/track?id=7172443" style="display: inline-block; background-color: #c322f4; color: #ffffff; padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(195, 34, 244, 0.2); transition: all 0.2s;">Track Order Now</a>
+      </div>
+
+      <div style="margin-top: 40px; border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">&copy; 2026 Stitch Inc. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">You are receiving this email because you registered on Stitch.</p>
+      </div>
+    </div>
+  
+========================================
+

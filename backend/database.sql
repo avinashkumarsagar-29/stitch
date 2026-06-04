@@ -71,6 +71,7 @@ BEGIN
     material NVARCHAR(100) NULL,
     approxPrice DECIMAL(10,2) NULL,
     status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+    trackingCode NVARCHAR(10) NULL,
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_Bookings_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
   );
@@ -122,6 +123,12 @@ GO
 IF COL_LENGTH('dbo.Bookings', 'approxPrice') IS NULL
 BEGIN
   ALTER TABLE dbo.Bookings ADD approxPrice DECIMAL(10,2) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'trackingCode') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD trackingCode NVARCHAR(10) NULL;
 END
 GO
 

@@ -12,6 +12,7 @@ type BookingRecord = {
   bookingTime: string;
   tailorName?: string | null;
   status: string;
+  trackingCode?: string | null;
 };
 
 export default function BookingHistory() {

@@ -14,6 +14,7 @@ type BookingRecord = {
   dropoffLocation: string;
   bookingDate: string;
   bookingTime: string;
+  trackingCode?: string | null;
 };
 
 type Tailor = {

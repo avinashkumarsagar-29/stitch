@@ -21,6 +21,7 @@ type BookingRecord = {
   material?: string | null;
   approxPrice?: number | null;
   status: string;
+  trackingCode?: string | null;
   createdAt: string;
   fullName?: string;
 };

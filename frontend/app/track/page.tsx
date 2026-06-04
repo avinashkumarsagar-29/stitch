@@ -21,6 +21,7 @@ type BookingRecord = {
   material?: string | null;
   approxPrice?: number | null;
   status: string;
+  trackingCode?: string | null;
   createdAt: string;
 };
 
@@ -386,7 +387,7 @@ function TrackContent() {
                           <div className="min-w-0 flex-1 pr-4">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-gray-900">
-                                Booking #{b.id}
+                                Booking #{b.id} {b.trackingCode && <span className="font-mono text-gray-400 font-normal">({b.trackingCode})</span>}
                               </span>
                               <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${b.status === "delivered"
                                   ? "bg-green-50 text-green-700 border border-green-200"
@@ -588,6 +589,12 @@ function TrackContent() {
                   <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Current Status</p>
                   <p className="mt-1 font-semibold text-gray-800 uppercase tracking-wider text-[10px]">{activeBooking.status}</p>
                 </div>
+                {activeBooking.trackingCode && (
+                  <div className="col-span-2">
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Tracking Code</p>
+                    <p className="mt-1 font-semibold text-gray-800 font-mono tracking-wider">{activeBooking.trackingCode}</p>
+                  </div>
+                )}
               </div>
 
               <div className="text-xs pt-2 border-t border-gray-50 space-y-2">
