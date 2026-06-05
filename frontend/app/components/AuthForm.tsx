@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { showToast } from "./Toast";
+import { safeSetLocalStorage } from "./profileStorage";
 
 type AuthFormProps = {
   mode: "login" | "register";
@@ -125,7 +126,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       }
 
       localStorage.setItem("stitch-auth", "true");
-      localStorage.setItem("stitch-user", JSON.stringify(data.user));
+      safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
       localStorage.setItem("stitch-role", data.user.role || "user");
       showToast(data.message, "success");
       window.dispatchEvent(new Event("stitch-auth-change"));

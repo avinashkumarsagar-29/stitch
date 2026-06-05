@@ -197,11 +197,34 @@ function NotificationsContent() {
     if (!tailorAddress) return false;
 
     const pickup = String(b.pickupLocation || "").toLowerCase().trim();
-    return (
+    const matchesAddress = (
       pickup === tailorAddress ||
       pickup.includes(tailorAddress) ||
       tailorAddress.includes(pickup)
     );
+    if (!matchesAddress) return false;
+
+    // Do not show if another booking at the same date, time, and location has been accepted by any tailor partner
+    const isSlotTaken = bookings.some((other) => {
+      if (other.id === b.id) return false;
+      if (other.status === "pending") return false;
+
+      const otherDate = new Date(other.bookingDate).toDateString();
+      const bDate = new Date(b.bookingDate).toDateString();
+      if (otherDate !== bDate) return false;
+
+      const otherTime = String(other.bookingTime).slice(0, 5);
+      const bTime = String(b.bookingTime).slice(0, 5);
+      if (otherTime !== bTime) return false;
+
+      const otherLoc = String(other.pickupLocation || "").toLowerCase().trim();
+      const bLoc = String(b.pickupLocation || "").toLowerCase().trim();
+      if (otherLoc !== bLoc) return false;
+
+      return true;
+    });
+
+    return !isSlotTaken;
   });
 
   async function handleAcceptOrder(bookingId: number) {

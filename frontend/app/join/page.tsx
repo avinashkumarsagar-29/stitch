@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { showToast } from "../components/Toast";
+import { getCurrentUser, getProfileStorageKey, safeSetLocalStorage } from "../components/profileStorage";
 
 export default function JoinPage() {
   const [formData, setFormData] = useState({
@@ -95,6 +96,18 @@ export default function JoinPage() {
       }
 
       showToast(data.message, "success");
+
+      // Auto-populate local profile storage if backend returned user profile sync data
+      if (data.user && data.profile) {
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+          safeSetLocalStorage(getProfileStorageKey(currentUser), JSON.stringify(data.profile));
+          safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
+          window.dispatchEvent(new Event("stitch-profile-change"));
+          window.dispatchEvent(new Event("stitch-auth-change"));
+        }
+      }
+
       setFormData({
         firstName: "",
         lastName: "",

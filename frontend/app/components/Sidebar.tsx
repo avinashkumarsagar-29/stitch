@@ -141,11 +141,34 @@ export default function Sidebar({
             if (b.tailorEmail || b.tailorPhoneNumber) return false;
             
             const pickup = String(b.pickupLocation || "").toLowerCase().trim();
-            return (
+            const matchesAddress = (
               pickup === tailorAddress ||
               pickup.includes(tailorAddress) ||
               tailorAddress.includes(pickup)
             );
+            if (!matchesAddress) return false;
+
+            // Check if slot taken
+            const isSlotTaken = data.bookings.some((other: any) => {
+              if (other.id === b.id) return false;
+              if (other.status === "pending") return false;
+
+              const otherDate = new Date(other.bookingDate).toDateString();
+              const bDate = new Date(b.bookingDate).toDateString();
+              if (otherDate !== bDate) return false;
+
+              const otherTime = String(other.bookingTime).slice(0, 5);
+              const bTime = String(b.bookingTime).slice(0, 5);
+              if (otherTime !== bTime) return false;
+
+              const otherLoc = String(other.pickupLocation || "").toLowerCase().trim();
+              const bLoc = String(b.pickupLocation || "").toLowerCase().trim();
+              if (otherLoc !== bLoc) return false;
+
+              return true;
+            });
+
+            return !isSlotTaken;
           });
           setNotificationCount(matching.length);
         }
@@ -164,7 +187,7 @@ export default function Sidebar({
     ? tailorLinks
     : isLoggedIn
       ? userLinks
-      : userLinks.filter((link) => link.label !== "Book Now");
+      : userLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order");
   const profileImage = profile.image || placeholderProfileImage;
 
   const handleLinkClick = () => {

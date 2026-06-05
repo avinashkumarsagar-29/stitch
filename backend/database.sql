@@ -17,6 +17,10 @@ BEGIN
     passwordHash NVARCHAR(255) NOT NULL DEFAULT '',
     role NVARCHAR(50) NOT NULL DEFAULT 'user',
     [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free',
+    firstName NVARCHAR(100) NULL,
+    lastName NVARCHAR(100) NULL,
+    address NVARCHAR(255) NULL,
+    image NVARCHAR(MAX) NULL,
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
   );
 END
@@ -25,6 +29,30 @@ GO
 IF COL_LENGTH('dbo.Users', 'role') IS NULL
 BEGIN
   ALTER TABLE dbo.Users ADD role NVARCHAR(50) NOT NULL DEFAULT 'user';
+END
+GO
+
+IF COL_LENGTH('dbo.Users', 'firstName') IS NULL
+BEGIN
+  ALTER TABLE dbo.Users ADD firstName NVARCHAR(100) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Users', 'lastName') IS NULL
+BEGIN
+  ALTER TABLE dbo.Users ADD lastName NVARCHAR(100) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Users', 'address') IS NULL
+BEGIN
+  ALTER TABLE dbo.Users ADD address NVARCHAR(255) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Users', 'image') IS NULL
+BEGIN
+  ALTER TABLE dbo.Users ADD image NVARCHAR(MAX) NULL;
 END
 GO
 

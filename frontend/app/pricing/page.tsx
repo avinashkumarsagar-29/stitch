@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useSyncExternalStore } from "react";
 import { showToast } from "../components/Toast";
+import { safeSetLocalStorage } from "../components/profileStorage";
 
 const customerPlans = [
   {
@@ -273,7 +274,7 @@ export default function PricingPage() {
         
         // Update local storage
         const updatedUser = { ...currentUser, plan: planId };
-        localStorage.setItem("stitch-user", JSON.stringify(updatedUser));
+        safeSetLocalStorage("stitch-user", JSON.stringify(updatedUser));
         window.dispatchEvent(new Event("stitch-profile-change"));
         window.dispatchEvent(new Event("stitch-auth-change"));
       } catch (err) {
@@ -373,7 +374,7 @@ export default function PricingPage() {
           
           // Update local storage
           const updatedUser = { ...currentUser, plan: planId };
-          localStorage.setItem("stitch-user", JSON.stringify(updatedUser));
+          safeSetLocalStorage("stitch-user", JSON.stringify(updatedUser));
           window.dispatchEvent(new Event("stitch-profile-change"));
           window.dispatchEvent(new Event("stitch-auth-change"));
 
@@ -436,7 +437,7 @@ export default function PricingPage() {
 
       // Update local storage
       const updatedUser = { ...currentUser, plan: mockOrder.planId };
-      localStorage.setItem("stitch-user", JSON.stringify(updatedUser));
+      safeSetLocalStorage("stitch-user", JSON.stringify(updatedUser));
       window.dispatchEvent(new Event("stitch-profile-change"));
       window.dispatchEvent(new Event("stitch-auth-change"));
     } catch (err) {

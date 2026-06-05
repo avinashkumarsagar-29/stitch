@@ -1,12 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, useEffect } from "react";
 import {
   emptyProfile,
   getProfileForCurrentUser,
   getProfileStorageKey,
   placeholderProfileImage,
+  getCurrentUser,
+  safeSetLocalStorage,
   type Profile,
 } from "./profileStorage";
 import { showToast } from "./Toast";
@@ -38,12 +40,46 @@ export default function ProfileEditor() {
 
     return getProfileForCurrentUser();
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
+  
   const userRole = useSyncExternalStore(
     subscribe,
     getUserRole,
     getServerUserRole,
   );
+  
+  useEffect(() => {
+    async function fetchProfile() {
+      const user = getCurrentUser();
+      if (!user || !user.id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const response = await fetch(`${apiUrl}/api/users/${user.id}/profile`);
+        const data = await response.json();
+
+        if (response.ok && data.profile) {
+          const fetchedProfile: Profile = data.profile;
+          setProfile(fetchedProfile);
+          // Sync with local storage
+          safeSetLocalStorage(getProfileStorageKey(user), JSON.stringify(fetchedProfile));
+          window.dispatchEvent(new Event("stitch-profile-change"));
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchProfile();
+  }, []);
+
   const isUser = userRole === "user";
   const profileImage = profile.image || placeholderProfileImage;
   const displayName = profile.fullName || "Your Profile";
@@ -52,8 +88,10 @@ export default function ProfileEditor() {
     setProfile((current) => {
       const nextProfile = { ...current, [field]: value };
 
-      if (field === "firstName" || field === "lastName") {
-        nextProfile.fullName = `${nextProfile.firstName} ${nextProfile.lastName}`.trim();
+      if (field === "fullName") {
+        const parts = value.trim().split(/\s+/);
+        nextProfile.firstName = parts[0] || "";
+        nextProfile.lastName = parts.slice(1).join(" ") || "";
       }
 
       return nextProfile;
@@ -79,11 +117,67 @@ export default function ProfileEditor() {
     reader.readAsDataURL(file);
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    localStorage.setItem(getProfileStorageKey(), JSON.stringify(profile));
-    window.dispatchEvent(new Event("stitch-profile-change"));
-    showToast("Profile updated successfully", "success");
+    const user = getCurrentUser();
+    if (!user || !user.id) {
+      showToast("You must be logged in to save profile", "error");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const response = await fetch(`${apiUrl}/api/users/${user.id}/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: profile.fullName,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          email: profile.email,
+          phone: profile.phone,
+          address: profile.address,
+          image: profile.image || null,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.message || "Failed to update profile", "error");
+        return;
+      }
+
+      // Update both profile storage and user storage
+      safeSetLocalStorage(getProfileStorageKey(user), JSON.stringify(data.profile));
+      safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
+      
+      // Dispatch events to trigger UI syncs across components
+      window.dispatchEvent(new Event("stitch-profile-change"));
+      window.dispatchEvent(new Event("stitch-auth-change"));
+      
+      setProfile(data.profile);
+      showToast("Profile updated successfully", "success");
+    } catch (err) {
+      console.error("Save profile error:", err);
+      showToast("Unable to connect to backend server", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center p-12 text-sm text-gray-400">
+        <svg className="animate-spin h-8 w-8 text-[#c322f4] mb-4" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        Loading profile data...
+      </div>
+    );
   }
 
   return (
@@ -149,30 +243,20 @@ export default function ProfileEditor() {
           </p>
 
           <div className="mt-10 grid gap-5 sm:grid-cols-2">
-            <ProfileField
-              label="First Name"
-              value={profile.firstName}
-              onChange={(value) => updateProfile("firstName", value)}
-              placeholder="Enter first name"
-              icon={
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              }
-            />
-            <ProfileField
-              label="Last Name"
-              value={profile.lastName}
-              onChange={(value) => updateProfile("lastName", value)}
-              placeholder="Enter last name"
-              icon={
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              }
-            />
+            <div className="sm:col-span-2">
+              <ProfileField
+                label="Full Name"
+                value={profile.fullName}
+                onChange={(value) => updateProfile("fullName", value)}
+                placeholder="Enter full name"
+                icon = {
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                }
+              />
+            </div>
             <ProfileField
               label="Email Address"
               value={profile.email}
@@ -216,9 +300,10 @@ export default function ProfileEditor() {
 
           <button
             type="submit"
-            className="mt-8 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-8 py-3.5 text-sm font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:shadow-[#c322f4]/35 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer"
+            disabled={isSaving}
+            className="mt-8 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-8 py-3.5 text-sm font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:shadow-[#c322f4]/35 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
           >
-            Save Profile
+            {isSaving ? "Saving..." : "Save Profile"}
           </button>
         </form>
 

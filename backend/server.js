@@ -202,6 +202,11 @@ async function ensureAuthTables(pool) {
         phoneNumber NVARCHAR(20) NOT NULL UNIQUE,
         passwordHash NVARCHAR(255) NOT NULL DEFAULT '',
         role NVARCHAR(50) NOT NULL DEFAULT 'user',
+        [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free',
+        firstName NVARCHAR(100) NULL,
+        lastName NVARCHAR(100) NULL,
+        address NVARCHAR(255) NULL,
+        image NVARCHAR(MAX) NULL,
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
       );
     END
@@ -218,6 +223,34 @@ async function ensureAuthTables(pool) {
     IF COL_LENGTH('dbo.Users', 'plan') IS NULL
     BEGIN
       ALTER TABLE dbo.Users ADD [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free';
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'firstName') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD firstName NVARCHAR(100) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'lastName') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD lastName NVARCHAR(100) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'address') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD address NVARCHAR(255) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'image') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD image NVARCHAR(MAX) NULL;
     END
   `);
 
@@ -655,7 +688,7 @@ app.post("/api/auth/verify-otp", async (request, response) => {
       .request()
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .query(`
-        SELECT id, fullName, email, phoneNumber, role, [plan]
+        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image
         FROM Users
         WHERE phoneNumber = @phoneNumber
       `);
@@ -671,6 +704,10 @@ app.post("/api/auth/verify-otp", async (request, response) => {
         phoneNumber: user.phoneNumber,
         role: user.role,
         plan: user.plan || "Free",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        address: user.address || "",
+        image: user.image || "",
       },
     });
   } catch (error) {
@@ -681,6 +718,209 @@ app.post("/api/auth/verify-otp", async (request, response) => {
         process.env.NODE_ENV === "production"
           ? undefined
           : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.get("/api/users/:userId/profile", async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    if (!userId) {
+      return response.status(400).json({ message: "User ID is required" });
+    }
+
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+    const userResult = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image
+        FROM Users
+        WHERE id = @userId
+      `);
+
+    const user = userResult.recordset[0];
+    if (!user) {
+      return response.status(404).json({ message: "User not found" });
+    }
+
+    return response.json({
+      profile: {
+        fullName: user.fullName,
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email,
+        phone: user.phoneNumber,
+        address: user.address || "",
+        image: user.image || "",
+        role: user.role,
+        plan: user.plan || "Free",
+      }
+    });
+  } catch (error) {
+    console.error("Get profile error:", error);
+    return response.status(500).json({
+      message: "Unable to load profile",
+      detail: error.message,
+    });
+  }
+});
+
+app.put("/api/users/:userId/profile", async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    let fullName = String(request.body.fullName || "").trim();
+    let firstName = String(request.body.firstName || "").trim();
+    let lastName = String(request.body.lastName || "").trim();
+    const email = String(request.body.email || "").trim().toLowerCase();
+    const phone = normalizePhoneNumber(request.body.phone);
+    const address = String(request.body.address || "").trim();
+    const image = request.body.image || null;
+
+    if (!userId) {
+      return response.status(400).json({ message: "User ID is required" });
+    }
+
+    if (!fullName && (!firstName || !lastName)) {
+      return response.status(400).json({
+        message: "Full name, email, and phone number are required",
+      });
+    }
+
+    if (!fullName) {
+      fullName = `${firstName} ${lastName}`.trim();
+    } else {
+      const parts = fullName.split(/\s+/);
+      firstName = parts[0] || "";
+      lastName = parts.slice(1).join(" ") || "";
+    }
+
+    if (!email || !phone) {
+      return response.status(400).json({
+        message: "Email and phone number are required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+
+    // Fetch user role first
+    const roleResult = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT role, email, phoneNumber FROM Users WHERE id = @userId");
+
+    const user = roleResult.recordset[0];
+    if (!user) {
+      return response.status(404).json({ message: "User not found" });
+    }
+
+    const oldEmail = user.email;
+    const oldPhone = user.phoneNumber;
+
+    // Check if new email or phone is already used by another user
+    const checkDuplicate = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phone)
+      .query(`
+        SELECT id FROM Users 
+        WHERE (email = @email OR phoneNumber = @phoneNumber)
+          AND id <> @userId
+      `);
+
+    if (checkDuplicate.recordset.length > 0) {
+      return response.status(409).json({
+        message: "Email or phone number is already registered by another account",
+      });
+    }
+
+    // Update Users table
+    const result = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .input("fullName", sql.NVarChar(150), fullName)
+      .input("firstName", sql.NVarChar(100), firstName)
+      .input("lastName", sql.NVarChar(100), lastName)
+      .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phone)
+      .input("address", sql.NVarChar(255), address)
+      .input("image", sql.NVarChar(sql.MAX), image)
+      .query(`
+        UPDATE Users
+        SET 
+          fullName = @fullName,
+          firstName = @firstName,
+          lastName = @lastName,
+          email = @email,
+          phoneNumber = @phoneNumber,
+          address = @address,
+          image = @image
+        OUTPUT 
+          INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan],
+          INSERTED.firstName, INSERTED.lastName, INSERTED.address, INSERTED.image
+        WHERE id = @userId
+      `);
+
+    const updatedUser = result.recordset[0];
+
+    // If user is a tailor, synchronize their profile information to JoinApplications
+    if (user.role === "tailor") {
+      await ensureJoinTable(pool);
+      await pool
+        .request()
+        .input("firstName", sql.NVarChar(100), firstName)
+        .input("lastName", sql.NVarChar(100), lastName)
+        .input("email", sql.NVarChar(255), email)
+        .input("phoneNumber", sql.NVarChar(20), phone)
+        .input("address", sql.NVarChar(255), address)
+        .input("oldEmail", sql.NVarChar(255), oldEmail)
+        .input("oldPhone", sql.NVarChar(20), oldPhone)
+        .query(`
+          UPDATE JoinApplications
+          SET 
+            firstName = @firstName,
+            lastName = @lastName,
+            email = @email,
+            phoneNumber = @phoneNumber,
+            location = @address
+          WHERE email = @oldEmail OR phoneNumber = @oldPhone
+        `);
+    }
+
+    return response.json({
+      message: "Profile updated successfully",
+      profile: {
+        fullName: updatedUser.fullName,
+        firstName: updatedUser.firstName || "",
+        lastName: updatedUser.lastName || "",
+        email: updatedUser.email,
+        phone: updatedUser.phoneNumber,
+        address: updatedUser.address || "",
+        image: updatedUser.image || "",
+        role: updatedUser.role,
+        plan: updatedUser.plan || "Free",
+      },
+      user: {
+        id: updatedUser.id,
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        phoneNumber: updatedUser.phoneNumber,
+        role: updatedUser.role,
+        plan: updatedUser.plan || "Free",
+        firstName: updatedUser.firstName || "",
+        lastName: updatedUser.lastName || "",
+        address: updatedUser.address || "",
+        image: updatedUser.image || "",
+      }
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    return response.status(500).json({
+      message: "Unable to update profile",
+      detail: error.message,
     });
   }
 });
@@ -1168,9 +1408,79 @@ app.post("/api/join", async (request, response) => {
         )
       `);
 
+    const application = result.recordset[0];
+
+    // Auto-update User profile if a matching user is registered (by email or phone)
+    let updatedUserObj = null;
+    let updatedProfileObj = null;
+
+    const userCheck = await pool
+      .request()
+      .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .query(`
+        SELECT id FROM Users 
+        WHERE email = @email OR phoneNumber = @phoneNumber
+      `);
+
+    if (userCheck.recordset.length > 0) {
+      const matchUserId = userCheck.recordset[0].id;
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      const userUpdateResult = await pool
+        .request()
+        .input("userId", sql.Int, matchUserId)
+        .input("fullName", sql.NVarChar(150), fullName)
+        .input("firstName", sql.NVarChar(100), firstName)
+        .input("lastName", sql.NVarChar(100), lastName)
+        .input("address", sql.NVarChar(255), location)
+        .input("image", sql.NVarChar(sql.MAX), image)
+        .query(`
+          UPDATE Users
+          SET 
+            fullName = @fullName,
+            firstName = @firstName,
+            lastName = @lastName,
+            address = @address,
+            image = @image
+          OUTPUT 
+            INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan],
+            INSERTED.firstName, INSERTED.lastName, INSERTED.address, INSERTED.image
+          WHERE id = @userId
+        `);
+      
+      const updatedUser = userUpdateResult.recordset[0];
+      updatedUserObj = {
+        id: updatedUser.id,
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        phoneNumber: updatedUser.phoneNumber,
+        role: updatedUser.role,
+        plan: updatedUser.plan || "Free",
+        firstName: updatedUser.firstName || "",
+        lastName: updatedUser.lastName || "",
+        address: updatedUser.address || "",
+        image: updatedUser.image || "",
+      };
+      
+      updatedProfileObj = {
+        fullName: updatedUser.fullName,
+        firstName: updatedUser.firstName || "",
+        lastName: updatedUser.lastName || "",
+        email: updatedUser.email,
+        phone: updatedUser.phoneNumber,
+        address: updatedUser.address || "",
+        image: updatedUser.image || "",
+        role: updatedUser.role,
+        plan: updatedUser.plan || "Free",
+      };
+    }
+
     return response.status(201).json({
       message: "Application submitted successfully",
-      application: result.recordset[0],
+      application,
+      user: updatedUserObj,
+      profile: updatedProfileObj,
     });
   } catch (error) {
     console.error("Join application error:", error);
