@@ -14,6 +14,7 @@ type BookingRecord = {
   bookingDate: string;
   bookingTime: string;
   tailorName?: string | null;
+  tailorApplicationId?: number | null;
   tailorEmail?: string | null;
   tailorPhoneNumber?: string | null;
   clothCategory?: string | null;
@@ -24,6 +25,11 @@ type BookingRecord = {
   trackingCode?: string | null;
   createdAt: string;
   fullName?: string;
+  chest?: number | null;
+  waist?: number | null;
+  hip?: number | null;
+  shoulder?: number | null;
+  inseam?: number | null;
 };
 
 type StoredUser = {
@@ -103,7 +109,7 @@ function NotificationsContent() {
 
   // Fetch tailor application ID and matching bookings
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "tailor") {
+    if (!currentUser || !["tailor", "user"].includes(currentUser.role)) {
       setIsLoading(false);
       return;
     }
@@ -111,35 +117,38 @@ function NotificationsContent() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
     async function fetchTailorApp() {
+      if (currentUser?.role !== "tailor") return;
+      const userEmail = currentUser.email?.toLowerCase().trim() || "";
+      const userPhone = currentUser.phoneNumber?.trim() || "";
       try {
         const joinRes = await fetch(`${apiUrl}/api/join`);
         const joinData = await joinRes.json();
-        
+
         if (joinRes.ok && joinData.applications) {
           const matchedApp = joinData.applications.find(
             (app: JoinApplication) =>
-              app.email?.toLowerCase().trim() === currentUser.email?.toLowerCase().trim() ||
-              app.phoneNumber?.trim() === currentUser.phoneNumber?.trim()
+              (app.email && userEmail && app.email.toLowerCase().trim() === userEmail) ||
+              (app.phoneNumber && userPhone && app.phoneNumber.trim() === userPhone)
           );
           if (matchedApp) {
             setTailorAppId(matchedApp.id);
             setTailorAppLocation(matchedApp.location || "");
           } else {
-            setTailorAppId(1);
+            setTailorAppId(currentUser?.id || 1);
           }
         } else {
-          setTailorAppId(1);
+          setTailorAppId(currentUser?.id || 1);
         }
       } catch (error) {
         console.error("Fetch tailor application error:", error);
-        setTailorAppId(1);
+        setTailorAppId(currentUser?.id || 1);
       }
     }
 
     async function fetchBookingsData(showLoading = false) {
       if (showLoading) setIsLoading(true);
       try {
-        const bookingsRes = await fetch(`${apiUrl}/api/bookings`);
+        const bookingsRes = await fetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
         const bookingsData = await bookingsRes.json();
 
         if (bookingsRes.ok && bookingsData.bookings) {
@@ -153,19 +162,21 @@ function NotificationsContent() {
     }
 
     async function init() {
-      await fetchTailorApp();
+      if (currentUser?.role === "tailor") {
+        await fetchTailorApp();
+      }
       await fetchBookingsData(true);
     }
 
     init();
 
-    // Poll bookings every 10 seconds to show new matching bookings in real-time
+    // Poll bookings every 10 seconds to show updates
     const interval = setInterval(() => fetchBookingsData(false), 10000);
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // If not logged in as tailor, redirect or show message
-  if (!currentUser || currentUser.role !== "tailor") {
+  // Check access control
+  if (!currentUser || !["tailor", "user"].includes(currentUser.role)) {
     return (
       <div className="mx-auto max-w-xl py-12 text-center animate-fade-in">
         <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6 md:p-10 shadow-sm">
@@ -174,7 +185,7 @@ function NotificationsContent() {
             Access Denied
           </h3>
           <p className="mt-3 text-xs text-red-600 leading-relaxed">
-            You must be logged in as a tailor partner to view this notifications page.
+            You must be logged in to view this notifications page.
           </p>
           <div className="mt-6">
             <Link
@@ -189,25 +200,37 @@ function NotificationsContent() {
     );
   }
 
-  // Filter matching pending bookings based on address
+  // Filter matching pending bookings based on address and explicit assignment
   const tailorAddress = (profile.address || tailorAppLocation || "").toLowerCase().trim();
   const matchingBookings = bookings.filter((b) => {
-    if (b.status !== "pending") return false;
-    if (b.tailorEmail || b.tailorPhoneNumber) return false;
-    if (!tailorAddress) return false;
+    if (b.status !== "pending-price") return false;
 
-    const pickup = String(b.pickupLocation || "").toLowerCase().trim();
-    const matchesAddress = (
-      pickup === tailorAddress ||
-      pickup.includes(tailorAddress) ||
-      tailorAddress.includes(pickup)
+    // Check if explicitly assigned to this tailor partner
+    const isAssignedToMe = (
+      (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === currentUser.email?.toLowerCase().trim()) ||
+      (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === currentUser.phoneNumber?.trim()) ||
+      (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(tailorAppId))
     );
-    if (!matchesAddress) return false;
+
+    const isAssignedToOther = (b.tailorEmail || b.tailorPhoneNumber) && !isAssignedToMe;
+    if (isAssignedToOther) return false;
+
+    // If not assigned to me, it must match my address context
+    if (!isAssignedToMe) {
+      if (!tailorAddress) return false;
+      const pickup = String(b.pickupLocation || "").toLowerCase().trim();
+      const matchesAddress = (
+        pickup === tailorAddress ||
+        pickup.includes(tailorAddress) ||
+        tailorAddress.includes(pickup)
+      );
+      if (!matchesAddress) return false;
+    }
 
     // Do not show if another booking at the same date, time, and location has been accepted by any tailor partner
     const isSlotTaken = bookings.some((other) => {
       if (other.id === b.id) return false;
-      if (other.status === "pending") return false;
+      if (other.status === "pending" || other.status === "pending-price") return false;
 
       const otherDate = new Date(other.bookingDate).toDateString();
       const bDate = new Date(b.bookingDate).toDateString();
@@ -258,6 +281,65 @@ function NotificationsContent() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (currentUser.role === "user") {
+    const customerNotifications = bookings.filter(
+      (b) => Number(b.userId) === Number(currentUser.id) && b.status === "pending-payment"
+    );
+
+    return (
+      <div className="mx-auto max-w-5xl animate-fade-in">
+        {isLoading ? (
+          <div className="text-center py-12 text-sm text-gray-400">
+            <svg className="animate-spin h-8 w-8 text-[#c322f4] mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Loading your quotes...
+          </div>
+        ) : customerNotifications.length > 0 ? (
+          <div className="space-y-4">
+            {customerNotifications.map((b) => (
+              <div
+                key={b.id}
+                className="rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 md:p-6 gap-4 border"
+                style={{ backgroundColor: "#f4faf6", borderColor: "#ccead6", borderWidth: "1px" }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#5acba0" }} />
+                    <span className="text-sm font-bold" style={{ color: "#133b1b" }}>
+                      Price Quote Received!
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs md:text-sm text-gray-600 leading-relaxed">
+                    Tailor <strong className="text-gray-800 font-semibold">{b.tailorName || "Stitch Tailor"}</strong> has quoted a price of <strong className="font-bold text-emerald-600">₹{b.approxPrice}</strong> for your request. Please proceed to confirm and pay.
+                  </p>
+                </div>
+                <div className="flex shrink-0 w-full sm:w-auto">
+                  <Link
+                    href={`/payment?bookingId=${b.id}`}
+                    className="w-full sm:w-auto h-11 px-6 inline-flex items-center justify-center font-bold text-white transition-all text-center cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
+                    style={{ backgroundColor: "#00b894", borderRadius: "14px", fontSize: "11px" }}
+                  >
+                    Confirm & Pay Now
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/20 p-12 text-center text-xs text-gray-400">
+            <span className="text-3xl block mb-3">🔔</span>
+            <p className="font-bold text-gray-500">No new notifications</p>
+            <p className="mt-1 leading-relaxed">
+              You'll receive notifications and price quotes here once our tailor partners review your requests.
+            </p>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -327,7 +409,7 @@ function NotificationsContent() {
                     <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Customer</span>
                     <span className="text-gray-800 font-bold">{b.fullName || "Stitch Customer"}</span>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Booking Date</span>
@@ -352,19 +434,112 @@ function NotificationsContent() {
                       📍 {b.dropoffLocation}
                     </span>
                   </div>
+
+                  {(b.chest || b.waist || b.hip || b.shoulder || b.inseam) ? (
+                    <div>
+                      <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block mb-1">Customer Body Measurements (Inches)</span>
+                      <div className="grid grid-cols-5 gap-1 bg-amber-50/50 border border-amber-100/50 p-2 rounded-lg text-center text-[10px] font-bold text-gray-700">
+                        <div>
+                          <span className="text-[7px] text-gray-400 font-normal uppercase tracking-wider block">Chest</span>
+                          {b.chest !== null ? b.chest : "-"}
+                        </div>
+                        <div>
+                          <span className="text-[7px] text-gray-400 font-normal uppercase tracking-wider block">Waist</span>
+                          {b.waist !== null ? b.waist : "-"}
+                        </div>
+                        <div>
+                          <span className="text-[7px] text-gray-400 font-normal uppercase tracking-wider block">Hip</span>
+                          {b.hip !== null ? b.hip : "-"}
+                        </div>
+                        <div>
+                          <span className="text-[7px] text-gray-400 font-normal uppercase tracking-wider block">Shoulder</span>
+                          {b.shoulder !== null ? b.shoulder : "-"}
+                        </div>
+                        <div>
+                          <span className="text-[7px] text-gray-400 font-normal uppercase tracking-wider block">Inseam</span>
+                          {b.inseam !== null ? b.inseam : "-"}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Customer Body Measurements</span>
+                      <span className="text-gray-400 text-[10px] leading-tight block mt-0.5">No saved measurements shared</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="pt-5 border-t border-gray-50 mt-5">
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => handleAcceptOrder(b.id)}
-                  suppressHydrationWarning
-                  className="w-full h-11 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-xs font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:scale-[1.01] transition-all duration-200 cursor-pointer disabled:opacity-60"
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.currentTarget as HTMLFormElement;
+                    const priceInput = form.elements.namedItem("price") as HTMLInputElement;
+                    const priceNum = Number(priceInput.value);
+                    if (!priceNum || priceNum <= 0) {
+                      showToast("Please enter a valid price quote", "error");
+                      return;
+                    }
+                    if (!tailorAppId) {
+                      showToast("Could not find your tailor application ID. Please apply to join first.", "error");
+                      return;
+                    }
+                    setIsSubmitting(true);
+                    try {
+                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+                      const response = await fetch(`${apiUrl}/api/bookings/${b.id}/price`, {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          approxPrice: priceNum,
+                          tailorApplicationId: tailorAppId,
+                        }),
+                      });
+                      const data = await response.json();
+
+                      if (!response.ok) {
+                        showToast(data.message || "Failed to submit price quote", "error");
+                      } else {
+                        showToast("Price quote submitted and order accepted!", "success");
+                        router.push(`/track?id=${b.id}`);
+                      }
+                    } catch (error) {
+                      console.error("Accept & Quote order error:", error);
+                      showToast("Unable to connect to backend server", "error");
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  className="space-y-3"
                 >
-                  {isSubmitting ? "Accepting..." : "Accept Order & Assign to Me"}
-                </button>
+                  <div>
+                    <label className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600 block mb-1">
+                      Enter Your Approx Price Quote (₹)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs">₹</span>
+                      <input
+                        type="number"
+                        name="price"
+                        min="1"
+                        required
+                        placeholder="e.g. 150"
+                        className="w-full h-11 pl-7 pr-3 rounded-xl border border-gray-200 bg-gray-50/30 text-xs font-semibold text-gray-800 outline-none focus:border-[#c322f4] transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    suppressHydrationWarning
+                    className="w-full h-11 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-xs font-bold text-white shadow-md shadow-[#c322f4]/15 hover:shadow-lg hover:scale-[1.01] transition-all duration-200 cursor-pointer disabled:opacity-60"
+                  >
+                    {isSubmitting ? "Submitting..." : "Quote Price & Accept Order"}
+                  </button>
+                </form>
               </div>
             </div>
           ))}
@@ -384,11 +559,28 @@ function NotificationsContent() {
 }
 
 export default function NotificationsPage() {
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const user = getCurrentUser() as any;
+    setRole(user?.role || "user");
+  }, []);
+
+  if (role === "user") {
+    return (
+      <main className="p-4 md:p-8 lg:p-10 min-h-screen font-sans">
+        <Suspense fallback={<div className="text-center py-12 text-sm text-gray-400">Loading Notifications...</div>}>
+          <NotificationsContent />
+        </Suspense>
+      </main>
+    );
+  }
+
   return (
     <main className="p-4 md:p-8 lg:p-10 bg-gray-50/50 min-h-screen font-sans">
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm animate-fade-in">
         <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e]" />
-        
+
         <Suspense fallback={<div className="text-center py-12 text-sm text-gray-400">Loading Notifications...</div>}>
           <NotificationsContent />
         </Suspense>

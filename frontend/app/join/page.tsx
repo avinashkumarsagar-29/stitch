@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { showToast } from "../components/Toast";
-import { getCurrentUser, getProfileStorageKey, safeSetLocalStorage } from "../components/profileStorage";
+import { getCurrentUser, getProfileStorageKey, safeSetLocalStorage, getProfileForCurrentUser } from "../components/profileStorage";
 
 export default function JoinPage() {
   const [formData, setFormData] = useState({
@@ -18,6 +18,28 @@ export default function JoinPage() {
   });
   const [imagePreview, setImagePreview] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user) {
+      const profile = getProfileForCurrentUser();
+      let fName = profile.firstName || "";
+      let lName = profile.lastName || "";
+      if (!fName && profile.fullName) {
+        const parts = profile.fullName.trim().split(" ");
+        fName = parts[0] || "";
+        lName = parts.slice(1).join(" ") || "";
+      }
+      setFormData((prev) => ({
+        ...prev,
+        firstName: fName,
+        lastName: lName,
+        email: profile.email || user.email || "",
+        phoneNumber: profile.phone || user.phoneNumber || "",
+        location: profile.address || "",
+      }));
+    }
+  }, []);
 
   function handleInputChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>

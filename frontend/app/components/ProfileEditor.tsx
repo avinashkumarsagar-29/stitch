@@ -43,6 +43,15 @@ export default function ProfileEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
+
+  const [measurements, setMeasurements] = useState({
+    chest: "",
+    waist: "",
+    hip: "",
+    shoulder: "",
+    inseam: "",
+  });
+  const [isSavingMeasurements, setIsSavingMeasurements] = useState(false);
   
   const userRole = useSyncExternalStore(
     subscribe,
@@ -51,33 +60,57 @@ export default function ProfileEditor() {
   );
   
   useEffect(() => {
-    async function fetchProfile() {
-      const user = getCurrentUser();
-      if (!user || !user.id) {
-        setIsLoading(false);
-        return;
-      }
+    const user = getCurrentUser();
+    if (!user || !user.id) {
+      setIsLoading(false);
+      return;
+    }
 
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const userId = user.id;
+    const currentUserObj = user;
+
+    async function fetchProfile() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/api/users/${user.id}/profile`);
+        const response = await fetch(`${apiUrl}/api/users/${userId}/profile`);
         const data = await response.json();
 
         if (response.ok && data.profile) {
           const fetchedProfile: Profile = data.profile;
           setProfile(fetchedProfile);
           // Sync with local storage
-          safeSetLocalStorage(getProfileStorageKey(user), JSON.stringify(fetchedProfile));
+          safeSetLocalStorage(getProfileStorageKey(currentUserObj), JSON.stringify(fetchedProfile));
           window.dispatchEvent(new Event("stitch-profile-change"));
         }
       } catch (err) {
         console.error("Failed to fetch profile:", err);
-      } finally {
-        setIsLoading(false);
       }
     }
 
-    fetchProfile();
+    async function fetchMeasurements() {
+      try {
+        const response = await fetch(`${apiUrl}/api/users/${userId}/measurements`);
+        const data = await response.json();
+        if (response.ok && data.measurements) {
+          setMeasurements({
+            chest: data.measurements.chest !== null ? String(data.measurements.chest) : "",
+            waist: data.measurements.waist !== null ? String(data.measurements.waist) : "",
+            hip: data.measurements.hip !== null ? String(data.measurements.hip) : "",
+            shoulder: data.measurements.shoulder !== null ? String(data.measurements.shoulder) : "",
+            inseam: data.measurements.inseam !== null ? String(data.measurements.inseam) : "",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch measurements:", err);
+      }
+    }
+
+    async function init() {
+      await Promise.all([fetchProfile(), fetchMeasurements()]);
+      setIsLoading(false);
+    }
+
+    init();
   }, []);
 
   const isUser = userRole === "user";
@@ -165,6 +198,46 @@ export default function ProfileEditor() {
       showToast("Unable to connect to backend server", "error");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleMeasurementsSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const user = getCurrentUser();
+    if (!user || !user.id) {
+      showToast("You must be logged in to save measurements", "error");
+      return;
+    }
+
+    setIsSavingMeasurements(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const response = await fetch(`${apiUrl}/api/users/${user.id}/measurements`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chest: measurements.chest,
+          waist: measurements.waist,
+          hip: measurements.hip,
+          shoulder: measurements.shoulder,
+          inseam: measurements.inseam,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.message || "Failed to update measurements", "error");
+        return;
+      }
+
+      showToast("Measurements saved successfully", "success");
+    } catch (err) {
+      console.error("Save measurements error:", err);
+      showToast("Unable to connect to backend server", "error");
+    } finally {
+      setIsSavingMeasurements(false);
     }
   }
 
@@ -307,6 +380,73 @@ export default function ProfileEditor() {
           </button>
         </form>
 
+        {isUser && (
+          <form onSubmit={handleMeasurementsSubmit} className="mt-12 pt-10 border-t border-gray-100 space-y-6">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-[#d2a22e] border border-[#d2a22e]/20 uppercase tracking-widest mb-3.5">
+                📏 Body Measurements
+              </span>
+              <h2 className="font-serif text-[26px] font-extrabold tracking-tight text-gray-950 sm:text-[30px]">
+                Your Saved Measurements (Inches)
+              </h2>
+              <p className="mt-2 max-w-[620px] text-xs leading-relaxed text-gray-500">
+                Provide your body dimensions once to allow tailors to auto-populate measurements on your bookings.
+              </p>
+            </div>
+
+            <div className="grid gap-5 grid-cols-2 sm:grid-cols-5">
+              <ProfileField
+                label="Chest"
+                value={measurements.chest}
+                onChange={(value) => setMeasurements((prev) => ({ ...prev, chest: value }))}
+                placeholder="eg. 38"
+                type="number"
+                required={false}
+              />
+              <ProfileField
+                label="Waist"
+                value={measurements.waist}
+                onChange={(value) => setMeasurements((prev) => ({ ...prev, waist: value }))}
+                placeholder="eg. 32"
+                type="number"
+                required={false}
+              />
+              <ProfileField
+                label="Hip"
+                value={measurements.hip}
+                onChange={(value) => setMeasurements((prev) => ({ ...prev, hip: value }))}
+                placeholder="eg. 40"
+                type="number"
+                required={false}
+              />
+              <ProfileField
+                label="Shoulder"
+                value={measurements.shoulder}
+                onChange={(value) => setMeasurements((prev) => ({ ...prev, shoulder: value }))}
+                placeholder="eg. 18"
+                type="number"
+                required={false}
+              />
+              <ProfileField
+                label="Inseam"
+                value={measurements.inseam}
+                onChange={(value) => setMeasurements((prev) => ({ ...prev, inseam: value }))}
+                placeholder="eg. 30"
+                type="number"
+                required={false}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSavingMeasurements}
+              className="rounded-xl bg-gradient-to-r from-amber-500 to-[#d2a22e] px-8 py-3.5 text-sm font-bold text-white shadow-md shadow-[#d2a22e]/15 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
+            >
+              {isSavingMeasurements ? "Saving..." : "Save Measurements"}
+            </button>
+          </form>
+        )}
+
         {isUser && showStatus ? <UserOrderStatus /> : null}
       </div>
     </section>
@@ -320,6 +460,7 @@ function ProfileField({
   placeholder,
   icon,
   type = "text",
+  required = true,
 }: {
   label: string;
   value: string;
@@ -327,6 +468,7 @@ function ProfileField({
   placeholder: string;
   icon?: React.ReactNode;
   type?: string;
+  required?: boolean;
 }) {
   return (
     <div>
@@ -344,7 +486,7 @@ function ProfileField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          required
+          required={required}
           suppressHydrationWarning
           className={`block w-full h-12 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 ${icon ? 'pl-10' : 'pl-4'}`}
         />

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useSyncExternalStore, useEffect } from "react";
+import { useState, useSyncExternalStore, useEffect, useRef } from "react";
 import {
   getProfileForCurrentUser,
   placeholderProfileImage,
@@ -13,11 +13,52 @@ import {
 } from "./profileStorage";
 import { showToast } from "./Toast";
 
+function playNotificationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+
+    // First chime
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    gain1.gain.setValueAtTime(0, ctx.currentTime);
+    gain1.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+
+    // Second chime (slightly offset)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+    gain2.gain.setValueAtTime(0, ctx.currentTime + 0.1);
+    gain2.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+
+    osc2.start(ctx.currentTime + 0.1);
+    osc2.stop(ctx.currentTime + 0.3);
+  } catch (error) {
+    console.warn("Failed to play notification sound:", error);
+  }
+}
+
 // Links configuration
 const userLinks = [
   { label: "Home", href: "/", icon: "🏠" },
   { label: "Book Now", href: "/booking", icon: "✂️" },
   { label: "Track Order", href: "/track", icon: "📦" },
+  { label: "Notifications", href: "/notifications", icon: "🔔" },
   { label: "Collection", href: "/collection", icon: "🧵" },
   { label: "About us", href: "/about", icon: "✨" },
   { label: "Pricing", href: "/pricing", icon: "🏷️ ️" }
@@ -25,6 +66,7 @@ const userLinks = [
 
 const tailorLinks = [
   { label: "Home", href: "/", icon: "🏠" },
+  { label: "My Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Update Order", href: "/track", icon: "📦" },
   { label: "Notifications", href: "/notifications", icon: "🔔" },
   { label: "Join Stitch", href: "/join", icon: "🤝" },
@@ -94,10 +136,12 @@ export default function Sidebar({
   const profile = useSyncExternalStore(subscribe, getProfileSnapshot, () => emptyProfile);
 
   const [notificationCount, setNotificationCount] = useState(0);
+  const prevCountRef = useRef(0);
 
   useEffect(() => {
-    if (!isLoggedIn || userRole !== "tailor") {
+    if (!isLoggedIn) {
       setNotificationCount(0);
+      prevCountRef.current = 0;
       return;
     }
 
@@ -108,69 +152,112 @@ export default function Sidebar({
         const currentUserEmail = currentUser?.email || "";
         const currentUserPhone = currentUser?.phoneNumber || "";
 
-        let dbLocation = "";
-        try {
-          const joinRes = await fetch(`${apiUrl}/api/join`);
-          const joinData = await joinRes.json();
-          if (joinRes.ok && joinData.applications) {
-            const matchedApp = joinData.applications.find(
-              (app: any) =>
-                (currentUserEmail && app.email?.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()) ||
-                (currentUserPhone && app.phoneNumber?.trim() === currentUserPhone.trim())
-            );
-            if (matchedApp) {
-              dbLocation = matchedApp.location || "";
+        if (userRole === "tailor") {
+          let dbLocation = "";
+          let tailorAppId = currentUser?.id || 1;
+          try {
+            const joinRes = await fetch(`${apiUrl}/api/join`);
+            const joinData = await joinRes.json();
+            if (joinRes.ok && joinData.applications) {
+              const matchedApp = joinData.applications.find(
+                (app: any) =>
+                  (currentUserEmail && app.email?.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()) ||
+                  (currentUserPhone && app.phoneNumber?.trim() === currentUserPhone.trim())
+              );
+              if (matchedApp) {
+                dbLocation = matchedApp.location || "";
+                tailorAppId = matchedApp.id;
+              }
             }
+          } catch (e) {
+            console.error("Error fetching join applications in Sidebar:", e);
           }
-        } catch (e) {
-          console.error("Error fetching join applications in Sidebar:", e);
-        }
 
-        const tailorAddress = (profile.address || dbLocation || "").toLowerCase().trim();
-        if (!tailorAddress) {
-          setNotificationCount(0);
-          return;
-        }
+          const tailorAddress = (profile.address || dbLocation || "").toLowerCase().trim();
+          if (!tailorAddress) {
+            const newCount = 0;
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+            return;
+          }
 
-        const response = await fetch(`${apiUrl}/api/bookings`);
-        const data = await response.json();
+          const response = await fetch(`${apiUrl}/api/bookings?role=tailor`);
+          const data = await response.json();
 
-        if (response.ok && data.bookings) {
-          const matching = data.bookings.filter((b: any) => {
-            if (b.status !== "pending") return false;
-            if (b.tailorEmail || b.tailorPhoneNumber) return false;
-            
-            const pickup = String(b.pickupLocation || "").toLowerCase().trim();
-            const matchesAddress = (
-              pickup === tailorAddress ||
-              pickup.includes(tailorAddress) ||
-              tailorAddress.includes(pickup)
-            );
-            if (!matchesAddress) return false;
+          if (response.ok && data.bookings) {
+            const matching = data.bookings.filter((b: any) => {
+              if (b.status !== "pending-price") return false;
 
-            // Check if slot taken
-            const isSlotTaken = data.bookings.some((other: any) => {
-              if (other.id === b.id) return false;
-              if (other.status === "pending") return false;
+              const isAssignedToMe = (
+                (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === currentUser?.email?.toLowerCase().trim()) ||
+                (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === currentUser?.phoneNumber?.trim()) ||
+                (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(tailorAppId))
+              );
 
-              const otherDate = new Date(other.bookingDate).toDateString();
-              const bDate = new Date(b.bookingDate).toDateString();
-              if (otherDate !== bDate) return false;
+              const isAssignedToOther = (b.tailorEmail || b.tailorPhoneNumber) && !isAssignedToMe;
+              if (isAssignedToOther) return false;
 
-              const otherTime = String(other.bookingTime).slice(0, 5);
-              const bTime = String(b.bookingTime).slice(0, 5);
-              if (otherTime !== bTime) return false;
+              if (!isAssignedToMe) {
+                if (!tailorAddress) return false;
+                const pickup = String(b.pickupLocation || "").toLowerCase().trim();
+                const matchesAddress = (
+                  pickup === tailorAddress ||
+                  pickup.includes(tailorAddress) ||
+                  tailorAddress.includes(pickup)
+                );
+                if (!matchesAddress) return false;
+              }
 
-              const otherLoc = String(other.pickupLocation || "").toLowerCase().trim();
-              const bLoc = String(b.pickupLocation || "").toLowerCase().trim();
-              if (otherLoc !== bLoc) return false;
+              // Check if slot taken
+              const isSlotTaken = data.bookings.some((other: any) => {
+                if (other.id === b.id) return false;
+                if (other.status === "pending" || other.status === "pending-price") return false;
 
-              return true;
+                const otherDate = new Date(other.bookingDate).toDateString();
+                const bDate = new Date(b.bookingDate).toDateString();
+                if (otherDate !== bDate) return false;
+
+                const otherTime = String(other.bookingTime).slice(0, 5);
+                const bTime = String(b.bookingTime).slice(0, 5);
+                if (otherTime !== bTime) return false;
+
+                const otherLoc = String(other.pickupLocation || "").toLowerCase().trim();
+                const bLoc = String(b.pickupLocation || "").toLowerCase().trim();
+                if (otherLoc !== bLoc) return false;
+
+                return true;
+              });
+
+              return !isSlotTaken;
             });
 
-            return !isSlotTaken;
-          });
-          setNotificationCount(matching.length);
+            const newCount = matching.length;
+            if (newCount > prevCountRef.current) {
+              playNotificationSound();
+            }
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+          }
+        } else if (userRole === "user") {
+          if (!currentUser?.id) {
+            const newCount = 0;
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+            return;
+          }
+          const response = await fetch(`${apiUrl}/api/bookings?role=user`);
+          const data = await response.json();
+          if (response.ok && data.bookings) {
+            const matching = data.bookings.filter(
+              (b: any) => Number(b.userId) === Number(currentUser.id) && b.status === "pending-payment"
+            );
+            const newCount = matching.length;
+            if (newCount > prevCountRef.current) {
+              playNotificationSound();
+            }
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+          }
         }
       } catch (error) {
         console.error("Failed to check notifications:", error);
@@ -187,7 +274,7 @@ export default function Sidebar({
     ? tailorLinks
     : isLoggedIn
       ? userLinks
-      : userLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order");
+      : userLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order" && link.label !== "Notifications");
   const profileImage = profile.image || placeholderProfileImage;
 
   const handleLinkClick = () => {
@@ -290,8 +377,8 @@ export default function Sidebar({
                     href="/profile"
                     onClick={handleLinkClick}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${pathname === "/profile"
-                        ? "bg-purple-50 text-[#c322f4]"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      ? "bg-purple-50 text-[#c322f4]"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                       }`}
                   >
                     <span>👤</span> Profile Settings
@@ -336,8 +423,8 @@ export default function Sidebar({
                     href={link.href}
                     onClick={handleLinkClick}
                     className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all ${active
-                        ? "bg-[#c322f4]/10 text-[#c322f4] border-l-4 border-[#c322f4]"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      ? "bg-[#c322f4]/10 text-[#c322f4] border-l-4 border-[#c322f4]"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                       }`}
                   >
                     <div className="flex items-center gap-3">
@@ -369,8 +456,8 @@ export default function Sidebar({
                     href={link.href}
                     onClick={handleLinkClick}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${active
-                        ? "bg-[#c322f4]/10 text-[#c322f4] border-l-4 border-[#c322f4]"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      ? "bg-[#c322f4]/10 text-[#c322f4] border-l-4 border-[#c322f4]"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                       }`}
                   >
                     <span className="text-base">{link.icon}</span>

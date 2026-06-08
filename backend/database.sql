@@ -190,8 +190,28 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('dbo.Measurements', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.Measurements (
+    id INT IDENTITY PRIMARY KEY,
+    userId INT NOT NULL,
+    chest DECIMAL(5,2),
+    waist DECIMAL(5,2),
+    hip DECIMAL(5,2),
+    shoulder DECIMAL(5,2),
+    inseam DECIMAL(5,2),
+    updatedAt DATETIME2 DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_Measurements_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
+  );
+END
+GO
+
 SELECT * FROM dbo.Users ORDER BY createdAt DESC;
 SELECT * FROM dbo.LoginOtps ORDER BY createdAt DESC;
 SELECT * FROM dbo.Bookings ORDER BY createdAt DESC;
 SELECT * FROM dbo.JoinApplications ORDER BY createdAt DESC;
+IF OBJECT_ID('dbo.Measurements', 'U') IS NOT NULL
+BEGIN
+  SELECT * FROM dbo.Measurements ORDER BY updatedAt DESC;
+END
 GO

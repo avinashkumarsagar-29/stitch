@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
 import { showToast } from "../components/Toast";
+import TrackingMap from "../components/TrackingMap";
 
 type BookingRecord = {
   id: number;
@@ -68,6 +69,78 @@ function getCurrentUserSnapshot(): StoredUser | null {
   return cachedUser;
 }
 
+function PriceQuoteForm({ bookingId, onQuoteSubmitted }: { bookingId: number; onQuoteSubmitted: (price: number) => void }) {
+  const [quotePrice, setQuotePrice] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleQuoteSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const priceNum = Number(quotePrice);
+    if (!priceNum || priceNum <= 0) {
+      showToast("Please enter a valid positive price", "error");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/price`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ approxPrice: priceNum }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.message || "Failed to submit price quote", "error");
+      } else {
+        showToast("Price quote submitted successfully!", "success");
+        onQuoteSubmitted(priceNum);
+      }
+    } catch (error) {
+      console.error(error);
+      showToast("Unable to connect to server", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleQuoteSubmit} className="rounded-2xl border border-purple-200 bg-purple-50 p-6 shadow-sm animate-fade-in space-y-4">
+      <div className="space-y-1">
+        <h4 className="text-sm font-bold text-purple-900">Submit Your Price Quote</h4>
+        <p className="text-xs text-purple-700">
+          Review the customer's garment category, material, image, and body measurements below. Enter your custom price quote below to send it to the customer.
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">₹</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            placeholder="Enter your price quote (e.g. 500)"
+            value={quotePrice}
+            onChange={(e) => setQuotePrice(e.target.value)}
+            className="w-full h-11 pl-8 pr-4 rounded-xl border border-purple-200 bg-white text-xs font-semibold text-gray-800 outline-none focus:border-purple-500 transition-colors"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-xs font-bold text-white shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer disabled:opacity-60 shrink-0"
+        >
+          {isSubmitting ? "Submitting..." : "Send Quote"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function TrackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -94,7 +167,7 @@ function TrackContent() {
       setIsLoading(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/api/bookings/${id}`);
+        const response = await fetch(`${apiUrl}/api/bookings/${id}?role=${currentUser?.role || 'user'}`);
         const data = await response.json();
 
         if (!response.ok) {
@@ -128,7 +201,7 @@ function TrackContent() {
       setIsListLoading(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/api/bookings`);
+        const response = await fetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
         const data = await response.json();
 
         if (response.ok && data.bookings) {
@@ -141,7 +214,7 @@ function TrackContent() {
                 b.tailorPhoneNumber === currentUser.phoneNumber
               );
             } else {
-              return b.userId === currentUser.id;
+              return Number(b.userId) === Number(currentUser.id);
             }
           });
           setUserBookings(filtered);
@@ -232,7 +305,7 @@ function TrackContent() {
 
   function getStepIndex(status: string): number {
     const s = String(status || "").toLowerCase().trim();
-    if (s === "pending") return -1;
+    if (s === "pending-price" || s === "pending-payment" || s === "pending") return -1;
     if (s === "booked") return 0;
     if (s === "picked-up") return 1;
     if (s === "in-stitching") return 2;
@@ -390,12 +463,12 @@ function TrackContent() {
                                 Booking #{b.id} {b.trackingCode && <span className="font-mono text-gray-400 font-normal">({b.trackingCode})</span>}
                               </span>
                               <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${b.status === "delivered"
-                                  ? "bg-green-50 text-green-700 border border-green-200"
-                                  : b.status === "pending"
-                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                    : "bg-purple-50 text-purple-700 border border-purple-200"
+                                ? "bg-green-50 text-green-700 border border-green-200"
+                                : b.status === "pending" || b.status === "pending-price" || b.status === "pending-payment"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : "bg-purple-50 text-purple-700 border border-purple-200"
                                 }`}>
-                                {b.status}
+                                {b.status === "pending-price" ? "Price Quote Needed" : b.status === "pending-payment" ? "Payment Pending" : b.status}
                               </span>
                             </div>
                             <p className="mt-1 text-[11px] text-gray-500 truncate">
@@ -461,6 +534,37 @@ function TrackContent() {
             </div>
           </div>
 
+          {/* Action alerts for Quoting Workflow */}
+          {activeBooking.status === "pending-price" && !isTailor && (
+            <div className="rounded-2xl border border-purple-200 bg-purple-50 p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm animate-fade-in">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-purple-900 flex items-center gap-1.5">
+                  <span className="animate-pulse h-2 w-2 rounded-full bg-purple-600" />
+                  Waiting for Tailor Price Quote
+                </h4>
+                <p className="text-xs text-purple-700">
+                  Your selected tailor partner <strong>{activeBooking.tailorName}</strong> is reviewing your cloth details. We will notify you once they quote the final tailoring price.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeBooking.status === "pending-price" && isTailor && (
+            <PriceQuoteForm bookingId={activeBooking.id} onQuoteSubmitted={(price) => {
+              setActiveBooking(prev => prev ? { ...prev, approxPrice: price, status: 'pending-payment' } : null);
+              setUserBookings(prevList => prevList.map(b => b.id === activeBooking.id ? { ...b, approxPrice: price, status: 'pending-payment' } : b));
+            }} />
+          )}
+
+          {activeBooking.status === "pending-payment" && isTailor && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6 shadow-sm animate-fade-in">
+              <h4 className="text-sm font-bold text-blue-900">Price Quote Submitted</h4>
+              <p className="text-xs text-blue-700 mt-1">
+                You quoted a price of <strong>₹{activeBooking.approxPrice}</strong>. Waiting for the customer to confirm the price and make the payment.
+              </p>
+            </div>
+          )}
+
           {/* Visual Timeline Card */}
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-400 mb-6">
@@ -488,8 +592,8 @@ function TrackContent() {
                   <div key={step.id} className="flex flex-col items-center text-center relative z-10">
                     <div
                       className={`flex h-11 w-11 items-center justify-center rounded-full border-4 transition-all duration-300 ${isCompleted
-                          ? "bg-[#c322f4] text-white border-purple-200"
-                          : "bg-white text-gray-400 border-gray-100"
+                        ? "bg-[#c322f4] text-white border-purple-200"
+                        : "bg-white text-gray-400 border-gray-100"
                         } ${isActive
                           ? "scale-110 shadow-lg shadow-[#c322f4]/30 ring-4 ring-[#c322f4]/20 animate-pulse"
                           : ""
@@ -530,8 +634,8 @@ function TrackContent() {
                   <div key={step.id} className="relative flex gap-4">
                     <div
                       className={`absolute -left-[31px] flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all duration-300 ${isCompleted
-                          ? "bg-[#c322f4] text-white border-purple-200"
-                          : "bg-white text-gray-400 border-gray-100"
+                        ? "bg-[#c322f4] text-white border-purple-200"
+                        : "bg-white text-gray-400 border-gray-100"
                         } ${isActive ? "scale-110 shadow-md ring-4 ring-[#c322f4]/20" : ""}`}
                     >
                       <span className="text-xs font-bold">{step.icon}</span>
@@ -551,132 +655,145 @@ function TrackContent() {
           </div>
 
           {/* Details Section */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Order Details card */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm space-y-4">
-              <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d2a22e]" />
-                Order Details
-              </h3>
+          <div className="grid gap-6 lg:grid-cols-12">
+            {/* Left side: details & courier */}
+            <div className="lg:col-span-5 space-y-6 flex flex-col">
+              {/* Order Details card */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm space-y-4">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#d2a22e]" />
+                  Order Details
+                </h3>
 
-              {activeBooking.clothImage && (
-                <div className="relative h-44 overflow-hidden rounded-xl bg-gray-50 border border-gray-100">
-                  <Image
-                    src={activeBooking.clothImage}
-                    alt="Cloth Preview"
-                    fill
-                    sizes="400px"
-                    unoptimized
-                    className="object-cover"
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Cloth Category</p>
-                  <p className="mt-1 font-semibold text-gray-800">{activeBooking.clothCategory || "Details pending"}</p>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Material</p>
-                  <p className="mt-1 font-semibold text-gray-800">{activeBooking.material || "Details pending"}</p>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Approx Price</p>
-                  <p className="mt-1 font-semibold text-[#c322f4]">{activeBooking.approxPrice ? `₹${activeBooking.approxPrice}` : "TBD"}</p>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Current Status</p>
-                  <p className="mt-1 font-semibold text-gray-800 uppercase tracking-wider text-[10px]">{activeBooking.status}</p>
-                </div>
-                {activeBooking.trackingCode && (
-                  <div className="col-span-2">
-                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Tracking Code</p>
-                    <p className="mt-1 font-semibold text-gray-800 font-mono tracking-wider">{activeBooking.trackingCode}</p>
+                {activeBooking.clothImage && (
+                  <div className="relative h-44 overflow-hidden rounded-xl bg-gray-50 border border-gray-100">
+                    <Image
+                      src={activeBooking.clothImage}
+                      alt="Cloth Preview"
+                      fill
+                      sizes="400px"
+                      unoptimized
+                      className="object-cover"
+                    />
                   </div>
                 )}
+
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Cloth Category</p>
+                    <p className="mt-1 font-semibold text-gray-800">{activeBooking.clothCategory || "Details pending"}</p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Material</p>
+                    <p className="mt-1 font-semibold text-gray-800">{activeBooking.material || "Details pending"}</p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Approx Price</p>
+                    <p className="mt-1 font-semibold text-[#c322f4]">{activeBooking.approxPrice ? `₹${activeBooking.approxPrice}` : "TBD"}</p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Current Status</p>
+                    <p className="mt-1 font-semibold text-gray-800 uppercase tracking-wider text-[10px]">{activeBooking.status}</p>
+                  </div>
+                  {activeBooking.trackingCode && (
+                    <div className="col-span-2">
+                      <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Tracking Code</p>
+                      <p className="mt-1 font-semibold text-gray-800 font-mono tracking-wider">{activeBooking.trackingCode}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-xs pt-2 border-t border-gray-50 space-y-2">
+                  <div>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Pickup Address</p>
+                    <p className="mt-0.5 text-gray-700">{activeBooking.pickupLocation}</p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Drop-off Address</p>
+                    <p className="mt-0.5 text-gray-700">{activeBooking.dropoffLocation}</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="text-xs pt-2 border-t border-gray-50 space-y-2">
-                <div>
-                  <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Pickup Address</p>
-                  <p className="mt-0.5 text-gray-700">{activeBooking.pickupLocation}</p>
+              {/* Tailor & Simulator Card */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm flex flex-col justify-between flex-1">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#d2a22e]" />
+                    Assigned Tailor
+                  </h3>
+
+                  {activeBooking.tailorName ? (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-base font-bold text-gray-800">{activeBooking.tailorName}</p>
+                        <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mt-0.5">✂️ Expert Tailoring Partner</p>
+                      </div>
+
+                      <div className="text-xs space-y-2 pt-2">
+                        <div className="flex justify-between border-b border-gray-50 pb-1.5">
+                          <span className="font-semibold text-gray-400">Phone</span>
+                          <span className="text-gray-700 font-medium">{activeBooking.tailorPhoneNumber || "N/A"}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-50 pb-1.5">
+                          <span className="font-semibold text-gray-400">Email</span>
+                          <span className="text-gray-700 font-medium truncate max-w-[200px]">{activeBooking.tailorEmail || "N/A"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-xs text-gray-400">No tailor assigned yet.</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Our team is matching your order with a professional tailor near you.</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Drop-off Address</p>
-                  <p className="mt-0.5 text-gray-700">{activeBooking.dropoffLocation}</p>
-                </div>
+
+                {/* Simulator Card (Demo Mode) */}
+                {currentUser?.role === "tailor" && (
+                  <div className="mt-6 pt-6 border-t border-gray-100 bg-purple-50/50 p-4 rounded-xl border border-purple-100/50 animate-fade-in">
+                    <p className="text-[9px] font-extrabold uppercase tracking-widest text-purple-700 mb-2">
+                      ⚙️ Status Control (Tailor Only)
+                    </p>
+                    <p className="text-[10px] text-gray-500 mb-3 leading-snug">
+                      Update the tracking status of this garment. Changes will reflect immediately on the customer's page.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { id: "booked", label: "Confirmed" },
+                        { id: "picked-up", label: "Picked Up" },
+                        { id: "in-stitching", label: "Stitching" },
+                        { id: "ready", label: "Ready" },
+                        { id: "out-for-delivery", label: "Out" },
+                        { id: "delivered", label: "Delivered" },
+                      ].map((btn) => (
+                        <button
+                          key={btn.id}
+                          disabled={isSimulating}
+                          onClick={() => simulateStatus(btn.id)}
+                          suppressHydrationWarning
+                          className={`px-2 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${activeBooking.status === btn.id
+                            ? "bg-[#c322f4] text-white shadow-sm"
+                            : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                            }`}
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Tailor & Simulator Card */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm flex flex-col justify-between">
-              <div className="space-y-4">
-                <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#d2a22e]" />
-                  Assigned Tailor
-                </h3>
-
-                {activeBooking.tailorName ? (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-base font-bold text-gray-800">{activeBooking.tailorName}</p>
-                      <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mt-0.5">✂️ Expert Tailoring Partner</p>
-                    </div>
-
-                    <div className="text-xs space-y-2 pt-2">
-                      <div className="flex justify-between border-b border-gray-50 pb-1.5">
-                        <span className="font-semibold text-gray-400">Phone</span>
-                        <span className="text-gray-700 font-medium">{activeBooking.tailorPhoneNumber || "N/A"}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-gray-50 pb-1.5">
-                        <span className="font-semibold text-gray-400">Email</span>
-                        <span className="text-gray-700 font-medium truncate max-w-[200px]">{activeBooking.tailorEmail || "N/A"}</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <p className="text-xs text-gray-400">No tailor assigned yet.</p>
-                    <p className="text-[10px] text-gray-400 mt-1">Our team is matching your order with a professional tailor near you.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Simulator Card (Demo Mode) */}
-              {currentUser?.role === "tailor" && (
-                <div className="mt-6 pt-6 border-t border-gray-100 bg-purple-50/50 p-4 rounded-xl border border-purple-100/50 animate-fade-in">
-                  <p className="text-[9px] font-extrabold uppercase tracking-widest text-purple-700 mb-2">
-                    ⚙️ Status Control (Tailor Only)
-                  </p>
-                  <p className="text-[10px] text-gray-500 mb-3 leading-snug">
-                    Update the tracking status of this garment. Changes will reflect immediately on the customer's page.
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { id: "booked", label: "Confirmed" },
-                      { id: "picked-up", label: "Picked Up" },
-                      { id: "in-stitching", label: "Stitching" },
-                      { id: "ready", label: "Ready" },
-                      { id: "out-for-delivery", label: "Out" },
-                      { id: "delivered", label: "Delivered" },
-                    ].map((btn) => (
-                      <button
-                        key={btn.id}
-                        disabled={isSimulating}
-                        onClick={() => simulateStatus(btn.id)}
-                        suppressHydrationWarning
-                        className={`px-2 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${activeBooking.status === btn.id
-                            ? "bg-[#c322f4] text-white shadow-sm"
-                            : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                          }`}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            {/* Right side: Real-time tracking Map */}
+            <div className="lg:col-span-7 flex flex-col h-[450px] lg:h-auto">
+              <TrackingMap
+                status={activeBooking.status}
+                pickupLocation={activeBooking.pickupLocation}
+                dropoffLocation={activeBooking.dropoffLocation}
+                tailorName={activeBooking.tailorName}
+              />
             </div>
           </div>
         </div>
@@ -756,12 +873,12 @@ function TailorOrderCard({
             </p>
           </div>
           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ${booking.status === "delivered"
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : booking.status === "pending"
-                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                : "bg-purple-50 text-purple-700 border border-purple-200"
+            ? "bg-green-50 text-green-700 border border-green-200"
+            : booking.status === "pending-price" || booking.status === "pending-payment" || booking.status === "pending"
+              ? "bg-amber-50 text-amber-700 border border-amber-200"
+              : "bg-purple-50 text-purple-700 border border-purple-200"
             }`}>
-            {booking.status}
+            {booking.status === "pending-price" ? "Price Quote Needed" : booking.status === "pending-payment" ? "Payment Pending" : booking.status}
           </span>
         </div>
 
@@ -800,49 +917,99 @@ function TailorOrderCard({
         </div>
       </div>
 
-      <div className="pt-3 border-t border-gray-50 mt-2 space-y-3">
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          suppressHydrationWarning
-          className="w-full h-9 rounded-xl border border-purple-100 bg-purple-50/30 hover:bg-purple-50 text-purple-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-        >
-          ⚙️ {expanded ? "Hide Status Controls" : "Update Status"}
-        </button>
+      {booking.status === "pending-price" ? (
+        <div className="pt-3 border-t border-gray-50 mt-2">
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.currentTarget as HTMLFormElement;
+            const priceInput = form.elements.namedItem("price") as HTMLInputElement;
+            const priceNum = Number(priceInput.value);
+            if (!priceNum || priceNum <= 0) {
+              showToast("Please enter a valid price", "error");
+              return;
+            }
+            try {
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+              const response = await fetch(`${apiUrl}/api/bookings/${booking.id}/price`, {
+                method: "PATCH",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ approxPrice: priceNum }),
+              });
+              if (response.ok) {
+                showToast("Price quote submitted!", "success");
+                onStatusUpdate(booking.id, "pending-payment");
+              } else {
+                showToast("Failed to submit price quote", "error");
+              }
+            } catch (err) {
+              showToast("Network error", "error");
+            }
+          }} className="flex gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-[10px]">₹</span>
+              <input
+                type="number"
+                name="price"
+                min="1"
+                placeholder="Enter price quote..."
+                className="w-full h-8 pl-5 pr-2 rounded-lg border border-purple-100 bg-purple-50/10 text-[10px] font-semibold text-gray-800 outline-none focus:border-purple-400 transition-colors"
+              />
+            </div>
+            <button
+              type="submit"
+              className="h-8 px-3 rounded-lg bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-[10px] font-bold text-white shadow-sm hover:scale-[1.01] transition-all cursor-pointer shrink-0"
+            >
+              Quote
+            </button>
+          </form>
+        </div>
+      ) : (
+        <div className="pt-3 border-t border-gray-50 mt-2 space-y-3">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            suppressHydrationWarning
+            className="w-full h-9 rounded-xl border border-purple-100 bg-purple-50/30 hover:bg-purple-50 text-purple-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            ⚙️ {expanded ? "Hide Status Controls" : "Update Status"}
+          </button>
 
-        {expanded && (
-          <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100/50 space-y-2.5 animate-fade-in">
-            <p className="text-[9px] font-extrabold uppercase tracking-widest text-purple-700">
-              Select Current Stage
-            </p>
-            <div className="grid grid-cols-3 gap-1">
-              {steps.map((step) => (
-                <button
-                  key={step.id}
-                  disabled={isSimulating}
-                  onClick={() => onStatusUpdate(booking.id, step.id)}
-                  suppressHydrationWarning
-                  className={`py-1.5 text-[9px] font-extrabold rounded-lg transition-all cursor-pointer ${booking.status === step.id
+          {expanded && (
+            <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100/50 space-y-2.5 animate-fade-in">
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-purple-700">
+                Select Current Stage
+              </p>
+              <div className="grid grid-cols-3 gap-1">
+                {steps.map((step) => (
+                  <button
+                    key={step.id}
+                    disabled={isSimulating}
+                    onClick={() => onStatusUpdate(booking.id, step.id)}
+                    suppressHydrationWarning
+                    className={`py-1.5 text-[9px] font-extrabold rounded-lg transition-all cursor-pointer ${booking.status === step.id
                       ? "bg-[#c322f4] text-white shadow-sm"
                       : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                    }`}
-                >
-                  {step.label}
-                </button>
-              ))}
-            </div>
+                      }`}
+                  >
+                    {step.label}
+                  </button>
+                ))}
+              </div>
 
-            <div className="pt-2 border-t border-purple-100/30">
-              <Link
-                href={`/track?id=${booking.id}`}
-                className="block text-center text-[9px] font-extrabold uppercase tracking-wider text-purple-600 hover:underline"
-              >
-                👁️ View Tracking Page
-              </Link>
+              <div className="pt-2 border-t border-purple-100/30">
+                <Link
+                  href={`/track?id=${booking.id}`}
+                  className="block text-center text-[9px] font-extrabold uppercase tracking-wider text-purple-600 hover:underline"
+                >
+                  👁️ View Tracking Page
+                </Link>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

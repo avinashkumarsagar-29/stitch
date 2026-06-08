@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, useSyncExternalStore, useEffect } from "react";
+import { useState, useSyncExternalStore, useEffect, useRef } from "react";
 import Sidebar from "./Sidebar";
 import Link from "next/link";
 import ThemeSelector from "./ThemeSelector";
@@ -12,14 +12,50 @@ import {
   getProfileStorageKey,
 } from "./profileStorage";
 
+function playNotificationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+
+    // First chime
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    gain1.gain.setValueAtTime(0, ctx.currentTime);
+    gain1.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+
+    // Second chime (slightly offset)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+    gain2.gain.setValueAtTime(0, ctx.currentTime + 0.1);
+    gain2.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+
+    osc2.start(ctx.currentTime + 0.1);
+    osc2.stop(ctx.currentTime + 0.3);
+  } catch (error) {
+    console.warn("Failed to play notification sound:", error);
+  }
+}
+
 const customerLinks = [
   { label: "Book Now", href: "/booking" },
   { label: "Track Order", href: "/track" },
-  { label: "Collection", href: "/collection" },
-  { label: "Pricing", href: "/pricing" },
   { label: "About us", href: "/about" },
-  { label: "Careers", href: "/careers" },
-  { label: "Blog", href: "/blog" },
 ];
 
 const tailorLinks = [
@@ -89,10 +125,12 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isTailor = userRole === "tailor";
 
   const [notificationCount, setNotificationCount] = useState(0);
+  const prevCountRef = useRef(0);
 
   useEffect(() => {
-    if (!isLoggedIn || !isTailor) {
+    if (!isLoggedIn) {
       setNotificationCount(0);
+      prevCountRef.current = 0;
       return;
     }
 
@@ -103,69 +141,111 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         const currentUserEmail = currentUser?.email || "";
         const currentUserPhone = currentUser?.phoneNumber || "";
 
-        let dbLocation = "";
-        try {
-          const joinRes = await fetch(`${apiUrl}/api/join`);
-          const joinData = await joinRes.json();
-          if (joinRes.ok && joinData.applications) {
-            const matchedApp = joinData.applications.find(
-              (app: any) =>
-                (currentUserEmail && app.email?.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()) ||
-                (currentUserPhone && app.phoneNumber?.trim() === currentUserPhone.trim())
-            );
-            if (matchedApp) {
-              dbLocation = matchedApp.location || "";
+        if (isTailor) {
+          let dbLocation = "";
+          let tailorAppId = currentUser?.id || 1;
+          try {
+            const joinRes = await fetch(`${apiUrl}/api/join`);
+            const joinData = await joinRes.json();
+            if (joinRes.ok && joinData.applications) {
+              const matchedApp = joinData.applications.find(
+                (app: any) =>
+                  (currentUserEmail && app.email?.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()) ||
+                  (currentUserPhone && app.phoneNumber?.trim() === currentUserPhone.trim())
+              );
+              if (matchedApp) {
+                dbLocation = matchedApp.location || "";
+                tailorAppId = matchedApp.id;
+              }
             }
+          } catch (e) {
+            console.error("Error fetching join applications in LayoutWrapper:", e);
           }
-        } catch (e) {
-          console.error("Error fetching join applications in LayoutWrapper:", e);
-        }
 
-        const tailorAddress = (profile.address || dbLocation || "").toLowerCase().trim();
-        if (!tailorAddress) {
-          setNotificationCount(0);
-          return;
-        }
+          const tailorAddress = (profile.address || dbLocation || "").toLowerCase().trim();
+          if (!tailorAddress) {
+            const newCount = 0;
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+            return;
+          }
 
-        const response = await fetch(`${apiUrl}/api/bookings`);
-        const data = await response.json();
+          const response = await fetch(`${apiUrl}/api/bookings?role=tailor`);
+          const data = await response.json();
 
-        if (response.ok && data.bookings) {
-          const matching = data.bookings.filter((b: any) => {
-            if (b.status !== "pending") return false;
-            if (b.tailorEmail || b.tailorPhoneNumber) return false;
-            
-            const pickup = String(b.pickupLocation || "").toLowerCase().trim();
-            const matchesAddress = (
-              pickup === tailorAddress ||
-              pickup.includes(tailorAddress) ||
-              tailorAddress.includes(pickup)
-            );
-            if (!matchesAddress) return false;
+          if (response.ok && data.bookings) {
+            const matching = data.bookings.filter((b: any) => {
+              if (b.status !== "pending-price") return false;
 
-            // Check if slot taken
-            const isSlotTaken = data.bookings.some((other: any) => {
-              if (other.id === b.id) return false;
-              if (other.status === "pending") return false;
+              const isAssignedToMe = (
+                (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === currentUser?.email?.toLowerCase().trim()) ||
+                (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === currentUser?.phoneNumber?.trim()) ||
+                (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(tailorAppId))
+              );
 
-              const otherDate = new Date(other.bookingDate).toDateString();
-              const bDate = new Date(b.bookingDate).toDateString();
-              if (otherDate !== bDate) return false;
+              const isAssignedToOther = (b.tailorEmail || b.tailorPhoneNumber) && !isAssignedToMe;
+              if (isAssignedToOther) return false;
 
-              const otherTime = String(other.bookingTime).slice(0, 5);
-              const bTime = String(b.bookingTime).slice(0, 5);
-              if (otherTime !== bTime) return false;
+              if (!isAssignedToMe) {
+                if (!tailorAddress) return false;
+                const pickup = String(b.pickupLocation || "").toLowerCase().trim();
+                const matchesAddress = (
+                  pickup === tailorAddress ||
+                  pickup.includes(tailorAddress) ||
+                  tailorAddress.includes(pickup)
+                );
+                if (!matchesAddress) return false;
+              }
 
-              const otherLoc = String(other.pickupLocation || "").toLowerCase().trim();
-              const bLoc = String(b.pickupLocation || "").toLowerCase().trim();
-              if (otherLoc !== bLoc) return false;
+              // Check if slot taken
+              const isSlotTaken = data.bookings.some((other: any) => {
+                if (other.id === b.id) return false;
+                if (other.status === "pending" || other.status === "pending-price") return false;
 
-              return true;
+                const otherDate = new Date(other.bookingDate).toDateString();
+                const bDate = new Date(b.bookingDate).toDateString();
+                if (otherDate !== bDate) return false;
+
+                const otherTime = String(other.bookingTime).slice(0, 5);
+                const bTime = String(b.bookingTime).slice(0, 5);
+                if (otherTime !== bTime) return false;
+
+                const otherLoc = String(other.pickupLocation || "").toLowerCase().trim();
+                const bLoc = String(b.pickupLocation || "").toLowerCase().trim();
+                if (otherLoc !== bLoc) return false;
+
+                return true;
+              });
+
+              return !isSlotTaken;
             });
-
-            return !isSlotTaken;
-          });
-          setNotificationCount(matching.length);
+            const newCount = matching.length;
+            if (newCount > prevCountRef.current) {
+              playNotificationSound();
+            }
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+          }
+        } else {
+          if (!currentUser?.id) {
+            const newCount = 0;
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+            return;
+          }
+          const response = await fetch(`${apiUrl}/api/bookings?role=user`);
+          const data = await response.json();
+          if (response.ok && data.bookings) {
+            const matching = data.bookings.filter(
+              (b: any) => Number(b.userId) === Number(currentUser.id) && b.status === "pending-payment"
+            );
+            const newCount = matching.length;
+            if (newCount > prevCountRef.current) {
+              playNotificationSound();
+            }
+            prevCountRef.current = newCount;
+            setNotificationCount(newCount);
+          }
         }
       } catch (error) {
         console.error("Failed to check notifications:", error);
@@ -179,8 +259,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const links = isTailor
     ? tailorLinks
     : isLoggedIn
-    ? customerLinks
-    : customerLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order");
+      ? customerLinks
+      : customerLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order" && link.label !== "Notifications");
 
   const noLayoutPages = ["/login", "/register"];
   const isNoLayout = noLayoutPages.includes(pathname);
@@ -203,9 +283,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             <button
               type="button"
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 transition-all cursor-pointer ${
-                sidebarOpen ? "md:opacity-0 md:pointer-events-none" : ""
-              }`}
+              className={`flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 transition-all cursor-pointer ${sidebarOpen ? "md:opacity-0 md:pointer-events-none" : ""
+                }`}
               aria-label="Toggle navigation menu"
               suppressHydrationWarning
             >
@@ -217,9 +296,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             {/* Logo Brand Block - hide on desktop if sidebar is open to avoid duplication */}
             <Link
               href="/"
-              className={`flex items-end gap-1.5 ml-2 transition-all duration-300 ${
-                sidebarOpen ? "md:opacity-0 md:pointer-events-none" : ""
-              }`}
+              className={`flex items-end gap-1.5 ml-2 transition-all duration-300 ${sidebarOpen ? "md:opacity-0 md:pointer-events-none" : ""
+                }`}
               aria-label="Stitch home"
             >
               <span className="relative flex h-10 w-8 items-center justify-center text-3xl font-black leading-none text-[#0c1b24]">
@@ -246,9 +324,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`hover:text-[#c322f4] transition-colors ${
-                    active ? "text-[#c322f4] border-b-2 border-[#c322f4] pb-1 mt-0.5" : ""
-                  }`}
+                  className={`hover:text-[#c322f4] transition-colors ${active ? "text-[#c322f4] border-b-2 border-[#c322f4] pb-1 mt-0.5" : ""
+                    }`}
                 >
                   {link.label}
                 </Link>
@@ -260,7 +337,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           <div className="flex items-center gap-2">
             {/* Desktop Capsule Button */}
             <div className="hidden md:flex items-center gap-3">
-              {isLoggedIn && isTailor && (
+              {isLoggedIn && (
                 <Link
                   href="/notifications"
                   className="relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:border-slate-200 transition-all"
@@ -295,7 +372,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
             {/* Mobile Profile Icon/Key Button */}
             <div className="md:hidden flex items-center gap-2">
-              {isLoggedIn && isTailor && (
+              {isLoggedIn && (
                 <Link
                   href="/notifications"
                   className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 transition-colors"

@@ -67,7 +67,7 @@ export default function UserOrderStatus() {
 
         const bookings: BookingRecord[] = data.bookings || [];
         const userBooking =
-          bookings.find((item) => item.userId === user?.id) || bookings[0] || null;
+          bookings.find((item) => Number(item.userId) === Number(user?.id)) || bookings[0] || null;
 
         setBooking(userBooking);
       } catch {

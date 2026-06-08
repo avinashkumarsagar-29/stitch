@@ -68,6 +68,13 @@ export default function BookingDetailsPage() {
     approxPrice: "",
     clothImage: "",
   });
+  const [measurements, setMeasurements] = useState({
+    chest: "",
+    waist: "",
+    hip: "",
+    shoulder: "",
+    inseam: "",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -95,6 +102,27 @@ export default function BookingDetailsPage() {
 
         setBooking(bookingData.booking);
         setTailor(tailorData.tailor);
+
+        // Fetch saved measurements if user is logged in
+        const savedUser = localStorage.getItem("stitch-user");
+        const user = savedUser ? JSON.parse(savedUser) : null;
+        if (user && user.id) {
+          try {
+            const measRes = await fetch(`${apiUrl}/api/users/${user.id}/measurements`);
+            const measData = await measRes.json();
+            if (measRes.ok && measData.measurements) {
+              setMeasurements({
+                chest: measData.measurements.chest !== null ? String(measData.measurements.chest) : "",
+                waist: measData.measurements.waist !== null ? String(measData.measurements.waist) : "",
+                hip: measData.measurements.hip !== null ? String(measData.measurements.hip) : "",
+                shoulder: measData.measurements.shoulder !== null ? String(measData.measurements.shoulder) : "",
+                inseam: measData.measurements.inseam !== null ? String(measData.measurements.inseam) : "",
+              });
+            }
+          } catch (e) {
+            console.error("Failed to load measurements:", e);
+          }
+        }
       } catch {
         showToast("Unable to connect to backend server", "error");
       } finally {
@@ -136,15 +164,35 @@ export default function BookingDetailsPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!details.clothCategory || !details.material || !details.approxPrice) {
-      showToast("Please fill cloth category, material, and price", "error");
+    if (!details.clothCategory || !details.material) {
+      showToast("Please fill cloth category and material", "error");
       return;
     }
 
     setIsSaving(true);
-
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      
+      // Save/update body measurements in the database if user is logged in
+      const savedUser = localStorage.getItem("stitch-user");
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      if (user && user.id) {
+        await fetch(`${apiUrl}/api/users/${user.id}/measurements`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chest: measurements.chest,
+            waist: measurements.waist,
+            hip: measurements.hip,
+            shoulder: measurements.shoulder,
+            inseam: measurements.inseam,
+          }),
+        });
+      }
+
+      // Save details to backend (approxPrice is null because tailor sets it!)
       const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/details`, {
         method: "POST",
         headers: {
@@ -154,21 +202,23 @@ export default function BookingDetailsPage() {
           tailorApplicationId: Number(tailorId),
           clothCategory: details.clothCategory,
           material: details.material,
-          approxPrice: Number(details.approxPrice),
+          approxPrice: null,
           clothImage: details.clothImage || null,
         }),
       });
+
       const data = await response.json();
 
       if (!response.ok) {
-        showToast(data.message || "Unable to save order details", "error");
+        showToast(data.message || "Failed to submit booking details", "error");
         return;
       }
 
-      showToast(data.message || "Order details saved successfully", "success");
-      router.push("/profile");
-    } catch {
-      showToast("Unable to connect to backend server", "error");
+      showToast("Details submitted! Waiting for tailor price quote...", "success");
+      router.push(`/track?id=${bookingId}`);
+    } catch (err) {
+      console.error(err);
+      showToast("Unable to submit booking details", "error");
     } finally {
       setIsSaving(false);
     }
@@ -215,24 +265,7 @@ export default function BookingDetailsPage() {
                     onChange={(value) => updateDetails("material", value)}
                     options={materials}
                   />
-                  <label className="block rounded-xl border border-gray-200 bg-white p-5">
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">
-                      Approx Price
-                    </span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="0.01"
-                      value={details.approxPrice}
-                      onChange={(event) =>
-                        updateDetails("approxPrice", event.target.value)
-                      }
-                      placeholder="Enter approximate price"
-                      required
-                      className="mt-3 h-11 w-full rounded-xl border border-gray-200 bg-gray-50/30 px-3 text-sm font-medium text-[#202635] outline-none focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 transition-all duration-200"
-                    />
-                  </label>
-                  <label className="block rounded-xl border border-gray-200 bg-white p-5">
+                  <label className="block rounded-xl border border-gray-200 bg-white p-5 col-span-2">
                     <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">
                       Cloth Image
                     </span>
@@ -257,6 +290,50 @@ export default function BookingDetailsPage() {
                     />
                   </div>
                 ) : null}
+
+                {/* Body Measurements Section */}
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/10 p-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📏</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">Your Body Measurements</h3>
+                      <p className="text-[10px] text-gray-500">Auto-filled from your profile. Feel free to adjust these for this order (in inches).</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
+                    <MeasurementField
+                      label="Chest"
+                      value={measurements.chest}
+                      onChange={(val) => setMeasurements(prev => ({ ...prev, chest: val }))}
+                      placeholder="eg. 38"
+                    />
+                    <MeasurementField
+                      label="Waist"
+                      value={measurements.waist}
+                      onChange={(val) => setMeasurements(prev => ({ ...prev, waist: val }))}
+                      placeholder="eg. 32"
+                    />
+                    <MeasurementField
+                      label="Hip"
+                      value={measurements.hip}
+                      onChange={(val) => setMeasurements(prev => ({ ...prev, hip: val }))}
+                      placeholder="eg. 40"
+                    />
+                    <MeasurementField
+                      label="Shoulder"
+                      value={measurements.shoulder}
+                      onChange={(val) => setMeasurements(prev => ({ ...prev, shoulder: val }))}
+                      placeholder="eg. 18"
+                    />
+                    <MeasurementField
+                      label="Inseam"
+                      value={measurements.inseam}
+                      onChange={(val) => setMeasurements(prev => ({ ...prev, inseam: val }))}
+                      placeholder="eg. 30"
+                    />
+                  </div>
+                </div>
 
                 <div className="flex flex-wrap gap-3">
                   <button
@@ -390,3 +467,31 @@ function InfoLine({ label, value }: { label: string; value?: string }) {
     </div>
   );
 }
+
+function MeasurementField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div>
+      <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest block mb-1.5">{label}</span>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        step="0.1"
+        min="0"
+        className="h-10 w-full rounded-xl border border-gray-200 bg-white px-2.5 text-center text-xs font-semibold text-gray-800 outline-none focus:border-[#c322f4] focus:ring-4 focus:ring-[#c322f4]/10 transition-all duration-200"
+      />
+    </div>
+  );
+}
+

@@ -191,6 +191,25 @@ async function ensureJoinTable(pool) {
   `);
 }
 
+async function ensureMeasurementsTable(pool) {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.Measurements', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.Measurements (
+        id INT IDENTITY PRIMARY KEY,
+        userId INT NOT NULL,
+        chest DECIMAL(5,2),
+        waist DECIMAL(5,2),
+        hip DECIMAL(5,2),
+        shoulder DECIMAL(5,2),
+        inseam DECIMAL(5,2),
+        updatedAt DATETIME2 DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT FK_Measurements_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
+      );
+    END
+  `);
+}
+
 async function ensureAuthTables(pool) {
   await pool.request().query(`
     IF OBJECT_ID('dbo.Users', 'U') IS NULL
@@ -437,13 +456,12 @@ async function sendBookingEmail(userEmail, booking) {
         </tr>
         <tr>
           <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Scheduled Time:</td>
-          <td style="padding: 6px 0; color: #1f2937;">${
-            booking.bookingTime instanceof Date
-              ? `${String(booking.bookingTime.getUTCHours()).padStart(2, '0')}:${String(booking.bookingTime.getUTCMinutes()).padStart(2, '0')}`
-              : String(booking.bookingTime).includes("T")
-                ? String(booking.bookingTime).split("T")[1].slice(0, 5)
-                : String(booking.bookingTime).slice(0, 5)
-          }</td>
+          <td style="padding: 6px 0; color: #1f2937;">${booking.bookingTime instanceof Date
+      ? `${String(booking.bookingTime.getUTCHours()).padStart(2, '0')}:${String(booking.bookingTime.getUTCMinutes()).padStart(2, '0')}`
+      : String(booking.bookingTime).includes("T")
+        ? String(booking.bookingTime).split("T")[1].slice(0, 5)
+        : String(booking.bookingTime).slice(0, 5)
+    }</td>
         </tr>
       </table>
 
@@ -498,6 +516,110 @@ ${htmlContent}
     });
 
     console.log("Email sent successfully:", info.messageId);
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending email via SMTP:", error);
+    throw error;
+  }
+}
+
+async function sendPriceQuoteEmail(userEmail, booking) {
+  const host = process.env.SMTP_HOST;
+  const port = process.env.SMTP_PORT;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || "no-reply@stitch.com";
+
+  const isMailConfigured = host && port && user && pass;
+
+  const subject = `New Price Quote for your Stitch Booking - ${booking.trackingCode || booking.id}`;
+  const trackingLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/notifications`;
+
+  const htmlContent = `
+    <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Hello ${booking.userFullName || 'Valued Customer'},</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        Great news! A tailor has reviewed your tailoring request for order <strong>#${booking.trackingCode}</strong> and provided a price quote.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Tailor's Price Quote</p>
+        <p style="margin: 8px 0 0 0; font-size: 32px; font-weight: 900; color: #c322f4; letter-spacing: 2px;">₹${booking.approxPrice}</p>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Please review and confirm this quote to proceed with payment.</p>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-top: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">Order Details</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px;">
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af; width: 40%;">Cloth Category:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">${booking.clothCategory || ''}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Material:</td>
+          <td style="padding: 6px 0; color: #1f2937;">${booking.material || ''}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Tailor Partner:</td>
+          <td style="padding: 6px 0; color: #1f2937;">${booking.tailorName || 'Assigned Tailor'}</td>
+        </tr>
+      </table>
+
+      <div style="text-align: center; margin-top: 32px;">
+        <a href="${trackingLink}" style="display: inline-block; background-color: #c322f4; color: #ffffff; padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(195, 34, 244, 0.2); transition: all 0.2s;">Review & Pay Now</a>
+      </div>
+
+      <div style="margin-top: 40px; border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">&copy; ${new Date().getFullYear()} Stitch Inc. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">You are receiving this email because you registered on Stitch.</p>
+      </div>
+    </div>
+  `;
+
+  if (!isMailConfigured) {
+    const logFilePath = path.join(__dirname, "mock_emails.log");
+    const logEntry = `
+========================================
+TIMESTAMP: ${new Date().toISOString()}
+TO: ${userEmail}
+FROM: ${from}
+SUBJECT: ${subject}
+BODY:
+${htmlContent}
+========================================
+\n`;
+    try {
+      fs.appendFileSync(logFilePath, logEntry, "utf8");
+      console.log(`Mock email logged successfully to ${logFilePath}`);
+    } catch (err) {
+      console.error("Failed to write mock email to log file:", err);
+    }
+    return { sent: false, mock: true };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port: Number(port),
+      secure: port === "465",
+      auth: {
+        user,
+        pass,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from,
+      to: userEmail,
+      subject,
+      html: htmlContent,
+    });
+
+    console.log("Price Quote Email sent successfully:", info.messageId);
     return { sent: true, messageId: info.messageId };
   } catch (error) {
     console.error("Error sending email via SMTP:", error);
@@ -767,6 +889,104 @@ app.get("/api/users/:userId/profile", async (request, response) => {
   }
 });
 
+app.get("/api/users/:userId/measurements", async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    if (!userId) {
+      return response.status(400).json({ message: "User ID is required" });
+    }
+
+    const pool = await getSqlPool();
+    await ensureMeasurementsTable(pool);
+
+    const result = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        SELECT TOP 1 chest, waist, hip, shoulder, inseam
+        FROM Measurements
+        WHERE userId = @userId
+      `);
+
+    const measurements = result.recordset[0] || null;
+    return response.json({
+      measurements
+    });
+  } catch (error) {
+    console.error("Get measurements error:", error);
+    return response.status(500).json({
+      message: "Unable to load measurements",
+      detail: error.message,
+    });
+  }
+});
+
+app.put("/api/users/:userId/measurements", async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    const chest = request.body.chest !== undefined && request.body.chest !== "" ? Number(request.body.chest) : null;
+    const waist = request.body.waist !== undefined && request.body.waist !== "" ? Number(request.body.waist) : null;
+    const hip = request.body.hip !== undefined && request.body.hip !== "" ? Number(request.body.hip) : null;
+    const shoulder = request.body.shoulder !== undefined && request.body.shoulder !== "" ? Number(request.body.shoulder) : null;
+    const inseam = request.body.inseam !== undefined && request.body.inseam !== "" ? Number(request.body.inseam) : null;
+
+    if (!userId) {
+      return response.status(400).json({ message: "User ID is required" });
+    }
+
+    const pool = await getSqlPool();
+    await ensureMeasurementsTable(pool);
+
+    // Check if measurements exist
+    const checkExist = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT 1 FROM Measurements WHERE userId = @userId");
+
+    if (checkExist.recordset.length > 0) {
+      // Update
+      await pool
+        .request()
+        .input("userId", sql.Int, userId)
+        .input("chest", sql.Decimal(5, 2), chest)
+        .input("waist", sql.Decimal(5, 2), waist)
+        .input("hip", sql.Decimal(5, 2), hip)
+        .input("shoulder", sql.Decimal(5, 2), shoulder)
+        .input("inseam", sql.Decimal(5, 2), inseam)
+        .query(`
+          UPDATE Measurements
+          SET chest = @chest, waist = @waist, hip = @hip, shoulder = @shoulder, inseam = @inseam, updatedAt = SYSUTCDATETIME()
+          WHERE userId = @userId
+        `);
+    } else {
+      // Insert
+      await pool
+        .request()
+        .input("userId", sql.Int, userId)
+        .input("chest", sql.Decimal(5, 2), chest)
+        .input("waist", sql.Decimal(5, 2), waist)
+        .input("hip", sql.Decimal(5, 2), hip)
+        .input("shoulder", sql.Decimal(5, 2), shoulder)
+        .input("inseam", sql.Decimal(5, 2), inseam)
+        .query(`
+          INSERT INTO Measurements (userId, chest, waist, hip, shoulder, inseam)
+          VALUES (@userId, @chest, @waist, @hip, @shoulder, @inseam)
+        `);
+    }
+
+    return response.json({
+      message: "Measurements saved successfully",
+      measurements: { chest, waist, hip, shoulder, inseam }
+    });
+  } catch (error) {
+    console.error("Save measurements error:", error);
+    return response.status(500).json({
+      message: "Unable to save measurements",
+      detail: error.message,
+    });
+  }
+});
+
 app.put("/api/users/:userId/profile", async (request, response) => {
   try {
     const userId = Number(request.params.userId);
@@ -999,10 +1219,20 @@ app.post("/api/bookings", async (request, response) => {
   }
 });
 
-app.get("/api/bookings", async (_request, response) => {
+app.get("/api/bookings", async (request, response) => {
   try {
     const pool = await getSqlPool();
     await ensureBookingsTable(pool);
+    await ensureMeasurementsTable(pool);
+
+    const role = String(request.query.role || "").trim().toLowerCase();
+    if (role === "user" || role === "customer") {
+      await pool.request().query(`
+        DELETE FROM Bookings
+        WHERE status IN ('delivered', 'out-for-delivery')
+          AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
+      `);
+    }
     const result = await pool.request().query(`
       SELECT
         b.id,
@@ -1023,9 +1253,15 @@ app.get("/api/bookings", async (_request, response) => {
         b.approxPrice,
         b.status,
         b.trackingCode,
-        b.createdAt
+        b.createdAt,
+        m.chest,
+        m.waist,
+        m.hip,
+        m.shoulder,
+        m.inseam
       FROM Bookings b
       LEFT JOIN Users u ON u.id = b.userId
+      LEFT JOIN Measurements m ON m.userId = b.userId
       ORDER BY b.createdAt DESC
     `);
 
@@ -1057,6 +1293,16 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
 
     const pool = await getSqlPool();
     await ensureBookingsTable(pool);
+    await ensureMeasurementsTable(pool);
+
+    const role = String(request.query.role || "").trim().toLowerCase();
+    if (role === "user" || role === "customer") {
+      await pool.request().query(`
+        DELETE FROM Bookings
+        WHERE status IN ('delivered', 'out-for-delivery')
+          AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
+      `);
+    }
     const result = await pool
       .request()
       .input("bookingIdNum", sql.Int, bookingIdNum)
@@ -1081,9 +1327,15 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
           b.approxPrice,
           b.status,
           b.trackingCode,
-          b.createdAt
+          b.createdAt,
+          m.chest,
+          m.waist,
+          m.hip,
+          m.shoulder,
+          m.inseam
         FROM Bookings b
         LEFT JOIN Users u ON u.id = b.userId
+        LEFT JOIN Measurements m ON m.userId = b.userId
         WHERE b.id = @bookingIdNum OR b.trackingCode = @bookingIdStr
       `);
     const booking = result.recordset[0];
@@ -1113,7 +1365,7 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
     const tailorApplicationId = Number(request.body.tailorApplicationId);
     const clothCategory = String(request.body.clothCategory || "").trim();
     const material = String(request.body.material || "").trim();
-    const approxPrice = Number(request.body.approxPrice);
+    const approxPrice = request.body.approxPrice !== undefined && request.body.approxPrice !== null ? Number(request.body.approxPrice) : null;
     const clothImage = request.body.clothImage || null;
 
     if (!bookingId || !tailorApplicationId) {
@@ -1122,9 +1374,15 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
       });
     }
 
-    if (!clothCategory || !material || !Number.isFinite(approxPrice) || approxPrice <= 0) {
+    if (!clothCategory || !material) {
       return response.status(400).json({
-        message: "Cloth category, material, and approximate price are required",
+        message: "Cloth category and material are required",
+      });
+    }
+
+    if (approxPrice !== null && (!Number.isFinite(approxPrice) || approxPrice <= 0)) {
+      return response.status(400).json({
+        message: "Approximate price must be a positive number",
       });
     }
 
@@ -1146,7 +1404,7 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
         LEFT JOIN Users u ON u.id = b.userId
         WHERE b.id = @bookingId
       `);
-    
+
     const existingBooking = checkBooking.recordset[0];
     if (!existingBooking) {
       return response.status(404).json({
@@ -1157,7 +1415,7 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
     const trackingCode = existingBooking.trackingCode || String(Math.floor(1000000 + Math.random() * 9000000));
     const userEmail = existingBooking.userEmail || "";
 
-    const tailorResult = await pool
+    let tailorResult = await pool
       .request()
       .input("tailorApplicationId", sql.Int, tailorApplicationId)
       .query(`
@@ -1170,13 +1428,44 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
         FROM JoinApplications
         WHERE id = @tailorApplicationId
       `);
-    const tailor = tailorResult.recordset[0];
+    let tailor = tailorResult.recordset[0];
+
+    if (!tailor) {
+      // Fallback: Check Users table where role is tailor
+      const userResult = await pool
+        .request()
+        .input("userId", sql.Int, tailorApplicationId)
+        .query(`
+          SELECT TOP 1
+            id,
+            firstName,
+            lastName,
+            fullName,
+            email,
+            phoneNumber
+          FROM Users
+          WHERE id = @userId AND role = 'tailor'
+        `);
+      const userTailor = userResult.recordset[0];
+      if (userTailor) {
+        tailor = {
+          id: userTailor.id,
+          firstName: userTailor.firstName || userTailor.fullName.split(' ')[0] || '',
+          lastName: userTailor.lastName || userTailor.fullName.split(' ').slice(1).join(' ') || '',
+          email: userTailor.email,
+          phoneNumber: userTailor.phoneNumber
+        };
+      }
+    }
 
     if (!tailor) {
       return response.status(404).json({
         message: "Tailor not found",
       });
     }
+
+    const tailorName = `${tailor.firstName} ${tailor.lastName}`.trim();
+    const status = approxPrice !== null ? 'pending' : 'pending-price';
 
     const bookingResult = await pool
       .request()
@@ -1186,6 +1475,11 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
       .input("material", sql.NVarChar(100), material)
       .input("approxPrice", sql.Decimal(10, 2), approxPrice)
       .input("trackingCode", sql.NVarChar(10), trackingCode)
+      .input("tailorApplicationId", sql.Int, tailor.id)
+      .input("tailorName", sql.NVarChar(201), tailorName)
+      .input("tailorEmail", sql.NVarChar(255), tailor.email)
+      .input("tailorPhoneNumber", sql.NVarChar(20), tailor.phoneNumber)
+      .input("status", sql.NVarChar(50), status)
       .query(`
         UPDATE Bookings
         SET
@@ -1194,7 +1488,11 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
           material = @material,
           approxPrice = @approxPrice,
           trackingCode = @trackingCode,
-          status = 'pending'
+          tailorApplicationId = @tailorApplicationId,
+          tailorName = @tailorName,
+          tailorEmail = @tailorEmail,
+          tailorPhoneNumber = @tailorPhoneNumber,
+          status = @status
         OUTPUT
           INSERTED.id,
           INSERTED.userId,
@@ -1223,13 +1521,13 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
       });
     }
 
-    // Send email confirmation in background
-    if (userEmail) {
+    // Send email confirmation in background if price is quoted/confirmed
+    if (userEmail && approxPrice !== null) {
       sendBookingEmail(userEmail, booking).catch((err) => {
         console.error("Failed to send booking email:", err);
       });
     } else {
-      console.log(`Booking #${bookingId} has no registered user email associated. Email notification skipped.`);
+      console.log(`Booking #${bookingId} has no registered user email associated or price not set. Email notification skipped.`);
     }
 
     return response.json({
@@ -1263,7 +1561,7 @@ app.post("/api/bookings/:bookingId/tailor", async (request, response) => {
     await ensureBookingsTable(pool);
     await ensureJoinTable(pool);
 
-    const tailorResult = await pool
+    let tailorResult = await pool
       .request()
       .input("tailorApplicationId", sql.Int, tailorApplicationId)
       .query(`
@@ -1276,7 +1574,35 @@ app.post("/api/bookings/:bookingId/tailor", async (request, response) => {
         FROM JoinApplications
         WHERE id = @tailorApplicationId
       `);
-    const tailor = tailorResult.recordset[0];
+    let tailor = tailorResult.recordset[0];
+
+    if (!tailor) {
+      // Fallback: Check Users table where role is tailor
+      const userResult = await pool
+        .request()
+        .input("userId", sql.Int, tailorApplicationId)
+        .query(`
+          SELECT TOP 1
+            id,
+            firstName,
+            lastName,
+            fullName,
+            email,
+            phoneNumber
+          FROM Users
+          WHERE id = @userId AND role = 'tailor'
+        `);
+      const userTailor = userResult.recordset[0];
+      if (userTailor) {
+        tailor = {
+          id: userTailor.id,
+          firstName: userTailor.firstName || userTailor.fullName.split(' ')[0] || '',
+          lastName: userTailor.lastName || userTailor.fullName.split(' ').slice(1).join(' ') || '',
+          email: userTailor.email,
+          phoneNumber: userTailor.phoneNumber
+        };
+      }
+    }
 
     if (!tailor) {
       return response.status(404).json({
@@ -1448,7 +1774,7 @@ app.post("/api/join", async (request, response) => {
             INSERTED.firstName, INSERTED.lastName, INSERTED.address, INSERTED.image
           WHERE id = @userId
         `);
-      
+
       const updatedUser = userUpdateResult.recordset[0];
       updatedUserObj = {
         id: updatedUser.id,
@@ -1462,7 +1788,7 @@ app.post("/api/join", async (request, response) => {
         address: updatedUser.address || "",
         image: updatedUser.image || "",
       };
-      
+
       updatedProfileObj = {
         fullName: updatedUser.fullName,
         firstName: updatedUser.firstName || "",
@@ -1640,7 +1966,42 @@ app.get("/api/tailors/:tailorId", async (request, response) => {
         FROM JoinApplications
         WHERE id = @tailorId
       `);
-    const tailor = result.recordset[0];
+    let tailor = result.recordset[0];
+
+    if (!tailor) {
+      // Fallback: Check Users table where role is tailor
+      const userResult = await pool
+        .request()
+        .input("userId", sql.Int, tailorId)
+        .query(`
+          SELECT TOP 1
+            id,
+            firstName,
+            lastName,
+            fullName,
+            email,
+            phoneNumber,
+            address,
+            image,
+            [plan]
+          FROM Users
+          WHERE id = @userId AND role = 'tailor'
+        `);
+      const userTailor = userResult.recordset[0];
+      if (userTailor) {
+        tailor = {
+          id: userTailor.id,
+          firstName: userTailor.firstName || userTailor.fullName.split(' ')[0] || '',
+          lastName: userTailor.lastName || userTailor.fullName.split(' ').slice(1).join(' ') || '',
+          email: userTailor.email,
+          phoneNumber: userTailor.phoneNumber,
+          experience: "Professional Tailor Partner",
+          location: userTailor.address || "Not provided",
+          image: userTailor.image || null,
+          plan: userTailor.plan || "Free",
+        };
+      }
+    }
 
     if (!tailor) {
       return response.status(404).json({
@@ -1771,36 +2132,38 @@ app.post("/api/payments/verify-payment", async (request, response) => {
         });
       }
 
-      // Update plan in Users table
-      await pool
-        .request()
-        .input("plan", sql.NVarChar(50), planId)
-        .input("userId", sql.Int, userId)
-        .query("UPDATE Users SET [plan] = @plan WHERE id = @userId");
-
-      // Sync user subscription details to JoinApplications if they are a Tailor
-      const userResult = await pool
-        .request()
-        .input("userId", sql.Int, userId)
-        .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
-      const user = userResult.recordset[0];
-
-      if (user && user.role === "tailor") {
+      if (!planId.startsWith("booking_")) {
+        // Update plan in Users table
         await pool
           .request()
           .input("plan", sql.NVarChar(50), planId)
-          .input("email", sql.NVarChar(255), user.email)
-          .input("phoneNumber", sql.NVarChar(20), user.phoneNumber)
-          .query(`
-            UPDATE JoinApplications
-            SET [plan] = @plan
-            WHERE email = @email OR phoneNumber = @phoneNumber
-          `);
+          .input("userId", sql.Int, userId)
+          .query("UPDATE Users SET [plan] = @plan WHERE id = @userId");
+
+        // Sync user subscription details to JoinApplications if they are a Tailor
+        const userResult = await pool
+          .request()
+          .input("userId", sql.Int, userId)
+          .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
+        const user = userResult.recordset[0];
+
+        if (user && user.role === "tailor") {
+          await pool
+            .request()
+            .input("plan", sql.NVarChar(50), planId)
+            .input("email", sql.NVarChar(255), user.email)
+            .input("phoneNumber", sql.NVarChar(20), user.phoneNumber)
+            .query(`
+              UPDATE JoinApplications
+              SET [plan] = @plan
+              WHERE email = @email OR phoneNumber = @phoneNumber
+            `);
+        }
       }
 
       return response.json({
         success: true,
-        message: "Mock payment verified and subscription activated",
+        message: planId.startsWith("booking_") ? "Mock payment verified and booking confirmed" : "Mock payment verified and subscription activated",
         plan: planId,
       });
     }
@@ -1824,36 +2187,38 @@ app.post("/api/payments/verify-payment", async (request, response) => {
       });
     }
 
-    // Signature matches, update plan in Users table
-    await pool
-      .request()
-      .input("plan", sql.NVarChar(50), planId)
-      .input("userId", sql.Int, userId)
-      .query("UPDATE Users SET [plan] = @plan WHERE id = @userId");
-
-    // Sync to JoinApplications if tailor
-    const userResult = await pool
-      .request()
-      .input("userId", sql.Int, userId)
-      .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
-    const user = userResult.recordset[0];
-
-    if (user && user.role === "tailor") {
+    if (!planId.startsWith("booking_")) {
+      // Signature matches, update plan in Users table
       await pool
         .request()
         .input("plan", sql.NVarChar(50), planId)
-        .input("email", sql.NVarChar(255), user.email)
-        .input("phoneNumber", sql.NVarChar(20), user.phoneNumber)
-        .query(`
-          UPDATE JoinApplications
-          SET [plan] = @plan
-          WHERE email = @email OR phoneNumber = @phoneNumber
-        `);
+        .input("userId", sql.Int, userId)
+        .query("UPDATE Users SET [plan] = @plan WHERE id = @userId");
+
+      // Sync to JoinApplications if tailor
+      const userResult = await pool
+        .request()
+        .input("userId", sql.Int, userId)
+        .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
+      const user = userResult.recordset[0];
+
+      if (user && user.role === "tailor") {
+        await pool
+          .request()
+          .input("plan", sql.NVarChar(50), planId)
+          .input("email", sql.NVarChar(255), user.email)
+          .input("phoneNumber", sql.NVarChar(20), user.phoneNumber)
+          .query(`
+            UPDATE JoinApplications
+            SET [plan] = @plan
+            WHERE email = @email OR phoneNumber = @phoneNumber
+          `);
+      }
     }
 
     return response.json({
       success: true,
-      message: "Payment verified and subscription activated successfully",
+      message: planId.startsWith("booking_") ? "Payment verified and booking confirmed successfully" : "Payment verified and subscription activated successfully",
       plan: planId,
     });
   } catch (error) {
@@ -1963,6 +2328,168 @@ app.patch("/api/bookings/:bookingId/status", async (request, response) => {
     console.error("Booking status update error:", error);
     return response.status(500).json({
       message: "Unable to update booking status",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/bookings/:bookingId/price", async (request, response) => {
+  try {
+    const bookingId = Number(request.params.bookingId);
+    const { approxPrice, tailorApplicationId } = request.body;
+
+    if (!bookingId || approxPrice === undefined || approxPrice === null) {
+      return response.status(400).json({
+        message: "Booking ID and approxPrice are required",
+      });
+    }
+
+    const priceNum = Number(approxPrice);
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      return response.status(400).json({
+        message: "approxPrice must be a positive number",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBookingsTable(pool);
+
+    let tailor = null;
+    if (tailorApplicationId) {
+      const tailorId = Number(tailorApplicationId);
+      let tailorResult = await pool
+        .request()
+        .input("tailorApplicationId", sql.Int, tailorId)
+        .query(`
+          SELECT TOP 1
+            id,
+            firstName,
+            lastName,
+            email,
+            phoneNumber
+          FROM JoinApplications
+          WHERE id = @tailorApplicationId
+        `);
+      tailor = tailorResult.recordset[0];
+
+      if (!tailor) {
+        // Fallback: Check Users table where role is tailor
+        const userResult = await pool
+          .request()
+          .input("userId", sql.Int, tailorId)
+          .query(`
+            SELECT TOP 1
+              id,
+              firstName,
+              lastName,
+              fullName,
+              email,
+              phoneNumber
+            FROM Users
+            WHERE id = @userId AND role = 'tailor'
+          `);
+        const userTailor = userResult.recordset[0];
+        if (userTailor) {
+          tailor = {
+            id: userTailor.id,
+            firstName: userTailor.firstName || userTailor.fullName.split(' ')[0] || '',
+            lastName: userTailor.lastName || userTailor.fullName.split(' ').slice(1).join(' ') || '',
+            email: userTailor.email,
+            phoneNumber: userTailor.phoneNumber
+          };
+        }
+      }
+
+      if (!tailor) {
+        return response.status(404).json({
+          message: "Tailor not found",
+        });
+      }
+    }
+
+    let result;
+    if (tailor) {
+      const tailorName = `${tailor.firstName} ${tailor.lastName}`.trim();
+      result = await pool
+        .request()
+        .input("bookingId", sql.Int, bookingId)
+        .input("approxPrice", sql.Decimal(10, 2), priceNum)
+        .input("tailorApplicationId", sql.Int, tailor.id)
+        .input("tailorName", sql.NVarChar(201), tailorName)
+        .input("tailorEmail", sql.NVarChar(255), tailor.email)
+        .input("tailorPhoneNumber", sql.NVarChar(20), tailor.phoneNumber)
+        .query(`
+          UPDATE Bookings
+          SET 
+            approxPrice = @approxPrice,
+            status = 'pending-payment',
+            tailorApplicationId = @tailorApplicationId,
+            tailorName = @tailorName,
+            tailorEmail = @tailorEmail,
+            tailorPhoneNumber = @tailorPhoneNumber
+          OUTPUT
+            INSERTED.id,
+            INSERTED.approxPrice,
+            INSERTED.status,
+            INSERTED.trackingCode
+          WHERE id = @bookingId
+        `);
+    } else {
+      result = await pool
+        .request()
+        .input("bookingId", sql.Int, bookingId)
+        .input("approxPrice", sql.Decimal(10, 2), priceNum)
+        .query(`
+          UPDATE Bookings
+          SET 
+            approxPrice = @approxPrice,
+            status = 'pending-payment'
+          OUTPUT
+            INSERTED.id,
+            INSERTED.approxPrice,
+            INSERTED.status,
+            INSERTED.trackingCode
+          WHERE id = @bookingId
+        `);
+    }
+
+    const booking = result.recordset[0];
+
+    if (!booking) {
+      return response.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    // Retrieve booking with user email details
+    const bookingQuery = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .query(`
+        SELECT 
+          b.*,
+          u.email AS userEmail,
+          u.fullName AS userFullName
+        FROM Bookings b
+        LEFT JOIN Users u ON b.userId = u.id
+        WHERE b.id = @bookingId
+      `);
+    const bookingDetails = bookingQuery.recordset[0];
+
+    if (bookingDetails && bookingDetails.userEmail) {
+      sendPriceQuoteEmail(bookingDetails.userEmail, bookingDetails).catch((err) => {
+        console.error("Failed to send price quote email:", err);
+      });
+    }
+
+    return response.json({
+      message: "Booking price updated successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Booking price update error:", error);
+    return response.status(500).json({
+      message: "Unable to update booking price",
       detail: error.message,
     });
   }

@@ -2,15 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { showToast } from "./Toast";
+import { getCurrentUser } from "./profileStorage";
 
 type BookingRecord = {
   id: number;
+  userId?: number | null;
   fullName?: string | null;
   pickupLocation: string;
   dropoffLocation: string;
   bookingDate: string;
   bookingTime: string;
   tailorName?: string | null;
+  tailorEmail?: string | null;
+  tailorPhoneNumber?: string | null;
+  tailorApplicationId?: number | null;
   status: string;
   trackingCode?: string | null;
 };
@@ -24,7 +29,8 @@ export default function BookingHistory() {
       try {
         const apiUrl =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/api/bookings`);
+        const userRole = localStorage.getItem("stitch-role") || "user";
+        const response = await fetch(`${apiUrl}/api/bookings?role=${userRole}`);
         const data = await response.json();
 
         if (!response.ok) {
@@ -32,7 +38,22 @@ export default function BookingHistory() {
           return;
         }
 
-        setBookings(data.bookings || []);
+        const user = getCurrentUser();
+        const allBookings: BookingRecord[] = data.bookings || [];
+        if (user) {
+          const userRole = localStorage.getItem("stitch-role") || "user";
+          if (userRole === "tailor") {
+            setBookings(allBookings.filter((b) =>
+              (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === user.email?.toLowerCase().trim()) ||
+              (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === user.phoneNumber?.trim()) ||
+              (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(user.id))
+            ));
+          } else {
+            setBookings(allBookings.filter((b) => Number(b.userId) === Number(user.id)));
+          }
+        } else {
+          setBookings([]);
+        }
       } catch {
         showToast("Unable to connect to backend server", "error");
       } finally {
