@@ -1,12 +1,14 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { showToast } from "../components/Toast";
 import { getCurrentUser, getProfileStorageKey, safeSetLocalStorage, getProfileForCurrentUser, authFetch } from "../components/profileStorage";
 import AuthGuard from "../components/AuthGuard";
 
 export default function JoinPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -126,10 +128,15 @@ export default function JoinPage() {
         if (currentUser) {
           safeSetLocalStorage(getProfileStorageKey(currentUser), JSON.stringify(data.profile));
           safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
+          if (data.user.role) {
+            localStorage.setItem("stitch-role", data.user.role);
+          }
           window.dispatchEvent(new Event("stitch-profile-change"));
           window.dispatchEvent(new Event("stitch-auth-change"));
         }
       }
+
+      const chosenPlan = formData.plan;
 
       setFormData({
         firstName: "",
@@ -142,6 +149,12 @@ export default function JoinPage() {
         plan: "Free",
       });
       setImagePreview("");
+
+      if (chosenPlan === "Plus" || chosenPlan === "Pro") {
+        router.push(`/pricing?plan=${chosenPlan}`);
+      } else {
+        router.push("/dashboard");
+      }
     } catch (error) {
       showToast("Unable to connect to backend server", "error");
       console.error(error);

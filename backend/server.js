@@ -2116,7 +2116,8 @@ app.post("/api/join", async (request, response) => {
             firstName = @firstName,
             lastName = @lastName,
             address = @address,
-            image = @image
+            image = @image,
+            role = 'tailor'
           OUTPUT 
             INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan],
             INSERTED.firstName, INSERTED.lastName, INSERTED.address, INSERTED.image

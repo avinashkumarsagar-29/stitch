@@ -33,11 +33,97 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
     time: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [locatingField, setLocatingField] = useState<"pickup" | "dropoff" | null>(null);
   const [tailors, setTailors] = useState<Tailor[]>([]);
   const [searchedLocation, setSearchedLocation] = useState("");
   const [currentBookingId, setCurrentBookingId] = useState<number | null>(null);
 
+  const handleUseCurrentLocation = (field: "pickup" | "dropoff") => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      showToast("Geolocation is not supported by your browser", "error");
+      return;
+    }
+
+    setLocatingField(field);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          // Reverse geocode using Nominatim OpenStreetMap
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+            {
+              headers: {
+                "User-Agent": "StitchTailoringApp/1.0"
+              }
+            }
+          );
+          const data = await response.json();
+          if (data && data.display_name) {
+            updateField(field, data.display_name);
+            showToast("Location detected successfully!", "success");
+          } else {
+            updateField(field, `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+            showToast("Location coordinates set", "success");
+          }
+        } catch (error) {
+          console.error("Reverse geocoding failed", error);
+          const { latitude, longitude } = position.coords;
+          updateField(field, `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          showToast("Failed to resolve address. Setting coordinates instead.", "warning");
+        } finally {
+          setLocatingField(null);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error", error);
+        showToast(error.message || "Failed to retrieve your current location", "error");
+        setLocatingField(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   function updateField(field: keyof BookingState, value: string) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const minDate = `${yyyy}-${mm}-${dd}`;
+
+    if (field === "date") {
+      if (value && value < minDate) {
+        showToast("Cannot select a past date", "warning");
+        setBooking((current) => ({ ...current, date: "", time: "" }));
+        return;
+      }
+    }
+
+    if (field === "time") {
+      if (booking.date === minDate && value) {
+        const hh = String(today.getHours()).padStart(2, '0');
+        const minPart = String(today.getMinutes()).padStart(2, '0');
+        const minTime = `${hh}:${minPart}`;
+        if (value < minTime) {
+          showToast("Cannot select a past time for today", "warning");
+          setBooking((current) => ({ ...current, time: "" }));
+          return;
+        }
+      }
+    }
+
+    // If changing date to today, check if currently selected time is now in the past
+    if (field === "date" && value === minDate && booking.time) {
+      const hh = String(today.getHours()).padStart(2, '0');
+      const minPart = String(today.getMinutes()).padStart(2, '0');
+      const minTime = `${hh}:${minPart}`;
+      if (booking.time < minTime) {
+        showToast("Time reset: cannot select a past time for today", "warning");
+        setBooking((current) => ({ ...current, date: value, time: "" }));
+        return;
+      }
+    }
+
     setBooking((current) => ({ ...current, [field]: value }));
   }
 
@@ -122,6 +208,8 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
           onLocationChange={(value) => updateField("pickup", value)}
           onDateChange={(value) => updateField("date", value)}
           onTimeChange={(value) => updateField("time", value)}
+          onUseCurrentLocation={() => handleUseCurrentLocation("pickup")}
+          isLocating={locatingField === "pickup"}
           readOnly={readOnly}
         />
         <BookingPanel
@@ -135,6 +223,8 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
           onTimeChange={(value) => updateField("time", value)}
           onSearch={handleSearch}
           isSubmitting={isSubmitting}
+          onUseCurrentLocation={() => handleUseCurrentLocation("dropoff")}
+          isLocating={locatingField === "dropoff"}
           readOnly={readOnly}
         />
       </div>
@@ -247,6 +337,8 @@ function BookingPanel({
   onDateChange,
   onTimeChange,
   onSearch,
+  onUseCurrentLocation,
+  isLocating = false,
   isSubmitting = false,
   readOnly = false,
 }: {
@@ -259,6 +351,8 @@ function BookingPanel({
   onDateChange: (value: string) => void;
   onTimeChange: (value: string) => void;
   onSearch?: () => void;
+  onUseCurrentLocation?: () => void;
+  isLocating?: boolean;
   isSubmitting?: boolean;
   readOnly?: boolean;
 }) {
@@ -267,6 +361,18 @@ function BookingPanel({
       ? "border-[#596173] bg-[#111827] text-white placeholder:text-[#aab2c0] focus:border-[#d779f4]"
       : "border-[#af18d5] bg-white text-[#111827] placeholder:text-[#4b5563] focus:border-[#111827]"
     }`;
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const minDate = `${yyyy}-${mm}-${dd}`;
+
+  let minTime = "";
+  if (date === minDate) {
+    const hh = String(today.getHours()).padStart(2, '0');
+    const minPart = String(today.getMinutes()).padStart(2, '0');
+    minTime = `${hh}:${minPart}`;
+  }
 
   return (
     <form
@@ -293,23 +399,54 @@ function BookingPanel({
       </label>
 
       <div className="grid items-end gap-3 lg:grid-cols-[1.2fr_1fr_1fr_auto]">
-        <label className="text-sm font-bold">
+        <label className="text-sm font-bold relative block">
           Locations
-          <input
-            type="text"
-            value={location}
-            onChange={(event) => onLocationChange(event.target.value)}
-            placeholder={isDark ? "Enter drop-off" : "Enter pickup"}
-            readOnly={readOnly}
-            className={inputClass}
-            suppressHydrationWarning
-          />
+          <div className="relative mt-2">
+            <input
+              type="text"
+              value={location}
+              onChange={(event) => onLocationChange(event.target.value)}
+              placeholder={isDark ? "Enter drop-off" : "Enter pickup"}
+              readOnly={readOnly}
+              className={`${isDark
+                ? "border-[#596173] bg-[#111827] text-white placeholder:text-[#aab2c0] focus:border-[#d779f4]"
+                : "border-[#af18d5] bg-white text-[#111827] placeholder:text-[#4b5563] focus:border-[#111827]"
+              } h-10 w-full rounded-[4px] border pl-3 pr-10 text-xs outline-none`}
+              suppressHydrationWarning
+            />
+            {onUseCurrentLocation && !readOnly && (
+              <button
+                type="button"
+                onClick={onUseCurrentLocation}
+                title="Use Current Location"
+                disabled={isLocating}
+                className={`absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center p-1 rounded active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 ${
+                  isDark
+                    ? "hover:bg-white/10 text-white hover:text-white"
+                    : "hover:bg-[#af18d5]/10 text-[#af18d5] hover:text-[#7a0c96]"
+                }`}
+              >
+                {isLocating ? (
+                  <svg className={`animate-spin h-4 w-4 ${isDark ? "text-white" : "text-[#af18d5]"}`} fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1 1 15 0Z" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
         </label>
         <label className="text-sm font-bold">
           Date
           <input
             type="date"
             value={date}
+            min={minDate}
             onChange={(event) => onDateChange(event.target.value)}
             readOnly={readOnly}
             className={inputClass}
@@ -321,6 +458,7 @@ function BookingPanel({
           <input
             type="time"
             value={time}
+            min={minTime}
             onChange={(event) => onTimeChange(event.target.value)}
             readOnly={readOnly}
             className={inputClass}

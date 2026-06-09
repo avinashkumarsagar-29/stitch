@@ -328,6 +328,24 @@ export default function PricingPage() {
     }
   }
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && isLoggedIn && currentUser) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const planParam = urlParams.get("plan");
+      if (planParam && (planParam === "Plus" || planParam === "Pro")) {
+        const activePlans = userRole === "tailor" ? tailorPlans : customerPlans;
+        const tier = activePlans.find((p) => p.id === planParam);
+        if (tier) {
+          // Clear query params so it doesn't trigger again on reload/navigation
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+          
+          handleCheckout(tier);
+        }
+      }
+    }
+  }, [isLoggedIn, currentUser, userRole]);
+
   // Real Razorpay Checkout flow
   async function triggerRazorpay(order: any, planId: string) {
     const loaded = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
