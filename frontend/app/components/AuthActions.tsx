@@ -91,6 +91,7 @@ export default function AuthActions({ isMobile = false }: { isMobile?: boolean }
     localStorage.removeItem("stitch-auth");
     localStorage.removeItem("stitch-role");
     localStorage.removeItem("stitch-user");
+    localStorage.removeItem("stitch-token");
     showToast("Logout successfully", "success");
     window.dispatchEvent(new Event("stitch-auth-change"));
     router.push("/");

@@ -10,6 +10,7 @@ import {
   getCurrentUser,
   safeSetLocalStorage,
   type Profile,
+  authFetch,
 } from "./profileStorage";
 import { showToast } from "./Toast";
 import UserOrderStatus from "./UserOrderStatus";
@@ -72,7 +73,7 @@ export default function ProfileEditor() {
 
     async function fetchProfile() {
       try {
-        const response = await fetch(`${apiUrl}/api/users/${userId}/profile`);
+        const response = await authFetch(`${apiUrl}/api/users/${userId}/profile`);
         const data = await response.json();
 
         if (response.ok && data.profile) {
@@ -89,7 +90,7 @@ export default function ProfileEditor() {
 
     async function fetchMeasurements() {
       try {
-        const response = await fetch(`${apiUrl}/api/users/${userId}/measurements`);
+        const response = await authFetch(`${apiUrl}/api/users/${userId}/measurements`);
         const data = await response.json();
         if (response.ok && data.measurements) {
           setMeasurements({
@@ -161,7 +162,7 @@ export default function ProfileEditor() {
     setIsSaving(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/users/${user.id}/profile`, {
+      const response = await authFetch(`${apiUrl}/api/users/${user.id}/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -212,7 +213,7 @@ export default function ProfileEditor() {
     setIsSavingMeasurements(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/users/${user.id}/measurements`, {
+      const response = await authFetch(`${apiUrl}/api/users/${user.id}/measurements`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

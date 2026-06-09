@@ -5,6 +5,7 @@ export type StoredUser = {
   fullName?: string;
   email?: string;
   phoneNumber?: string;
+  role?: string;
 };
 
 export type Profile = {
@@ -30,18 +31,89 @@ export const emptyProfile: Profile = {
   image: "",
 };
 
-export function getCurrentUser(): StoredUser | null {
-  const savedUser = localStorage.getItem("stitch-user");
-
-  if (!savedUser) {
-    return null;
-  }
-
+export function decodeJwt(token: string): any {
+  if (!token) return null;
   try {
-    return JSON.parse(savedUser);
-  } catch {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decoded);
+  } catch (error) {
+    console.error("Failed to decode JWT:", error);
     return null;
   }
+}
+
+let cachedUser: StoredUser | null = null;
+let lastToken = "";
+let lastUserStr = "";
+
+export function getCurrentUser(): StoredUser | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const token = localStorage.getItem("stitch-token") || "";
+  const userStr = localStorage.getItem("stitch-user") || "";
+
+  if (token !== lastToken || userStr !== lastUserStr) {
+    lastToken = token;
+    lastUserStr = userStr;
+
+    if (!token) {
+      cachedUser = null;
+    } else {
+      const payload = decodeJwt(token);
+      if (!payload) {
+        cachedUser = null;
+      } else {
+        let localUser: any = {};
+        if (userStr) {
+          try {
+            localUser = JSON.parse(userStr);
+          } catch {
+            // Ignore
+          }
+        }
+        cachedUser = {
+          ...localUser,
+          id: Number(payload.id || payload.sub),
+          email: payload.email || localUser.email || "",
+          phoneNumber: payload.phoneNumber || localUser.phoneNumber || "",
+          role: payload.role || "user", // ALWAYS enforce role from JWT!
+        };
+      }
+    }
+  }
+
+  return cachedUser;
+}
+
+export function getAuthToken() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return localStorage.getItem("stitch-token") || "";
+}
+
+export function authHeaders(headers?: HeadersInit) {
+  const nextHeaders = new Headers(headers);
+  const token = getAuthToken();
+
+  if (token && !nextHeaders.has("Authorization")) {
+    nextHeaders.set("Authorization", `Bearer ${token}`);
+  }
+
+  return nextHeaders;
+}
+
+export function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  return fetch(input, {
+    ...init,
+    headers: authHeaders(init.headers),
+  });
 }
 
 export function getProfileStorageKey(user: StoredUser | null = getCurrentUser()) {

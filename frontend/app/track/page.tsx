@@ -1,5 +1,7 @@
 "use client";
 
+import { authFetch } from "../components/profileStorage";
+
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -84,7 +86,7 @@ function PriceQuoteForm({ bookingId, onQuoteSubmitted }: { bookingId: number; on
     setIsSubmitting(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/price`, {
+      const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/price`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -167,7 +169,7 @@ function TrackContent() {
       setIsLoading(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/api/bookings/${id}?role=${currentUser?.role || 'user'}`);
+        const response = await authFetch(`${apiUrl}/api/bookings/${id}?role=${currentUser?.role || 'user'}`);
         const data = await response.json();
 
         if (!response.ok) {
@@ -201,7 +203,7 @@ function TrackContent() {
       setIsListLoading(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
+        const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
         const data = await response.json();
 
         if (response.ok && data.bookings) {
@@ -244,7 +246,7 @@ function TrackContent() {
     setIsSimulating(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/bookings/${activeBooking.id}/status`, {
+      const response = await authFetch(`${apiUrl}/api/bookings/${activeBooking.id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -277,7 +279,7 @@ function TrackContent() {
     setIsSimulating(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/status`, {
+      const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -930,7 +932,7 @@ function TailorOrderCard({
             }
             try {
               const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-              const response = await fetch(`${apiUrl}/api/bookings/${booking.id}/price`, {
+              const response = await authFetch(`${apiUrl}/api/bookings/${booking.id}/price`, {
                 method: "PATCH",
                 headers: {
                   "Content-Type": "application/json",

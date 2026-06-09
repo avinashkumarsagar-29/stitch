@@ -1,5 +1,7 @@
 "use client";
 
+import { authFetch } from "./profileStorage";
+
 import { useEffect, useState } from "react";
 import { showToast } from "./Toast";
 
@@ -57,7 +59,7 @@ export default function UserOrderStatus() {
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
         const savedUser = localStorage.getItem("stitch-user");
         const user: StoredUser | null = savedUser ? JSON.parse(savedUser) : null;
-        const response = await fetch(`${apiUrl}/api/bookings`);
+        const response = await authFetch(`${apiUrl}/api/bookings`);
         const data = await response.json();
 
         if (!response.ok) {

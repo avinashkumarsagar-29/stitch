@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
 import { showToast } from "../components/Toast";
-import { getProfileForCurrentUser, getCurrentUser, getProfileStorageKey, emptyProfile } from "../components/profileStorage";
+import { getProfileForCurrentUser, getCurrentUser, getProfileStorageKey, emptyProfile, authFetch } from "../components/profileStorage";
 
 type BookingRecord = {
   id: number;
@@ -121,7 +121,7 @@ function NotificationsContent() {
       const userEmail = currentUser.email?.toLowerCase().trim() || "";
       const userPhone = currentUser.phoneNumber?.trim() || "";
       try {
-        const joinRes = await fetch(`${apiUrl}/api/join`);
+        const joinRes = await authFetch(`${apiUrl}/api/join`);
         const joinData = await joinRes.json();
 
         if (joinRes.ok && joinData.applications) {
@@ -148,7 +148,7 @@ function NotificationsContent() {
     async function fetchBookingsData(showLoading = false) {
       if (showLoading) setIsLoading(true);
       try {
-        const bookingsRes = await fetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
+        const bookingsRes = await authFetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
         const bookingsData = await bookingsRes.json();
 
         if (bookingsRes.ok && bookingsData.bookings) {
@@ -259,7 +259,7 @@ function NotificationsContent() {
     setIsSubmitting(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/tailor`, {
+      const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/tailor`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -488,7 +488,7 @@ function NotificationsContent() {
                     setIsSubmitting(true);
                     try {
                       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-                      const response = await fetch(`${apiUrl}/api/bookings/${b.id}/price`, {
+                      const response = await authFetch(`${apiUrl}/api/bookings/${b.id}/price`, {
                         method: "PATCH",
                         headers: {
                           "Content-Type": "application/json",

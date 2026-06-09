@@ -1,5 +1,7 @@
 "use client";
 
+import { authFetch } from "./profileStorage";
+
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -53,15 +55,12 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const savedUser = localStorage.getItem("stitch-user");
-      const user = savedUser ? JSON.parse(savedUser) : null;
-      const response = await fetch(`${apiUrl}/api/bookings`, {
+      const response = await authFetch(`${apiUrl}/api/bookings`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: user?.id,
           pickupLocation: booking.pickup,
           dropoffLocation: booking.dropoff,
           bookingDate: booking.date,
@@ -75,7 +74,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
         return;
       }
 
-      const tailorResponse = await fetch(
+      const tailorResponse = await authFetch(
         `${apiUrl}/api/tailors?location=${encodeURIComponent(booking.pickup)}`,
       );
       const tailorData = await tailorResponse.json();

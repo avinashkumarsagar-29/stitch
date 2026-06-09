@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { showToast } from "./Toast";
-import { safeSetLocalStorage } from "./profileStorage";
+import { safeSetLocalStorage, authFetch } from "./profileStorage";
 
 type AuthFormProps = {
   mode: "login" | "register";
@@ -56,7 +56,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     };
 
     try {
-      const response = await fetch(`${apiUrl}/api/auth/register`, {
+      const response = await authFetch(`${apiUrl}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -82,7 +82,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
     try {
-      const response = await fetch(`${apiUrl}/api/auth/request-otp`, {
+      const response = await authFetch(`${apiUrl}/api/auth/request-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,7 +111,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
     try {
-      const response = await fetch(`${apiUrl}/api/auth/verify-otp`, {
+      const response = await authFetch(`${apiUrl}/api/auth/verify-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -126,6 +126,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       }
 
       localStorage.setItem("stitch-auth", "true");
+      localStorage.setItem("stitch-token", data.token);
       safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
       localStorage.setItem("stitch-role", data.user.role || "user");
       showToast(data.message, "success");

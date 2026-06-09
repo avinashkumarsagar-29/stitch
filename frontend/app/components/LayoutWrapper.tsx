@@ -10,6 +10,7 @@ import {
   emptyProfile,
   getCurrentUser,
   getProfileStorageKey,
+  authFetch,
 } from "./profileStorage";
 
 function playNotificationSound() {
@@ -145,7 +146,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           let dbLocation = "";
           let tailorAppId = currentUser?.id || 1;
           try {
-            const joinRes = await fetch(`${apiUrl}/api/join`);
+            const joinRes = await authFetch(`${apiUrl}/api/join`);
             const joinData = await joinRes.json();
             if (joinRes.ok && joinData.applications) {
               const matchedApp = joinData.applications.find(
@@ -170,7 +171,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             return;
           }
 
-          const response = await fetch(`${apiUrl}/api/bookings?role=tailor`);
+          const response = await authFetch(`${apiUrl}/api/bookings?role=tailor`);
           const data = await response.json();
 
           if (response.ok && data.bookings) {
@@ -233,7 +234,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             setNotificationCount(newCount);
             return;
           }
-          const response = await fetch(`${apiUrl}/api/bookings?role=user`);
+          const response = await authFetch(`${apiUrl}/api/bookings?role=user`);
           const data = await response.json();
           if (response.ok && data.bookings) {
             const matching = data.bookings.filter(

@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
+const crypto = require("crypto");
 const express = require("express");
 const https = require("https");
 const nodemailer = require("nodemailer");
@@ -282,8 +283,16 @@ async function ensureAuthTables(pool) {
         otpCode NVARCHAR(6) NOT NULL,
         expiresAt DATETIME2 NOT NULL,
         usedAt DATETIME2 NULL,
+        attempts INT NOT NULL DEFAULT 0,
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
       );
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.LoginOtps', 'attempts') IS NULL
+    BEGIN
+      ALTER TABLE dbo.LoginOtps ADD attempts INT NOT NULL DEFAULT 0;
     END
   `);
 
@@ -307,6 +316,132 @@ function normalizePhoneNumber(phoneNumber) {
 
 function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function base64UrlEncode(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET;
+
+  if (secret && secret.trim()) {
+    return secret;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET must be configured in production");
+  }
+
+  return "stitch-development-jwt-secret-change-me";
+}
+
+function signJwt(payload, expiresInSeconds = 60 * 60 * 24) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    alg: "HS256",
+    typ: "JWT",
+  };
+  const tokenPayload = {
+    ...payload,
+    iat: now,
+    exp: now + expiresInSeconds,
+  };
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(tokenPayload));
+  const signature = crypto
+    .createHmac("sha256", getJwtSecret())
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
+
+function verifyJwt(token) {
+  const [encodedHeader, encodedPayload, signature] = String(token || "").split(".");
+
+  if (!encodedHeader || !encodedPayload || !signature) {
+    throw new Error("Malformed token");
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", getJwtSecret())
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  const signatureBuffer = Buffer.from(signature);
+  const expectedSignatureBuffer = Buffer.from(expectedSignature);
+
+  if (
+    signatureBuffer.length !== expectedSignatureBuffer.length ||
+    !crypto.timingSafeEqual(signatureBuffer, expectedSignatureBuffer)
+  ) {
+    throw new Error("Invalid token signature");
+  }
+
+  const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+  const now = Math.floor(Date.now() / 1000);
+
+  if (payload.exp && payload.exp <= now) {
+    throw new Error("Token expired");
+  }
+
+  return payload;
+}
+
+function createAuthToken(user) {
+  return signJwt({
+    sub: String(user.id),
+    id: user.id,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    role: user.role || "user",
+  });
+}
+
+function authenticateApiRequest(request, response, next) {
+  const authHeader = request.get("authorization") || "";
+  const [scheme, token] = authHeader.split(" ");
+
+  if (scheme !== "Bearer" || !token) {
+    return response.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  try {
+    request.user = verifyJwt(token);
+    return next();
+  } catch (error) {
+    return response.status(401).json({
+      message: "Invalid or expired authentication token",
+    });
+  }
+}
+
+function requireAuth(request, response, next) {
+  return authenticateApiRequest(request, response, next);
+}
+
+function requireAdmin(request, response, next) {
+  if (request.user?.role !== "admin") {
+    return response.status(403).json({
+      message: "Forbidden: Admin access required",
+    });
+  }
+  next();
+}
+
+function getAuthenticatedUserId(request) {
+  return Number(request.user?.id || request.user?.sub || 0);
+}
+
+function isAuthenticatedTailor(request) {
+  return request.user?.role === "tailor";
+}
+
+function canAccessUser(request, userId) {
+  return getAuthenticatedUserId(request) === Number(userId);
 }
 
 function formatSmsPhoneNumber(phoneNumber) {
@@ -718,6 +853,25 @@ app.post("/api/auth/request-otp", async (request, response) => {
 
     const pool = await getSqlPool();
     await ensureAuthTables(pool);
+
+    // Rate Limiting Check: Max 3 OTP requests in the last 10 minutes
+    const recentOtpsResult = await pool
+      .request()
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .query(`
+        SELECT COUNT(*) AS count
+        FROM LoginOtps
+        WHERE phoneNumber = @phoneNumber
+          AND createdAt > DATEADD(minute, -10, SYSUTCDATETIME())
+      `);
+    const requestCount = recentOtpsResult.recordset[0].count;
+
+    if (requestCount >= 3) {
+      return response.status(429).json({
+        message: "Too many OTP requests. Please wait before requesting another OTP.",
+      });
+    }
+
     const userResult = await pool
       .request()
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
@@ -779,31 +933,61 @@ app.post("/api/auth/verify-otp", async (request, response) => {
 
     const pool = await getSqlPool();
     await ensureAuthTables(pool);
-    const otpResult = await pool
+
+    // Retrieve the latest active (unused & unexpired) OTP record for this phone number
+    const activeOtpResult = await pool
       .request()
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
-      .input("otpCode", sql.NVarChar(6), otpCode)
       .query(`
-        SELECT TOP 1 id
+        SELECT TOP 1 id, otpCode, attempts
         FROM LoginOtps
         WHERE phoneNumber = @phoneNumber
-          AND otpCode = @otpCode
           AND usedAt IS NULL
           AND expiresAt > SYSUTCDATETIME()
         ORDER BY createdAt DESC
       `);
+    
+    const activeOtp = activeOtpResult.recordset[0];
 
-    const otp = otpResult.recordset[0];
-
-    if (!otp) {
+    if (!activeOtp) {
       return response.status(401).json({
         message: "Invalid or expired OTP",
       });
     }
 
+    if (activeOtp.attempts >= 3) {
+      return response.status(429).json({
+        message: "Too many failed attempts. Please request a new OTP.",
+      });
+    }
+
+    if (activeOtp.otpCode !== otpCode) {
+      // Increment failed attempts. If total attempts reach 3, invalidate the OTP.
+      await pool
+        .request()
+        .input("id", sql.Int, activeOtp.id)
+        .query(`
+          UPDATE LoginOtps
+          SET attempts = attempts + 1,
+              usedAt = CASE WHEN attempts + 1 >= 3 THEN SYSUTCDATETIME() ELSE NULL END
+          WHERE id = @id
+        `);
+
+      if (activeOtp.attempts + 1 >= 3) {
+        return response.status(429).json({
+          message: "Too many failed attempts. This OTP has been invalidated. Please request a new OTP.",
+        });
+      }
+
+      return response.status(401).json({
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    // OTP is correct. Mark it as used.
     await pool
       .request()
-      .input("id", sql.Int, otp.id)
+      .input("id", sql.Int, activeOtp.id)
       .query("UPDATE LoginOtps SET usedAt = SYSUTCDATETIME() WHERE id = @id");
 
     const userResult = await pool
@@ -819,6 +1003,7 @@ app.post("/api/auth/verify-otp", async (request, response) => {
 
     return response.json({
       message: "Login successful",
+      token: createAuthToken(user),
       user: {
         id: user.id,
         fullName: user.fullName,
@@ -844,11 +1029,17 @@ app.post("/api/auth/verify-otp", async (request, response) => {
   }
 });
 
+app.use("/api", authenticateApiRequest);
+
 app.get("/api/users/:userId/profile", async (request, response) => {
   try {
     const userId = Number(request.params.userId);
     if (!userId) {
       return response.status(400).json({ message: "User ID is required" });
+    }
+
+    if (!canAccessUser(request, userId)) {
+      return response.status(403).json({ message: "You can only access your own profile" });
     }
 
     const pool = await getSqlPool();
@@ -896,6 +1087,10 @@ app.get("/api/users/:userId/measurements", async (request, response) => {
       return response.status(400).json({ message: "User ID is required" });
     }
 
+    if (!canAccessUser(request, userId)) {
+      return response.status(403).json({ message: "You can only access your own measurements" });
+    }
+
     const pool = await getSqlPool();
     await ensureMeasurementsTable(pool);
 
@@ -932,6 +1127,10 @@ app.put("/api/users/:userId/measurements", async (request, response) => {
 
     if (!userId) {
       return response.status(400).json({ message: "User ID is required" });
+    }
+
+    if (!canAccessUser(request, userId)) {
+      return response.status(403).json({ message: "You can only update your own measurements" });
     }
 
     const pool = await getSqlPool();
@@ -1000,6 +1199,10 @@ app.put("/api/users/:userId/profile", async (request, response) => {
 
     if (!userId) {
       return response.status(400).json({ message: "User ID is required" });
+    }
+
+    if (!canAccessUser(request, userId)) {
+      return response.status(403).json({ message: "You can only update your own profile" });
     }
 
     if (!fullName && (!firstName || !lastName)) {
@@ -1147,11 +1350,17 @@ app.put("/api/users/:userId/profile", async (request, response) => {
 
 app.post("/api/bookings", async (request, response) => {
   try {
-    const userId = request.body.userId ? Number(request.body.userId) : null;
+    const userId = getAuthenticatedUserId(request);
     const pickupLocation = String(request.body.pickupLocation || "").trim();
     const dropoffLocation = String(request.body.dropoffLocation || "").trim();
     const bookingDate = String(request.body.bookingDate || "").trim();
     const bookingTime = String(request.body.bookingTime || "").trim();
+
+    if (!userId) {
+      return response.status(401).json({
+        message: "Authentication required",
+      });
+    }
 
     if (!pickupLocation || !dropoffLocation || !bookingDate || !bookingTime) {
       return response.status(400).json({
@@ -1225,45 +1434,107 @@ app.get("/api/bookings", async (request, response) => {
     await ensureBookingsTable(pool);
     await ensureMeasurementsTable(pool);
 
-    const role = String(request.query.role || "").trim().toLowerCase();
-    if (role === "user" || role === "customer") {
-      await pool.request().query(`
-        DELETE FROM Bookings
-        WHERE status IN ('delivered', 'out-for-delivery')
-          AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
-      `);
+    const authenticatedUserId = getAuthenticatedUserId(request);
+    const userRole = request.user?.role || "user";
+
+    if (userRole === "user") {
+      await pool
+        .request()
+        .input("userId", sql.Int, authenticatedUserId)
+        .query(`
+          DELETE FROM Bookings
+          WHERE userId = @userId
+            AND status IN ('delivered', 'out-for-delivery')
+            AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
+        `);
     }
-    const result = await pool.request().query(`
-      SELECT
-        b.id,
-        b.userId,
-        u.fullName,
-        u.email,
-        b.pickupLocation,
-        b.dropoffLocation,
-        b.bookingDate,
-        b.bookingTime,
-        b.tailorApplicationId,
-        b.tailorName,
-        b.tailorEmail,
-        b.tailorPhoneNumber,
-        b.clothCategory,
-        b.clothImage,
-        b.material,
-        b.approxPrice,
-        b.status,
-        b.trackingCode,
-        b.createdAt,
-        m.chest,
-        m.waist,
-        m.hip,
-        m.shoulder,
-        m.inseam
-      FROM Bookings b
-      LEFT JOIN Users u ON u.id = b.userId
-      LEFT JOIN Measurements m ON m.userId = b.userId
-      ORDER BY b.createdAt DESC
-    `);
+
+    let result;
+    if (userRole === "tailor") {
+      const tailorEmail = request.user?.email || "";
+      const tailorPhoneNumber = request.user?.phoneNumber || "";
+
+      result = await pool
+        .request()
+        .input("tailorId", sql.Int, authenticatedUserId)
+        .input("tailorEmail", sql.NVarChar(255), tailorEmail)
+        .input("tailorPhoneNumber", sql.NVarChar(20), tailorPhoneNumber)
+        .query(`
+          SELECT
+            b.id,
+            b.userId,
+            u.fullName,
+            u.email,
+            b.pickupLocation,
+            b.dropoffLocation,
+            b.bookingDate,
+            b.bookingTime,
+            b.tailorApplicationId,
+            b.tailorName,
+            b.tailorEmail,
+            b.tailorPhoneNumber,
+            b.clothCategory,
+            b.clothImage,
+            b.material,
+            b.approxPrice,
+            b.status,
+            b.trackingCode,
+            b.createdAt,
+            m.chest,
+            m.waist,
+            m.hip,
+            m.shoulder,
+            m.inseam
+          FROM Bookings b
+          LEFT JOIN Users u ON u.id = b.userId
+          LEFT JOIN Measurements m ON m.userId = b.userId
+          WHERE b.tailorApplicationId = @tailorId
+             OR (b.tailorEmail IS NOT NULL AND LOWER(TRIM(b.tailorEmail)) = LOWER(TRIM(@tailorEmail)))
+             OR (b.tailorPhoneNumber IS NOT NULL AND TRIM(b.tailorPhoneNumber) = TRIM(@tailorPhoneNumber))
+             OR (b.tailorApplicationId IS NULL AND b.tailorEmail IS NULL AND b.status = 'pending-price')
+          ORDER BY b.createdAt DESC
+        `);
+    } else if (userRole === "user") {
+      result = await pool
+        .request()
+        .input("userId", sql.Int, authenticatedUserId)
+        .query(`
+          SELECT
+            b.id,
+            b.userId,
+            u.fullName,
+            u.email,
+            b.pickupLocation,
+            b.dropoffLocation,
+            b.bookingDate,
+            b.bookingTime,
+            b.tailorApplicationId,
+            b.tailorName,
+            b.tailorEmail,
+            b.tailorPhoneNumber,
+            b.clothCategory,
+            b.clothImage,
+            b.material,
+            b.approxPrice,
+            b.status,
+            b.trackingCode,
+            b.createdAt,
+            m.chest,
+            m.waist,
+            m.hip,
+            m.shoulder,
+            m.inseam
+          FROM Bookings b
+          LEFT JOIN Users u ON u.id = b.userId
+          LEFT JOIN Measurements m ON m.userId = b.userId
+          WHERE b.userId = @userId
+          ORDER BY b.createdAt DESC
+        `);
+    } else {
+      return response.status(403).json({
+        message: "Unauthorized role",
+      });
+    }
 
     return response.json({
       bookings: result.recordset,
@@ -1295,13 +1566,19 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
     await ensureBookingsTable(pool);
     await ensureMeasurementsTable(pool);
 
-    const role = String(request.query.role || "").trim().toLowerCase();
-    if (role === "user" || role === "customer") {
-      await pool.request().query(`
-        DELETE FROM Bookings
-        WHERE status IN ('delivered', 'out-for-delivery')
-          AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
-      `);
+    const authenticatedUserId = getAuthenticatedUserId(request);
+    const userRole = request.user?.role || "user";
+
+    if (userRole === "user") {
+      await pool
+        .request()
+        .input("userId", sql.Int, authenticatedUserId)
+        .query(`
+          DELETE FROM Bookings
+          WHERE userId = @userId
+            AND status IN ('delivered', 'out-for-delivery')
+            AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
+        `);
     }
     const result = await pool
       .request()
@@ -1343,6 +1620,12 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
     if (!booking) {
       return response.status(404).json({
         message: "Booking not found",
+      });
+    }
+
+    if (!isAuthenticatedTailor(request) && Number(booking.userId) !== getAuthenticatedUserId(request)) {
+      return response.status(403).json({
+        message: "You can only access your own bookings",
       });
     }
 
@@ -1409,6 +1692,36 @@ app.post("/api/bookings/:bookingId/details", async (request, response) => {
     if (!existingBooking) {
       return response.status(404).json({
         message: "Booking not found",
+      });
+    }
+
+    const authenticatedUserId = getAuthenticatedUserId(request);
+    const userRole = request.user?.role || "user";
+
+    if (userRole === "user") {
+      if (Number(existingBooking.userId) !== authenticatedUserId) {
+        return response.status(403).json({
+          message: "You can only update details for your own bookings",
+        });
+      }
+    } else if (userRole === "tailor") {
+      const tailorEmail = request.user?.email || "";
+      const tailorPhoneNumber = request.user?.phoneNumber || "";
+      const isAssigned = (
+        (existingBooking.tailorApplicationId && Number(existingBooking.tailorApplicationId) === authenticatedUserId) ||
+        (existingBooking.tailorEmail && existingBooking.tailorEmail.toLowerCase().trim() === tailorEmail.toLowerCase().trim()) ||
+        (existingBooking.tailorPhoneNumber && existingBooking.tailorPhoneNumber.trim() === tailorPhoneNumber.trim()) ||
+        (!existingBooking.tailorApplicationId && !existingBooking.tailorEmail)
+      );
+
+      if (!isAssigned) {
+        return response.status(403).json({
+          message: "You are not authorized to update details for this booking",
+        });
+      }
+    } else {
+      return response.status(403).json({
+        message: "Unauthorized role",
       });
     }
 
@@ -1557,9 +1870,44 @@ app.post("/api/bookings/:bookingId/tailor", async (request, response) => {
       });
     }
 
+    if (!isAuthenticatedTailor(request)) {
+      return response.status(403).json({
+        message: "Only tailor accounts can accept bookings",
+      });
+    }
+
     const pool = await getSqlPool();
     await ensureBookingsTable(pool);
     await ensureJoinTable(pool);
+
+    const authenticatedUserId = getAuthenticatedUserId(request);
+    const tailorEmail = request.user?.email || "";
+    const tailorPhoneNumber = request.user?.phoneNumber || "";
+
+    // Check if the requested tailorApplicationId matches the authenticated tailor
+    let isMatch = (tailorApplicationId === authenticatedUserId);
+
+    if (!isMatch) {
+      const checkMatchResult = await pool
+        .request()
+        .input("tailorApplicationId", sql.Int, tailorApplicationId)
+        .input("email", sql.NVarChar(255), tailorEmail)
+        .input("phone", sql.NVarChar(20), tailorPhoneNumber)
+        .query(`
+          SELECT 1 FROM JoinApplications
+          WHERE id = @tailorApplicationId
+            AND (LOWER(TRIM(email)) = LOWER(TRIM(@email)) OR TRIM(phoneNumber) = TRIM(@phone))
+        `);
+      if (checkMatchResult.recordset.length > 0) {
+        isMatch = true;
+      }
+    }
+
+    if (!isMatch) {
+      return response.status(403).json({
+        message: "You can only accept bookings for your own tailor account",
+      });
+    }
 
     let tailorResult = await pool
       .request()
@@ -1820,7 +2168,7 @@ app.post("/api/join", async (request, response) => {
   }
 });
 
-app.get("/api/join", async (_request, response) => {
+app.get("/api/join", requireAuth, requireAdmin, async (_request, response) => {
   try {
     const pool = await getSqlPool();
     await ensureJoinTable(pool);
@@ -2046,6 +2394,12 @@ app.post("/api/payments/create-order", async (request, response) => {
       });
     }
 
+    if (!canAccessUser(request, userId)) {
+      return response.status(403).json({
+        message: "You can only create payment orders for your own account",
+      });
+    }
+
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
@@ -2119,6 +2473,12 @@ app.post("/api/payments/verify-payment", async (request, response) => {
     if (!planId || !userId) {
       return response.status(400).json({
         message: "Plan ID and User ID are required",
+      });
+    }
+
+    if (!canAccessUser(request, userId)) {
+      return response.status(403).json({
+        message: "You can only verify payments for your own account",
       });
     }
 
@@ -2240,6 +2600,12 @@ app.post("/api/payments/activate-free-plan", async (request, response) => {
       });
     }
 
+    if (!canAccessUser(request, userId)) {
+      return response.status(403).json({
+        message: "You can only activate plans for your own account",
+      });
+    }
+
     const planToActivate = planId || "Free";
     const pool = await getSqlPool();
 
@@ -2295,8 +2661,88 @@ app.patch("/api/bookings/:bookingId/status", async (request, response) => {
       });
     }
 
+    const allowedStatuses = [
+      'pending',
+      'pending-price',
+      'pending-payment',
+      'booked',
+      'picked-up',
+      'in-stitching',
+      'ready',
+      'out-for-delivery',
+      'delivered',
+      'cancelled'
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      return response.status(400).json({
+        message: "Invalid status value",
+      });
+    }
+
     const pool = await getSqlPool();
     await ensureBookingsTable(pool);
+
+    const accessResult = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .query("SELECT TOP 1 userId, tailorApplicationId, status FROM Bookings WHERE id = @bookingId");
+    const existingBooking = accessResult.recordset[0];
+
+    if (!existingBooking) {
+      return response.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    const authenticatedUserId = getAuthenticatedUserId(request);
+    const userRole = request.user?.role || "user";
+
+    if (userRole === "tailor") {
+      // Must be the assigned tailor
+      if (!existingBooking.tailorApplicationId || Number(existingBooking.tailorApplicationId) !== authenticatedUserId) {
+        return response.status(403).json({
+          message: "You are not authorized to update this booking status",
+        });
+      }
+      // Tailors cannot set status to pending, pending-price, or pending-payment
+      const forbiddenTailorStatuses = ["pending", "pending-price", "pending-payment"];
+      if (forbiddenTailorStatuses.includes(status)) {
+        return response.status(400).json({
+          message: "Tailors cannot set status to pending, pending-price, or pending-payment",
+        });
+      }
+    } else if (userRole === "user") {
+      // Must own the booking
+      if (Number(existingBooking.userId) !== authenticatedUserId) {
+        return response.status(403).json({
+          message: "You can only update your own booking status",
+        });
+      }
+      // Customers can only set status to 'booked' (after payment) or 'cancelled'
+      if (status === "booked") {
+        if (existingBooking.status !== "pending-payment") {
+          return response.status(400).json({
+            message: "Cannot mark booking as booked unless it is pending payment",
+          });
+        }
+      } else if (status === "cancelled") {
+        const cancellableStatuses = ["pending", "pending-price", "pending-payment"];
+        if (!cancellableStatuses.includes(existingBooking.status)) {
+          return response.status(400).json({
+            message: "Cannot cancel a booking that is already confirmed or in progress",
+          });
+        }
+      } else {
+        return response.status(403).json({
+          message: "You are not authorized to set this status",
+        });
+      }
+    } else {
+      return response.status(403).json({
+        message: "Unauthorized role",
+      });
+    }
 
     const result = await pool
       .request()
@@ -2337,6 +2783,12 @@ app.patch("/api/bookings/:bookingId/price", async (request, response) => {
   try {
     const bookingId = Number(request.params.bookingId);
     const { approxPrice, tailorApplicationId } = request.body;
+
+    if (!isAuthenticatedTailor(request)) {
+      return response.status(403).json({
+        message: "Only tailor accounts can submit price quotes",
+      });
+    }
 
     if (!bookingId || approxPrice === undefined || approxPrice === null) {
       return response.status(400).json({

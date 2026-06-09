@@ -10,6 +10,7 @@ import {
   emptyProfile,
   getCurrentUser,
   getProfileStorageKey,
+  authFetch,
 } from "./profileStorage";
 import { showToast } from "./Toast";
 
@@ -156,7 +157,7 @@ export default function Sidebar({
           let dbLocation = "";
           let tailorAppId = currentUser?.id || 1;
           try {
-            const joinRes = await fetch(`${apiUrl}/api/join`);
+            const joinRes = await authFetch(`${apiUrl}/api/join`);
             const joinData = await joinRes.json();
             if (joinRes.ok && joinData.applications) {
               const matchedApp = joinData.applications.find(
@@ -181,7 +182,7 @@ export default function Sidebar({
             return;
           }
 
-          const response = await fetch(`${apiUrl}/api/bookings?role=tailor`);
+          const response = await authFetch(`${apiUrl}/api/bookings?role=tailor`);
           const data = await response.json();
 
           if (response.ok && data.bookings) {
@@ -245,7 +246,7 @@ export default function Sidebar({
             setNotificationCount(newCount);
             return;
           }
-          const response = await fetch(`${apiUrl}/api/bookings?role=user`);
+          const response = await authFetch(`${apiUrl}/api/bookings?role=user`);
           const data = await response.json();
           if (response.ok && data.bookings) {
             const matching = data.bookings.filter(
@@ -288,6 +289,7 @@ export default function Sidebar({
     localStorage.removeItem("stitch-auth");
     localStorage.removeItem("stitch-role");
     localStorage.removeItem("stitch-user");
+    localStorage.removeItem("stitch-token");
     showToast("Logout successfully", "success");
     window.dispatchEvent(new Event("stitch-auth-change"));
     handleLinkClick();

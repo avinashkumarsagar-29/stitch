@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { showToast } from "./Toast";
-import { getCurrentUser } from "./profileStorage";
+import { getCurrentUser, authFetch } from "./profileStorage";
 
 type BookingRecord = {
   id: number;
@@ -30,7 +30,7 @@ export default function BookingHistory() {
         const apiUrl =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
         const userRole = localStorage.getItem("stitch-role") || "user";
-        const response = await fetch(`${apiUrl}/api/bookings?role=${userRole}`);
+        const response = await authFetch(`${apiUrl}/api/bookings?role=${userRole}`);
         const data = await response.json();
 
         if (!response.ok) {

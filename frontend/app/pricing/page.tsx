@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useSyncExternalStore } from "react";
 import { showToast } from "../components/Toast";
-import { safeSetLocalStorage } from "../components/profileStorage";
+import { safeSetLocalStorage, authFetch } from "../components/profileStorage";
 
 const customerPlans = [
   {
@@ -252,7 +252,7 @@ export default function PricingPage() {
       try {
         setIsProcessing(true);
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/api/payments/activate-free-plan`, {
+        const response = await authFetch(`${apiUrl}/api/payments/activate-free-plan`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -290,7 +290,7 @@ export default function PricingPage() {
     try {
       setIsProcessing(true);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/payments/create-order`, {
+      const response = await authFetch(`${apiUrl}/api/payments/create-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -348,7 +348,7 @@ export default function PricingPage() {
         try {
           setIsProcessing(true);
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-          const verifyRes = await fetch(`${apiUrl}/api/payments/verify-payment`, {
+          const verifyRes = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -411,7 +411,7 @@ export default function PricingPage() {
       setShowMockModal(false);
       setIsProcessing(true);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/payments/verify-payment`, {
+      const response = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

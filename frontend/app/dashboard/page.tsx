@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
 import { showToast } from "../components/Toast";
-import { getProfileForCurrentUser, getCurrentUser, emptyProfile } from "../components/profileStorage";
+import { getProfileForCurrentUser, getCurrentUser, emptyProfile, authFetch } from "../components/profileStorage";
 
 type BookingRecord = {
   id: number;
@@ -91,7 +91,7 @@ function DashboardContent() {
     async function fetchBookings() {
       if (!currentUser) return;
       try {
-        const response = await fetch(`${apiUrl}/api/bookings?role=${currentUser.role}`);
+        const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser.role}`);
         const data = await response.json();
         if (response.ok && data.bookings) {
           // Filter bookings assigned to this tailor
@@ -151,6 +151,36 @@ function DashboardContent() {
     .filter((b) => b.status !== "pending-price" && b.approxPrice)
     .reduce((sum, b) => sum + Number(b.approxPrice || 0), 0);
 
+  // Calculate monthly earnings for the last 3 months dynamically
+  const now = new Date();
+  const monthlyEarnings = [0, 0, 0];
+  const monthLabels = ["", "", ""];
+
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - (2 - i), 1);
+    const monthIndex = d.getMonth();
+    const year = d.getFullYear();
+    monthLabels[i] = d.toLocaleString("default", { month: "short" });
+
+    const total = bookings.reduce((sum, b) => {
+      if (b.createdAt && b.approxPrice && b.status !== "pending-price" && b.status !== "cancelled") {
+        const bDate = new Date(b.createdAt);
+        if (bDate.getMonth() === monthIndex && bDate.getFullYear() === year) {
+          return sum + Number(b.approxPrice);
+        }
+      }
+      return sum;
+    }, 0);
+    monthlyEarnings[i] = total;
+  }
+
+  const maxEarning = Math.max(...monthlyEarnings);
+  const barHeights = monthlyEarnings.map((e) => {
+    if (maxEarning === 0) return "0%";
+    const pct = Math.round((e / maxEarning) * 100);
+    return `${pct}%`;
+  });
+
   const handleQuoteSubmit = async (bookingId: number) => {
     const priceStr = quotePrices[bookingId];
     const price = Number(priceStr);
@@ -162,7 +192,7 @@ function DashboardContent() {
     setIsSubmittingQuote((prev) => ({ ...prev, [bookingId]: true }));
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/price`, {
+      const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/price`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -342,9 +372,15 @@ function DashboardContent() {
               Earnings overview
             </h3>
             <div className="h-32 flex items-end justify-between pt-4 border-b border-gray-100 pb-2">
-              <Bar height="30%" label="Apr" />
-              <Bar height="55%" label="May" />
-              <Bar height="80%" label="Jun" active />
+              {monthLabels.map((label, idx) => (
+                <Bar
+                  key={label}
+                  height={barHeights[idx]}
+                  label={label}
+                  amount={monthlyEarnings[idx]}
+                  active={idx === 2}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -367,9 +403,12 @@ function MetricCard({ title, value, icon, color }: { title: string; value: strin
   );
 }
 
-function Bar({ height, label, active = false }: { height: string; label: string; active?: boolean }) {
+function Bar({ height, label, amount, active = false }: { height: string; label: string; amount: number; active?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-2 w-16">
+    <div className="flex flex-col items-center gap-2 w-16 group relative">
+      <div className="absolute -top-8 bg-gray-800 text-white text-[9px] font-bold py-1 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-sm z-10">
+        ₹{amount.toLocaleString("en-IN")}
+      </div>
       <div className="w-full bg-gray-50 rounded-t-lg relative h-24 flex items-end">
         <div
           className={`w-full rounded-t-lg transition-all duration-500 ${active ? 'bg-[#c322f4]' : 'bg-purple-200'}`}

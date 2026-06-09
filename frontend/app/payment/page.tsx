@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import AuthGuard from "../components/AuthGuard";
 import { showToast } from "../components/Toast";
-import { getCurrentUser } from "../components/profileStorage";
+import { getCurrentUser, authFetch } from "../components/profileStorage";
 
 type PendingBooking = {
   bookingId: number;
@@ -106,7 +106,7 @@ export default function PaymentPage() {
 
         if (urlBookingId) {
           const bookingId = Number(urlBookingId);
-          const bookingResponse = await fetch(`${apiUrl}/api/bookings/${bookingId}`);
+          const bookingResponse = await authFetch(`${apiUrl}/api/bookings/${bookingId}`);
           const bookingData = await bookingResponse.json();
 
           if (!bookingResponse.ok || !bookingData.booking) {
@@ -137,7 +137,7 @@ export default function PaymentPage() {
           pending = JSON.parse(stored);
           setPendingBooking(pending);
 
-          const bookingResponse = await fetch(`${apiUrl}/api/bookings/${pending.bookingId}`);
+          const bookingResponse = await authFetch(`${apiUrl}/api/bookings/${pending.bookingId}`);
           const bookingData = await bookingResponse.json();
 
           if (!bookingResponse.ok) {
@@ -148,7 +148,7 @@ export default function PaymentPage() {
           setBooking(bookingData.booking);
         }
 
-        const tailorResponse = await fetch(`${apiUrl}/api/tailors/${pending.tailorId}`);
+        const tailorResponse = await authFetch(`${apiUrl}/api/tailors/${pending.tailorId}`);
         const tailorData = await tailorResponse.json();
 
         if (!tailorResponse.ok) {
@@ -179,7 +179,7 @@ export default function PaymentPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/payments/create-order`, {
+      const response = await authFetch(`${apiUrl}/api/payments/create-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -232,7 +232,7 @@ export default function PaymentPage() {
         try {
           setIsProcessing(true);
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-          const verifyRes = await fetch(`${apiUrl}/api/payments/verify-payment`, {
+          const verifyRes = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -288,7 +288,7 @@ export default function PaymentPage() {
       setIsProcessing(true);
       
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/payments/verify-payment`, {
+      const response = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -332,7 +332,7 @@ export default function PaymentPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await fetch(`${apiUrl}/api/bookings/${pendingBooking.bookingId}/details`, {
+      const response = await authFetch(`${apiUrl}/api/bookings/${pendingBooking.bookingId}/details`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -355,7 +355,7 @@ export default function PaymentPage() {
       }
 
       // Explicitly update status to 'booked' since payment is completed
-      await fetch(`${apiUrl}/api/bookings/${pendingBooking.bookingId}/status`, {
+      await authFetch(`${apiUrl}/api/bookings/${pendingBooking.bookingId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

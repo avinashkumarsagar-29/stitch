@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { showToast } from "../components/Toast";
-import { getCurrentUser, getProfileStorageKey, safeSetLocalStorage, getProfileForCurrentUser } from "../components/profileStorage";
+import { getCurrentUser, getProfileStorageKey, safeSetLocalStorage, getProfileForCurrentUser, authFetch } from "../components/profileStorage";
+import AuthGuard from "../components/AuthGuard";
 
 export default function JoinPage() {
   const [formData, setFormData] = useState({
@@ -93,7 +94,7 @@ export default function JoinPage() {
         });
       }
 
-      const response = await fetch(`${apiUrl}/api/join`, {
+      const response = await authFetch(`${apiUrl}/api/join`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -150,6 +151,7 @@ export default function JoinPage() {
   }
 
   return (
+    <AuthGuard>
     <main className="p-4 md:p-8 lg:p-10 bg-gray-50/50 min-h-screen font-sans">
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm animate-fade-in">
         {/* Top color accent bar */}
@@ -457,6 +459,7 @@ export default function JoinPage() {
         </div>
       </div>
     </main>
+    </AuthGuard>
   );
 }
 

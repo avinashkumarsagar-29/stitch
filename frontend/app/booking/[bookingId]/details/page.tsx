@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import AuthGuard from "../../../components/AuthGuard";
 import { showToast } from "../../../components/Toast";
+import { authFetch } from "../../../components/profileStorage";
 
 type BookingRecord = {
   id: number;
@@ -84,8 +85,8 @@ export default function BookingDetailsPage() {
         const apiUrl =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
         const [bookingResponse, tailorResponse] = await Promise.all([
-          fetch(`${apiUrl}/api/bookings/${bookingId}`),
-          fetch(`${apiUrl}/api/tailors/${tailorId}`),
+          authFetch(`${apiUrl}/api/bookings/${bookingId}`),
+          authFetch(`${apiUrl}/api/tailors/${tailorId}`),
         ]);
         const bookingData = await bookingResponse.json();
         const tailorData = await tailorResponse.json();
@@ -108,7 +109,7 @@ export default function BookingDetailsPage() {
         const user = savedUser ? JSON.parse(savedUser) : null;
         if (user && user.id) {
           try {
-            const measRes = await fetch(`${apiUrl}/api/users/${user.id}/measurements`);
+            const measRes = await authFetch(`${apiUrl}/api/users/${user.id}/measurements`);
             const measData = await measRes.json();
             if (measRes.ok && measData.measurements) {
               setMeasurements({
@@ -177,7 +178,7 @@ export default function BookingDetailsPage() {
       const savedUser = localStorage.getItem("stitch-user");
       const user = savedUser ? JSON.parse(savedUser) : null;
       if (user && user.id) {
-        await fetch(`${apiUrl}/api/users/${user.id}/measurements`, {
+        await authFetch(`${apiUrl}/api/users/${user.id}/measurements`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -193,7 +194,7 @@ export default function BookingDetailsPage() {
       }
 
       // Save details to backend (approxPrice is null because tailor sets it!)
-      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/details`, {
+      const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/details`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -494,4 +495,3 @@ function MeasurementField({
     </div>
   );
 }
-
