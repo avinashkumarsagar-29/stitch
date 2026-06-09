@@ -148,6 +148,20 @@ async function ensureBookingsTable(pool) {
       ALTER TABLE dbo.Bookings ADD trackingCode NVARCHAR(10) NULL;
     END
   `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'referralDiscount') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD referralDiscount DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Bookings', 'creditApplied') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Bookings ADD creditApplied DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+    END
+  `);
 }
 
 async function ensureJoinTable(pool) {
@@ -209,6 +223,134 @@ async function ensureMeasurementsTable(pool) {
       );
     END
   `);
+}
+
+async function ensureReviewsTable(pool) {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.Reviews', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.Reviews (
+        id INT IDENTITY PRIMARY KEY,
+        bookingId INT NOT NULL,
+        userId INT NOT NULL,
+        tailorApplicationId INT NOT NULL,
+        rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        comment NVARCHAR(500) NULL,
+        createdAt DATETIME2 DEFAULT SYSUTCDATETIME()
+      );
+    END
+  `);
+}
+
+async function ensureReferralsTable(pool) {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.Referrals', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.Referrals (
+        id INT IDENTITY PRIMARY KEY,
+        referrerUserId INT NOT NULL,
+        referredUserId INT NOT NULL,
+        referralCode NVARCHAR(20) NOT NULL,
+        rewardGranted BIT DEFAULT 0,
+        createdAt DATETIME2 DEFAULT SYSUTCDATETIME()
+      );
+    END
+  `);
+}
+
+async function ensureBusinessOrdersTable(pool) {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.BusinessOrders', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.BusinessOrders (
+        id INT IDENTITY PRIMARY KEY,
+        userId INT NOT NULL,
+        companyName NVARCHAR(255) NOT NULL,
+        contactName NVARCHAR(150) NOT NULL,
+        email NVARCHAR(255) NOT NULL,
+        phoneNumber NVARCHAR(20) NOT NULL,
+        businessType NVARCHAR(100) NOT NULL,
+        quantity INT NOT NULL,
+        requirements NVARCHAR(MAX) NULL,
+        approxPrice DECIMAL(10,2) NULL,
+        status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+        createdAt DATETIME2 DEFAULT SYSUTCDATETIME(),
+        deliveredAt DATETIME2 NULL,
+        targetDeliveryDate DATE NULL,
+        location NVARCHAR(255) NULL,
+        tailorApplicationId INT NULL,
+        tailorName NVARCHAR(200) NULL,
+        tailorEmail NVARCHAR(255) NULL,
+        tailorPhoneNumber NVARCHAR(20) NULL,
+        CONSTRAINT FK_BusinessOrders_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
+      );
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.BusinessOrders', 'deliveredAt') IS NULL
+    BEGIN
+      ALTER TABLE dbo.BusinessOrders ADD deliveredAt DATETIME2 NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.BusinessOrders', 'targetDeliveryDate') IS NULL
+    BEGIN
+      ALTER TABLE dbo.BusinessOrders ADD targetDeliveryDate DATE NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.BusinessOrders', 'location') IS NULL
+    BEGIN
+      ALTER TABLE dbo.BusinessOrders ADD location NVARCHAR(255) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.BusinessOrders', 'tailorApplicationId') IS NULL
+    BEGIN
+      ALTER TABLE dbo.BusinessOrders ADD tailorApplicationId INT NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.BusinessOrders', 'tailorName') IS NULL
+    BEGIN
+      ALTER TABLE dbo.BusinessOrders ADD tailorName NVARCHAR(200) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.BusinessOrders', 'tailorEmail') IS NULL
+    BEGIN
+      ALTER TABLE dbo.BusinessOrders ADD tailorEmail NVARCHAR(255) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.BusinessOrders', 'tailorPhoneNumber') IS NULL
+    BEGIN
+      ALTER TABLE dbo.BusinessOrders ADD tailorPhoneNumber NVARCHAR(20) NULL;
+    END
+  `);
+}
+
+async function generateUniqueReferralCode(pool) {
+  let isUnique = false;
+  let code = "";
+  while (!isUnique) {
+    const randomChars = Math.random().toString(36).substring(2, 7).toUpperCase();
+    code = `STITCH-${randomChars}`;
+    const checkResult = await pool.request()
+      .input("code", sql.NVarChar(20), code)
+      .query("SELECT 1 FROM Users WHERE referralCode = @code");
+    if (checkResult.recordset.length === 0) {
+      isUnique = true;
+    }
+  }
+  return code;
 }
 
 async function ensureAuthTables(pool) {
@@ -273,6 +415,32 @@ async function ensureAuthTables(pool) {
       ALTER TABLE dbo.Users ADD image NVARCHAR(MAX) NULL;
     END
   `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'referralCode') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD referralCode NVARCHAR(20) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'credit') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD credit DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+    END
+  `);
+
+  // Migrate existing users who have NULL referralCode
+  const unmigratedUsers = await pool.request().query(`
+    SELECT id FROM Users WHERE referralCode IS NULL
+  `);
+  for (const user of unmigratedUsers.recordset) {
+    const code = await generateUniqueReferralCode(pool);
+    await pool.request()
+      .input("userId", sql.Int, user.id)
+      .input("code", sql.NVarChar(20), code)
+      .query("UPDATE Users SET referralCode = @code WHERE id = @userId");
+  }
 
   await pool.request().query(`
     IF OBJECT_ID('dbo.LoginOtps', 'U') IS NULL
@@ -769,6 +937,7 @@ app.post("/api/auth/register", async (request, response) => {
     const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
     const password = String(request.body.password || "");
     const role = String(request.body.role || "user").toLowerCase();
+    const referralCodeUsed = String(request.body.referralCodeUsed || "").trim();
 
     if (!fullName || !email || !phoneNumber || !password) {
       return response.status(400).json({
@@ -796,6 +965,22 @@ app.post("/api/auth/register", async (request, response) => {
 
     const pool = await getSqlPool();
     await ensureAuthTables(pool);
+    await ensureReferralsTable(pool);
+
+    let referrerUserId = null;
+    if (referralCodeUsed) {
+      const referrerResult = await pool
+        .request()
+        .input("code", sql.NVarChar(20), referralCodeUsed)
+        .query("SELECT id FROM Users WHERE referralCode = @code");
+      if (referrerResult.recordset.length === 0) {
+        return response.status(400).json({
+          message: "Invalid referral code",
+        });
+      }
+      referrerUserId = referrerResult.recordset[0].id;
+    }
+
     const existingUser = await pool
       .request()
       .input("email", sql.NVarChar(255), email)
@@ -809,6 +994,8 @@ app.post("/api/auth/register", async (request, response) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const referralCode = await generateUniqueReferralCode(pool);
+
     const result = await pool
       .request()
       .input("fullName", sql.NVarChar(150), fullName)
@@ -816,17 +1003,38 @@ app.post("/api/auth/register", async (request, response) => {
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .input("passwordHash", sql.NVarChar(255), passwordHash)
       .input("role", sql.NVarChar(50), role)
+      .input("referralCode", sql.NVarChar(20), referralCode)
       .query(`
-        INSERT INTO Users (fullName, email, phoneNumber, passwordHash, role)
-        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan]
-        VALUES (@fullName, @email, @phoneNumber, @passwordHash, @role)
+        INSERT INTO Users (fullName, email, phoneNumber, passwordHash, role, referralCode, credit)
+        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan], INSERTED.referralCode, INSERTED.credit
+        VALUES (@fullName, @email, @phoneNumber, @passwordHash, @role, @referralCode, 0)
       `);
+
+    const newUser = result.recordset[0];
+
+    if (referrerUserId) {
+      await pool
+        .request()
+        .input("referrerUserId", sql.Int, referrerUserId)
+        .input("referredUserId", sql.Int, newUser.id)
+        .input("referralCode", sql.NVarChar(20), referralCodeUsed)
+        .query(`
+          INSERT INTO Referrals (referrerUserId, referredUserId, referralCode, rewardGranted)
+          VALUES (@referrerUserId, @referredUserId, @referralCode, 0)
+        `);
+    }
 
     return response.status(201).json({
       message: "Registration successful",
       user: {
-        ...result.recordset[0],
-        plan: result.recordset[0].plan || "Free"
+        id: newUser.id,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        phoneNumber: newUser.phoneNumber,
+        role: newUser.role,
+        plan: newUser.plan || "Free",
+        referralCode: newUser.referralCode,
+        credit: newUser.credit !== undefined ? Number(newUser.credit) : 0,
       },
     });
   } catch (error) {
@@ -994,7 +1202,7 @@ app.post("/api/auth/verify-otp", async (request, response) => {
       .request()
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .query(`
-        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image
+        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image, referralCode, credit
         FROM Users
         WHERE phoneNumber = @phoneNumber
       `);
@@ -1015,6 +1223,8 @@ app.post("/api/auth/verify-otp", async (request, response) => {
         lastName: user.lastName || "",
         address: user.address || "",
         image: user.image || "",
+        referralCode: user.referralCode,
+        credit: user.credit !== undefined ? Number(user.credit) : 0,
       },
     });
   } catch (error) {
@@ -1048,7 +1258,7 @@ app.get("/api/users/:userId/profile", async (request, response) => {
       .request()
       .input("userId", sql.Int, userId)
       .query(`
-        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image
+        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image, referralCode, credit
         FROM Users
         WHERE id = @userId
       `);
@@ -1069,6 +1279,8 @@ app.get("/api/users/:userId/profile", async (request, response) => {
         image: user.image || "",
         role: user.role,
         plan: user.plan || "Free",
+        referralCode: user.referralCode,
+        credit: user.credit !== undefined ? Number(user.credit) : 0,
       }
     });
   } catch (error) {
@@ -1283,7 +1495,7 @@ app.put("/api/users/:userId/profile", async (request, response) => {
           image = @image
         OUTPUT 
           INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan],
-          INSERTED.firstName, INSERTED.lastName, INSERTED.address, INSERTED.image
+          INSERTED.firstName, INSERTED.lastName, INSERTED.address, INSERTED.image, INSERTED.referralCode, INSERTED.credit
         WHERE id = @userId
       `);
 
@@ -1325,6 +1537,8 @@ app.put("/api/users/:userId/profile", async (request, response) => {
         image: updatedUser.image || "",
         role: updatedUser.role,
         plan: updatedUser.plan || "Free",
+        referralCode: updatedUser.referralCode,
+        credit: updatedUser.credit !== undefined ? Number(updatedUser.credit) : 0,
       },
       user: {
         id: updatedUser.id,
@@ -1337,6 +1551,8 @@ app.put("/api/users/:userId/profile", async (request, response) => {
         lastName: updatedUser.lastName || "",
         address: updatedUser.address || "",
         image: updatedUser.image || "",
+        referralCode: updatedUser.referralCode,
+        credit: updatedUser.credit !== undefined ? Number(updatedUser.credit) : 0,
       }
     });
   } catch (error) {
@@ -1565,6 +1781,7 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
     const pool = await getSqlPool();
     await ensureBookingsTable(pool);
     await ensureMeasurementsTable(pool);
+    await ensureReviewsTable(pool);
 
     const authenticatedUserId = getAuthenticatedUserId(request);
     const userRole = request.user?.role || "user";
@@ -1581,40 +1798,46 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
         `);
     }
     const result = await pool
-      .request()
-      .input("bookingIdNum", sql.Int, bookingIdNum)
-      .input("bookingIdStr", sql.NVarChar(255), bookingIdParam)
-      .query(`
-        SELECT TOP 1
-          b.id,
-          b.userId,
-          u.fullName,
-          u.email,
-          b.pickupLocation,
-          b.dropoffLocation,
-          b.bookingDate,
-          b.bookingTime,
-          b.tailorApplicationId,
-          b.tailorName,
-          b.tailorEmail,
-          b.tailorPhoneNumber,
-          b.clothCategory,
-          b.clothImage,
-          b.material,
-          b.approxPrice,
-          b.status,
-          b.trackingCode,
-          b.createdAt,
-          m.chest,
-          m.waist,
-          m.hip,
-          m.shoulder,
-          m.inseam
-        FROM Bookings b
-        LEFT JOIN Users u ON u.id = b.userId
-        LEFT JOIN Measurements m ON m.userId = b.userId
-        WHERE b.id = @bookingIdNum OR b.trackingCode = @bookingIdStr
-      `);
+        .request()
+        .input("bookingIdNum", sql.Int, bookingIdNum)
+        .input("bookingIdStr", sql.NVarChar(255), bookingIdParam)
+        .query(`
+          SELECT TOP 1
+            b.id,
+            b.userId,
+            u.fullName,
+            u.email,
+            b.pickupLocation,
+            b.dropoffLocation,
+            b.bookingDate,
+            b.bookingTime,
+            b.tailorApplicationId,
+            b.tailorName,
+            b.tailorEmail,
+            b.tailorPhoneNumber,
+            b.clothCategory,
+            b.clothImage,
+            b.material,
+            b.approxPrice,
+            b.referralDiscount,
+            b.creditApplied,
+            b.status,
+            b.trackingCode,
+            b.createdAt,
+            m.chest,
+            m.waist,
+            m.hip,
+            m.shoulder,
+            m.inseam,
+            r.id AS reviewId,
+            r.rating AS reviewRating,
+            r.comment AS reviewComment
+          FROM Bookings b
+          LEFT JOIN Users u ON u.id = b.userId
+          LEFT JOIN Measurements m ON m.userId = b.userId
+          LEFT JOIN Reviews r ON r.bookingId = b.id
+          WHERE b.id = @bookingIdNum OR b.trackingCode = @bookingIdStr
+        `);
     const booking = result.recordset[0];
 
     if (!booking) {
@@ -1627,6 +1850,70 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
       return response.status(403).json({
         message: "You can only access your own bookings",
       });
+    }
+
+    // Dynamically calculate and save discounts if pending payment
+    if (booking.status === "pending-payment" && Number(booking.userId) === getAuthenticatedUserId(request)) {
+      try {
+        const userId = Number(booking.userId);
+        const bookingId = Number(booking.id);
+        const basePrice = Number(booking.approxPrice || 0);
+        const gstFee = Math.round(basePrice * 0.18);
+        const platformFee = 49;
+        const totalBasePrice = basePrice + gstFee + platformFee;
+
+        let referralDiscountApplied = 0;
+        let creditApplied = 0;
+
+        // Check if user is referred and has not had a booking confirmed yet
+        const referralRes = await pool.request()
+          .input("userId", sql.Int, userId)
+          .query("SELECT TOP 1 id FROM Referrals WHERE referredUserId = @userId");
+        
+        if (referralRes.recordset.length > 0) {
+          const bookedCountResult = await pool.request()
+            .input("userId", sql.Int, userId)
+            .input("bookingId", sql.Int, bookingId)
+            .query(`
+              SELECT COUNT(id) AS cnt 
+              FROM Bookings 
+              WHERE userId = @userId 
+                AND status IN ('booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered')
+                AND id <> @bookingId
+            `);
+          if (bookedCountResult.recordset[0].cnt === 0) {
+            referralDiscountApplied = 50.00;
+          }
+        }
+
+        // Check user available credit balance
+        const userCreditRes = await pool.request()
+          .input("userId", sql.Int, userId)
+          .query("SELECT credit FROM Users WHERE id = @userId");
+        const availableCredit = Number(userCreditRes.recordset[0]?.credit || 0);
+
+        let tempPrice = totalBasePrice - referralDiscountApplied;
+        if (tempPrice < 0) tempPrice = 0;
+
+        creditApplied = Math.min(availableCredit, tempPrice);
+
+        // Update database with the latest calculations
+        await pool.request()
+          .input("bookingId", sql.Int, bookingId)
+          .input("referralDiscount", sql.Decimal(10, 2), referralDiscountApplied)
+          .input("creditApplied", sql.Decimal(10, 2), creditApplied)
+          .query(`
+            UPDATE Bookings 
+            SET referralDiscount = @referralDiscount,
+                creditApplied = @creditApplied
+            WHERE id = @bookingId
+          `);
+
+        booking.referralDiscount = referralDiscountApplied;
+        booking.creditApplied = creditApplied;
+      } catch (err) {
+        console.error("Error calculating dynamic discounts on GET:", err);
+      }
     }
 
     return response.json({ booking });
@@ -2217,22 +2504,28 @@ app.get("/api/tailors", async (request, response) => {
 
     const pool = await getSqlPool();
     await ensureJoinTable(pool);
+    await ensureReviewsTable(pool);
     const result = await pool.request().query(`
       SELECT
-        id,
-        firstName,
-        lastName,
-        email,
-        phoneNumber,
-        experience,
-        location,
-        image,
-        [plan],
-        status,
-        createdAt
-      FROM JoinApplications
-      WHERE status = 'pending'
-      ORDER BY createdAt DESC
+        ja.id,
+        ja.firstName,
+        ja.lastName,
+        ja.email,
+        ja.phoneNumber,
+        ja.experience,
+        ja.location,
+        ja.image,
+        ja.[plan],
+        ja.status,
+        ja.createdAt,
+        COALESCE(AVG(CAST(r.rating AS DECIMAL(10,2))), 0) AS avgRating,
+        COUNT(r.id) AS reviewCount
+      FROM JoinApplications ja
+      LEFT JOIN Reviews r ON ja.id = r.tailorApplicationId
+      WHERE ja.status = 'pending'
+      GROUP BY 
+        ja.id, ja.firstName, ja.lastName, ja.email, ja.phoneNumber, 
+        ja.experience, ja.location, ja.image, ja.[plan], ja.status, ja.createdAt
     `);
     const searchWords = location
       .split(/[\s,.-]+/)
@@ -2262,8 +2555,15 @@ app.get("/api/tailors", async (request, response) => {
         location: tailor.location,
         image: tailor.image,
         plan: tailor.plan || "Free",
+        avgRating: Number(tailor.avgRating || 0),
+        reviewCount: Number(tailor.reviewCount || 0),
       }))
       .sort((a, b) => {
+        const ratingA = a.avgRating || 0;
+        const ratingB = b.avgRating || 0;
+        if (ratingB !== ratingA) {
+          return ratingB - ratingA;
+        }
         const weightA = planWeights[a.plan] || 1;
         const weightB = planWeights[b.plan] || 1;
         return weightB - weightA;
@@ -2358,6 +2658,21 @@ app.get("/api/tailors/:tailorId", async (request, response) => {
       });
     }
 
+    await ensureReviewsTable(pool);
+    const ratingResult = await pool
+      .request()
+      .input("tailorId", sql.Int, tailorId)
+      .query(`
+        SELECT 
+          COALESCE(AVG(CAST(rating AS DECIMAL(10,2))), 0) AS avgRating,
+          COUNT(id) AS reviewCount
+        FROM Reviews
+        WHERE tailorApplicationId = @tailorId
+      `);
+    const ratingInfo = ratingResult.recordset[0];
+    const avgRating = Number(ratingInfo?.avgRating || 0);
+    const reviewCount = Number(ratingInfo?.reviewCount || 0);
+
     return response.json({
       tailor: {
         id: tailor.id,
@@ -2368,6 +2683,8 @@ app.get("/api/tailors/:tailorId", async (request, response) => {
         location: tailor.location,
         image: tailor.image,
         plan: tailor.plan || "Free",
+        avgRating,
+        reviewCount,
       },
     });
   } catch (error) {
@@ -2401,6 +2718,90 @@ app.post("/api/payments/create-order", async (request, response) => {
       });
     }
 
+    const pool = await getSqlPool();
+    let finalPrice = price;
+    let referralDiscountApplied = 0;
+    let creditApplied = 0;
+
+    if (planId.startsWith("booking_")) {
+      const bookingId = Number(planId.replace("booking_", ""));
+      const bookingResult = await pool.request()
+        .input("bookingId", sql.Int, bookingId)
+        .query("SELECT approxPrice FROM Bookings WHERE id = @bookingId");
+      const booking = bookingResult.recordset[0];
+      if (!booking) {
+        return response.status(404).json({
+          message: "Booking not found",
+        });
+      }
+
+      const basePrice = Number(booking.approxPrice || 0);
+      const gstFee = Math.round(basePrice * 0.18);
+      const platformFee = 49;
+      const totalBasePrice = basePrice + gstFee + platformFee;
+
+      // Check if user is referred and has not had a booking confirmed yet
+      const referralRes = await pool.request()
+        .input("userId", sql.Int, userId)
+        .query("SELECT TOP 1 id FROM Referrals WHERE referredUserId = @userId");
+      
+      if (referralRes.recordset.length > 0) {
+        const bookedCountResult = await pool.request()
+          .input("userId", sql.Int, userId)
+          .input("bookingId", sql.Int, bookingId)
+          .query(`
+            SELECT COUNT(id) AS cnt 
+            FROM Bookings 
+            WHERE userId = @userId 
+              AND status IN ('booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered')
+              AND id <> @bookingId
+          `);
+        if (bookedCountResult.recordset[0].cnt === 0) {
+          referralDiscountApplied = 50.00;
+        }
+      }
+
+      // Check user available credit balance
+      const userCreditRes = await pool.request()
+        .input("userId", sql.Int, userId)
+        .query("SELECT credit FROM Users WHERE id = @userId");
+      const availableCredit = Number(userCreditRes.recordset[0]?.credit || 0);
+
+      let tempPrice = totalBasePrice - referralDiscountApplied;
+      if (tempPrice < 0) tempPrice = 0;
+
+      creditApplied = Math.min(availableCredit, tempPrice);
+      finalPrice = tempPrice - creditApplied;
+      if (finalPrice < 0) finalPrice = 0;
+
+      // Save referralDiscount and creditApplied back to booking
+      await pool.request()
+        .input("bookingId", sql.Int, bookingId)
+        .input("referralDiscount", sql.Decimal(10, 2), referralDiscountApplied)
+        .input("creditApplied", sql.Decimal(10, 2), creditApplied)
+        .query(`
+          UPDATE Bookings 
+          SET referralDiscount = @referralDiscount,
+              creditApplied = @creditApplied
+          WHERE id = @bookingId
+        `);
+    }
+
+    if (finalPrice === 0) {
+      return response.json({
+        id: "order_free_" + Math.random().toString(36).substring(2, 11),
+        amount: 0,
+        currency: "INR",
+        isMock: true,
+        isFree: true,
+        key: "rzp_test_mockkey",
+        planId,
+        billingCycle,
+        referralDiscount: referralDiscountApplied,
+        creditApplied,
+      });
+    }
+
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
@@ -2410,12 +2811,14 @@ app.post("/api/payments/create-order", async (request, response) => {
       // Return a Mock Order for developer testing
       return response.json({
         id: "order_mock_" + Math.random().toString(36).substring(2, 11),
-        amount: Math.round(price * 100),
+        amount: Math.round(finalPrice * 100),
         currency: "INR",
         isMock: true,
         key: "rzp_test_mockkey",
         planId,
         billingCycle,
+        referralDiscount: referralDiscountApplied,
+        creditApplied,
       });
     }
 
@@ -2427,7 +2830,7 @@ app.post("/api/payments/create-order", async (request, response) => {
         "Authorization": authHeader
       },
       body: JSON.stringify({
-        amount: Math.round(price * 100),
+        amount: Math.round(finalPrice * 100),
         currency: "INR",
         receipt: "receipt_order_" + Date.now()
       })
@@ -2450,6 +2853,8 @@ app.post("/api/payments/create-order", async (request, response) => {
       key: keyId,
       planId,
       billingCycle,
+      referralDiscount: referralDiscountApplied,
+      creditApplied,
     });
   } catch (error) {
     console.error("Create order error:", error);
@@ -2487,7 +2892,7 @@ app.post("/api/payments/verify-payment", async (request, response) => {
 
     if (isMock) {
       const keyId = process.env.RAZORPAY_KEY_ID;
-      if (keyId && keyId.trim()) {
+      if (keyId && keyId.trim() && !String(razorpay_order_id).startsWith("order_free_")) {
         return response.status(400).json({
           message: "Mock payments are disabled because real Razorpay keys are configured",
         });
@@ -2767,6 +3172,55 @@ app.patch("/api/bookings/:bookingId/status", async (request, response) => {
       });
     }
 
+    if (status === "booked" && existingBooking.status === "pending-payment") {
+      const bookingDetailsRes = await pool.request()
+        .input("bookingId", sql.Int, bookingId)
+        .query("SELECT userId, referralDiscount, creditApplied FROM Bookings WHERE id = @bookingId");
+      const bd = bookingDetailsRes.recordset[0];
+      if (bd) {
+        const userId = bd.userId;
+        const creditApplied = Number(bd.creditApplied || 0);
+
+        if (creditApplied > 0) {
+          await pool.request()
+            .input("userId", sql.Int, userId)
+            .input("creditApplied", sql.Decimal(10, 2), creditApplied)
+            .query(`
+              UPDATE Users 
+              SET credit = CASE WHEN credit >= @creditApplied THEN credit - @creditApplied ELSE 0 END 
+              WHERE id = @userId
+            `);
+        }
+
+        // Check if there is a pending referral reward
+        const referralRes = await pool.request()
+          .input("userId", sql.Int, userId)
+          .query("SELECT TOP 1 id, referrerUserId, rewardGranted FROM Referrals WHERE referredUserId = @userId");
+        const referral = referralRes.recordset[0];
+        if (referral && !referral.rewardGranted) {
+          const bookedCountResult = await pool.request()
+            .input("userId", sql.Int, userId)
+            .input("bookingId", sql.Int, bookingId)
+            .query(`
+              SELECT COUNT(id) AS cnt 
+              FROM Bookings 
+              WHERE userId = @userId 
+                AND status IN ('booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered')
+                AND id <> @bookingId
+            `);
+          if (bookedCountResult.recordset[0].cnt === 0) {
+            await pool.request()
+              .input("referralId", sql.Int, referral.id)
+              .query("UPDATE Referrals SET rewardGranted = 1 WHERE id = @referralId");
+
+            await pool.request()
+              .input("referrerId", sql.Int, referral.referrerUserId)
+              .query("UPDATE Users SET credit = credit + 50.00 WHERE id = @referrerId");
+          }
+        }
+      }
+    }
+
     return response.json({
       message: "Booking status updated successfully",
       booking,
@@ -2943,6 +3397,379 @@ app.patch("/api/bookings/:bookingId/price", async (request, response) => {
     console.error("Booking price update error:", error);
     return response.status(500).json({
       message: "Unable to update booking price",
+      detail: error.message,
+    });
+  }
+});
+
+app.post("/api/reviews", requireAuth, async (request, response) => {
+  try {
+    const { bookingId, rating, comment } = request.body;
+    const userId = getAuthenticatedUserId(request);
+
+    if (!bookingId || !rating) {
+      return response.status(400).json({
+        message: "Booking ID and rating are required",
+      });
+    }
+
+    const ratingNum = Number(rating);
+    if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      return response.status(400).json({
+        message: "Rating must be a number between 1 and 5",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureReviewsTable(pool);
+
+    // Retrieve booking to verify ownership, status, and tailor details
+    const bookingResult = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .query(`
+        SELECT TOP 1 userId, status, tailorApplicationId 
+        FROM Bookings 
+        WHERE id = @bookingId
+      `);
+    const booking = bookingResult.recordset[0];
+
+    if (!booking) {
+      return response.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    if (Number(booking.userId) !== userId) {
+      return response.status(403).json({
+        message: "You can only review your own bookings",
+      });
+    }
+
+    if (booking.status !== "delivered") {
+      return response.status(400).json({
+        message: "You can only review bookings that have been delivered",
+      });
+    }
+
+    if (!booking.tailorApplicationId) {
+      return response.status(400).json({
+        message: "No tailor partner is assigned to this booking",
+      });
+    }
+
+    // Check if review already exists
+    const existingResult = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .query(`
+        SELECT TOP 1 id FROM Reviews WHERE bookingId = @bookingId
+      `);
+    if (existingResult.recordset.length > 0) {
+      return response.status(400).json({
+        message: "You have already reviewed this booking",
+      });
+    }
+
+    // Insert the review
+    const insertResult = await pool
+      .request()
+      .input("bookingId", sql.Int, bookingId)
+      .input("userId", sql.Int, userId)
+      .input("tailorApplicationId", sql.Int, booking.tailorApplicationId)
+      .input("rating", sql.Int, ratingNum)
+      .input("comment", sql.NVarChar(500), comment ? String(comment).slice(0, 500) : null)
+      .query(`
+        INSERT INTO Reviews (bookingId, userId, tailorApplicationId, rating, comment)
+        OUTPUT INSERTED.id
+        VALUES (@bookingId, @userId, @tailorApplicationId, @rating, @comment)
+      `);
+
+    return response.status(201).json({
+      message: "Review submitted successfully",
+      reviewId: insertResult.recordset[0].id,
+    });
+  } catch (error) {
+    console.error("Create review error:", error);
+    return response.status(500).json({
+      message: "Unable to submit review",
+      detail: error.message,
+    });
+  }
+});
+
+app.post("/api/business-orders", requireAuth, async (request, response) => {
+  try {
+    const userId = getAuthenticatedUserId(request);
+    const { companyName, contactName, email, phoneNumber, businessType, quantity, requirements, targetDeliveryDate, location, tailorApplicationId } = request.body;
+
+    if (!companyName || !contactName || !email || !phoneNumber || !businessType || !quantity) {
+      return response.status(400).json({
+        message: "Company name, contact name, email, phone number, business type, and quantity are required",
+      });
+    }
+
+    const quantityNum = Number(quantity);
+    if (isNaN(quantityNum) || quantityNum <= 0) {
+      return response.status(400).json({
+        message: "Quantity must be a positive number",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBusinessOrdersTable(pool);
+
+    let tailorName = null;
+    let tailorEmail = null;
+    let tailorPhoneNumber = null;
+
+    if (tailorApplicationId) {
+      const tailorRes = await pool.request()
+        .input("tailorId", sql.Int, Number(tailorApplicationId))
+        .query("SELECT firstName + ' ' + lastName AS fullName, email, phoneNumber FROM JoinApplications WHERE id = @tailorId");
+      if (tailorRes.recordset.length > 0) {
+        const t = tailorRes.recordset[0];
+        tailorName = t.fullName;
+        tailorEmail = t.email;
+        tailorPhoneNumber = t.phoneNumber;
+      }
+    }
+
+    const result = await pool.request()
+      .input("userId", sql.Int, userId)
+      .input("companyName", sql.NVarChar(255), companyName)
+      .input("contactName", sql.NVarChar(150), contactName)
+      .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .input("businessType", sql.NVarChar(100), businessType)
+      .input("quantity", sql.Int, quantityNum)
+      .input("requirements", sql.NVarChar(sql.MAX), requirements || null)
+      .input("targetDeliveryDate", sql.Date, targetDeliveryDate ? new Date(targetDeliveryDate) : null)
+      .input("location", sql.NVarChar(255), location || null)
+      .input("tailorApplicationId", sql.Int, tailorApplicationId ? Number(tailorApplicationId) : null)
+      .input("tailorName", sql.NVarChar(200), tailorName)
+      .input("tailorEmail", sql.NVarChar(255), tailorEmail)
+      .input("tailorPhoneNumber", sql.NVarChar(20), tailorPhoneNumber)
+      .query(`
+        INSERT INTO BusinessOrders (userId, companyName, contactName, email, phoneNumber, businessType, quantity, requirements, targetDeliveryDate, location, tailorApplicationId, tailorName, tailorEmail, tailorPhoneNumber, status)
+        OUTPUT INSERTED.id, INSERTED.userId, INSERTED.companyName, INSERTED.contactName, INSERTED.email, INSERTED.phoneNumber, INSERTED.businessType, INSERTED.quantity, INSERTED.requirements, INSERTED.approxPrice, INSERTED.status, INSERTED.targetDeliveryDate, INSERTED.location, INSERTED.tailorApplicationId, INSERTED.tailorName, INSERTED.tailorEmail, INSERTED.tailorPhoneNumber, INSERTED.createdAt
+        VALUES (@userId, @companyName, @contactName, @email, @phoneNumber, @businessType, @quantity, @requirements, @targetDeliveryDate, @location, @tailorApplicationId, @tailorName, @tailorEmail, @tailorPhoneNumber, 'pending')
+      `);
+
+    return response.status(201).json({
+      message: "Business order inquiry submitted successfully",
+      businessOrder: result.recordset[0],
+    });
+  } catch (error) {
+    console.error("Create business order error:", error);
+    return response.status(500).json({
+      message: "Unable to submit business order inquiry",
+      detail: error.message,
+    });
+  }
+});
+
+app.get("/api/business-orders", requireAuth, async (request, response) => {
+  try {
+    const userId = getAuthenticatedUserId(request);
+    const userRole = request.user?.role || "user";
+    const pool = await getSqlPool();
+    await ensureBusinessOrdersTable(pool);
+
+    let result;
+    if (userRole === "tailor") {
+      // Tailors see all bulk inquiries
+      result = await pool.request().query(`
+        SELECT bo.id, bo.userId, bo.companyName, bo.contactName, bo.email, bo.phoneNumber, bo.businessType, bo.quantity, bo.requirements, bo.approxPrice, bo.status, bo.targetDeliveryDate, bo.location, bo.tailorApplicationId, bo.tailorName, bo.tailorEmail, bo.tailorPhoneNumber, bo.createdAt, bo.deliveredAt, u.fullName AS userFullName
+        FROM BusinessOrders bo
+        LEFT JOIN Users u ON u.id = bo.userId
+        ORDER BY bo.createdAt DESC
+      `);
+    } else {
+      // Normal customers see only their own bulk inquiries
+      result = await pool.request()
+        .input("userId", sql.Int, userId)
+        .query(`
+          SELECT bo.id, bo.userId, bo.companyName, bo.contactName, bo.email, bo.phoneNumber, bo.businessType, bo.quantity, bo.requirements, bo.approxPrice, bo.status, bo.targetDeliveryDate, bo.location, bo.tailorApplicationId, bo.tailorName, bo.tailorEmail, bo.tailorPhoneNumber, bo.createdAt, bo.deliveredAt
+          FROM BusinessOrders bo
+          WHERE bo.userId = @userId
+          ORDER BY bo.createdAt DESC
+        `);
+    }
+
+    return response.json({
+      businessOrders: result.recordset,
+    });
+  } catch (error) {
+    console.error("Get business orders error:", error);
+    return response.status(500).json({
+      message: "Unable to load business orders",
+      detail: error.message,
+    });
+  }
+});
+
+app.get("/api/business-orders/:orderId", requireAuth, async (request, response) => {
+  try {
+    const orderId = Number(request.params.orderId);
+    const userId = getAuthenticatedUserId(request);
+    const userRole = request.user?.role || "user";
+    const pool = await getSqlPool();
+    await ensureBusinessOrdersTable(pool);
+
+    const result = await pool.request()
+      .input("orderId", sql.Int, orderId)
+      .query(`
+        SELECT bo.id, bo.userId, bo.companyName, bo.contactName, bo.email, bo.phoneNumber, bo.businessType, bo.quantity, bo.requirements, bo.approxPrice, bo.status, bo.targetDeliveryDate, bo.location, bo.tailorApplicationId, bo.tailorName, bo.tailorEmail, bo.tailorPhoneNumber, bo.createdAt, bo.deliveredAt, u.fullName AS userFullName
+        FROM BusinessOrders bo
+        LEFT JOIN Users u ON u.id = bo.userId
+        WHERE bo.id = @orderId
+      `);
+
+    const order = result.recordset[0];
+    if (!order) {
+      return response.status(404).json({
+        message: "Business order not found",
+      });
+    }
+
+    if (userRole !== "tailor" && Number(order.userId) !== userId) {
+      return response.status(403).json({
+        message: "You can only track your own business orders",
+      });
+    }
+
+    return response.json({
+      businessOrder: order,
+    });
+  } catch (error) {
+    console.error("Get business order error:", error);
+    return response.status(500).json({
+      message: "Unable to load business order details",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/business-orders/:orderId/price", requireAuth, async (request, response) => {
+  try {
+    const orderId = Number(request.params.orderId);
+    const { approxPrice } = request.body;
+    const userRole = request.user?.role || "user";
+
+    if (userRole !== "tailor") {
+      return response.status(403).json({
+        message: "Only tailor accounts can submit price quotes for bulk orders",
+      });
+    }
+
+    if (!orderId || approxPrice === undefined || approxPrice === null) {
+      return response.status(400).json({
+        message: "Order ID and approxPrice are required",
+      });
+    }
+
+    const priceNum = Number(approxPrice);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      return response.status(400).json({
+        message: "Quote price must be a positive number",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBusinessOrdersTable(pool);
+
+    const result = await pool.request()
+      .input("orderId", sql.Int, orderId)
+      .input("approxPrice", sql.Decimal(10, 2), priceNum)
+      .query(`
+        UPDATE BusinessOrders
+        SET approxPrice = @approxPrice,
+            status = 'quoted'
+        OUTPUT INSERTED.id, INSERTED.approxPrice, INSERTED.status
+        WHERE id = @orderId
+      `);
+
+    if (result.recordset.length === 0) {
+      return response.status(404).json({
+        message: "Business order not found",
+      });
+    }
+
+    return response.json({
+      message: "Price quote submitted successfully",
+      businessOrder: result.recordset[0],
+    });
+  } catch (error) {
+    console.error("Submit business quote error:", error);
+    return response.status(500).json({
+      message: "Unable to submit price quote",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/business-orders/:orderId/status", requireAuth, async (request, response) => {
+  try {
+    const orderId = Number(request.params.orderId);
+    const { status } = request.body;
+    const userId = getAuthenticatedUserId(request);
+    const userRole = request.user?.role || "user";
+
+    if (!orderId || !status) {
+      return response.status(400).json({
+        message: "Order ID and status are required",
+      });
+    }
+
+    const allowedStatuses = ["pending", "quoted", "booked", "delivered", "cancelled"];
+    if (!allowedStatuses.includes(status)) {
+      return response.status(400).json({
+        message: "Invalid status value",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBusinessOrdersTable(pool);
+
+    // If customer, verify ownership
+    if (userRole === "user") {
+      const checkResult = await pool.request()
+        .input("orderId", sql.Int, orderId)
+        .query("SELECT userId FROM BusinessOrders WHERE id = @orderId");
+      const order = checkResult.recordset[0];
+      if (!order) {
+        return response.status(404).json({ message: "Business order not found" });
+      }
+      if (Number(order.userId) !== userId) {
+        return response.status(403).json({ message: "You can only update status for your own business orders" });
+      }
+
+      // Customer can only mark as 'booked' (confirming quote) or 'cancelled'
+      if (status !== "booked" && status !== "cancelled") {
+        return response.status(400).json({ message: "Customers can only accept a quote or cancel the request" });
+      }
+    }
+
+    const result = await pool.request()
+      .input("orderId", sql.Int, orderId)
+      .input("status", sql.NVarChar(50), status)
+      .query(`
+        UPDATE BusinessOrders
+        SET status = @status,
+            deliveredAt = CASE WHEN @status = 'delivered' THEN SYSUTCDATETIME() ELSE deliveredAt END
+        OUTPUT INSERTED.id, INSERTED.status, INSERTED.deliveredAt
+        WHERE id = @orderId
+      `);
+
+    return response.json({
+      message: "Business order status updated successfully",
+      businessOrder: result.recordset[0],
+    });
+  } catch (error) {
+    console.error("Update business status error:", error);
+    return response.status(500).json({
+      message: "Unable to update status",
       detail: error.message,
     });
   }

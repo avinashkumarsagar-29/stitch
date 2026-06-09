@@ -206,6 +206,126 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('dbo.Reviews', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.Reviews (
+    id INT IDENTITY PRIMARY KEY,
+    bookingId INT NOT NULL,
+    userId INT NOT NULL,
+    tailorApplicationId INT NOT NULL,
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment NVARCHAR(500) NULL,
+    createdAt DATETIME2 DEFAULT SYSUTCDATETIME()
+  );
+END
+GO
+
+IF OBJECT_ID('dbo.Referrals', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.Referrals (
+    id INT IDENTITY PRIMARY KEY,
+    referrerUserId INT NOT NULL,
+    referredUserId INT NOT NULL,
+    referralCode NVARCHAR(20) NOT NULL,
+    rewardGranted BIT DEFAULT 0,
+    createdAt DATETIME2 DEFAULT SYSUTCDATETIME()
+  );
+END
+GO
+
+IF COL_LENGTH('dbo.Users', 'referralCode') IS NULL
+BEGIN
+  ALTER TABLE dbo.Users ADD referralCode NVARCHAR(20) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Users', 'credit') IS NULL
+BEGIN
+  ALTER TABLE dbo.Users ADD credit DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'referralDiscount') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD referralDiscount DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+END
+GO
+
+IF COL_LENGTH('dbo.Bookings', 'creditApplied') IS NULL
+BEGIN
+  ALTER TABLE dbo.Bookings ADD creditApplied DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+END
+GO
+
+IF OBJECT_ID('dbo.BusinessOrders', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.BusinessOrders (
+    id INT IDENTITY PRIMARY KEY,
+    userId INT NOT NULL,
+    companyName NVARCHAR(255) NOT NULL,
+    contactName NVARCHAR(150) NOT NULL,
+    email NVARCHAR(255) NOT NULL,
+    phoneNumber NVARCHAR(20) NOT NULL,
+    businessType NVARCHAR(100) NOT NULL,
+    quantity INT NOT NULL,
+    requirements NVARCHAR(MAX) NULL,
+    approxPrice DECIMAL(10,2) NULL,
+    status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+    createdAt DATETIME2 DEFAULT SYSUTCDATETIME(),
+    deliveredAt DATETIME2 NULL,
+    targetDeliveryDate DATE NULL,
+    location NVARCHAR(255) NULL,
+    tailorApplicationId INT NULL,
+    tailorName NVARCHAR(200) NULL,
+    tailorEmail NVARCHAR(255) NULL,
+    tailorPhoneNumber NVARCHAR(20) NULL,
+    CONSTRAINT FK_BusinessOrders_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
+  );
+END
+GO
+
+IF COL_LENGTH('dbo.BusinessOrders', 'deliveredAt') IS NULL
+BEGIN
+  ALTER TABLE dbo.BusinessOrders ADD deliveredAt DATETIME2 NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.BusinessOrders', 'targetDeliveryDate') IS NULL
+BEGIN
+  ALTER TABLE dbo.BusinessOrders ADD targetDeliveryDate DATE NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.BusinessOrders', 'location') IS NULL
+BEGIN
+  ALTER TABLE dbo.BusinessOrders ADD location NVARCHAR(255) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.BusinessOrders', 'tailorApplicationId') IS NULL
+BEGIN
+  ALTER TABLE dbo.BusinessOrders ADD tailorApplicationId INT NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.BusinessOrders', 'tailorName') IS NULL
+BEGIN
+  ALTER TABLE dbo.BusinessOrders ADD tailorName NVARCHAR(200) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.BusinessOrders', 'tailorEmail') IS NULL
+BEGIN
+  ALTER TABLE dbo.BusinessOrders ADD tailorEmail NVARCHAR(255) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.BusinessOrders', 'tailorPhoneNumber') IS NULL
+BEGIN
+  ALTER TABLE dbo.BusinessOrders ADD tailorPhoneNumber NVARCHAR(20) NULL;
+END
+GO
+
 SELECT * FROM dbo.Users ORDER BY createdAt DESC;
 SELECT * FROM dbo.LoginOtps ORDER BY createdAt DESC;
 SELECT * FROM dbo.Bookings ORDER BY createdAt DESC;
@@ -215,3 +335,4 @@ BEGIN
   SELECT * FROM dbo.Measurements ORDER BY updatedAt DESC;
 END
 GO
+

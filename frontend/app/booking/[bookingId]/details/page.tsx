@@ -26,6 +26,8 @@ type Tailor = {
   email: string;
   location: string;
   image: string | null;
+  avgRating?: number;
+  reviewCount?: number;
 };
 
 type OrderDetails = {
@@ -371,9 +373,16 @@ export default function BookingDetailsPage() {
                       />
                     </div>
                   ) : null}
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {tailor.name}
-                  </h2>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {tailor.name}
+                    </h2>
+                    {tailor.avgRating !== undefined && tailor.avgRating > 0 && (
+                      <span className="flex items-center gap-1 shrink-0 rounded bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-600 border border-amber-200">
+                        ★ {Number(tailor.avgRating).toFixed(1)} <span className="text-gray-400 font-normal">({tailor.reviewCount})</span>
+                      </span>
+                    )}
+                  </div>
                   <InfoLine label="Experience" value={tailor.experience} />
                   <InfoLine label="Location" value={tailor.location} />
                   <InfoLine label="Phone" value={tailor.phoneNumber} />

@@ -178,6 +178,41 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           const response = await authFetch(`${apiUrl}/api/bookings?role=tailor`);
           const data = await response.json();
 
+          let businessCount = 0;
+          try {
+            const bizRes = await authFetch(`${apiUrl}/api/business-orders`);
+            const bizData = await bizRes.json();
+            if (bizRes.ok && bizData.businessOrders) {
+              const matchingBiz = bizData.businessOrders.filter((bo: any) => {
+                if (bo.status !== "pending") return false;
+
+                const isAssignedToMe = (
+                  (bo.tailorEmail && bo.tailorEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim()) ||
+                  (bo.tailorPhoneNumber && bo.tailorPhoneNumber.trim() === currentUserPhone.trim()) ||
+                  (bo.tailorApplicationId && Number(bo.tailorApplicationId) === Number(tailorAppId))
+                );
+
+                const isAssignedToOther = (bo.tailorEmail || bo.tailorPhoneNumber || bo.tailorApplicationId) && !isAssignedToMe;
+                if (isAssignedToOther) return false;
+
+                if (!isAssignedToMe) {
+                  if (!tailorAddress) return false;
+                  const loc = String(bo.location || "").toLowerCase().trim();
+                  const matchesAddress = (
+                    loc === tailorAddress ||
+                    loc.includes(tailorAddress) ||
+                    tailorAddress.includes(loc)
+                  );
+                  if (!matchesAddress) return false;
+                }
+                return true;
+              });
+              businessCount = matchingBiz.length;
+            }
+          } catch (e) {
+            console.error("Error checking business notifications in LayoutWrapper:", e);
+          }
+
           if (response.ok && data.bookings) {
             const matching = data.bookings.filter((b: any) => {
               if (b.status !== "pending-price") return false;
@@ -224,7 +259,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
               return !isSlotTaken;
             });
-            const newCount = matching.length;
+
+            const newCount = matching.length + businessCount;
             if (newCount > prevCountRef.current) {
               playNotificationSound();
             }
@@ -238,13 +274,28 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             setNotificationCount(newCount);
             return;
           }
+
+          let businessCount = 0;
+          try {
+            const bizRes = await authFetch(`${apiUrl}/api/business-orders`);
+            const bizData = await bizRes.json();
+            if (bizRes.ok && bizData.businessOrders) {
+              const matchingBiz = bizData.businessOrders.filter(
+                (bo: any) => Number(bo.userId) === Number(currentUser.id) && bo.status === "quoted"
+              );
+              businessCount = matchingBiz.length;
+            }
+          } catch (e) {
+            console.error("Error checking business notifications in LayoutWrapper:", e);
+          }
+
           const response = await authFetch(`${apiUrl}/api/bookings?role=user`);
           const data = await response.json();
           if (response.ok && data.bookings) {
             const matching = data.bookings.filter(
               (b: any) => Number(b.userId) === Number(currentUser.id) && b.status === "pending-payment"
             );
-            const newCount = matching.length;
+            const newCount = matching.length + businessCount;
             if (newCount > prevCountRef.current) {
               playNotificationSound();
             }

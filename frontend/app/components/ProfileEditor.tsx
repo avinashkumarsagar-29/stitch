@@ -44,6 +44,15 @@ export default function ProfileEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopyReferral() {
+    if (!profile.referralCode) return;
+    navigator.clipboard.writeText(profile.referralCode);
+    setCopied(true);
+    showToast("Referral code copied to clipboard!", "success");
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   const [measurements, setMeasurements] = useState({
     chest: "",
@@ -291,6 +300,27 @@ export default function ProfileEditor() {
           <p>{profile.email}</p>
           <p>{profile.phone}</p>
         </div>
+
+        {/* Wallet Credit and Referral Code Sidebar Summary */}
+        <div className="mt-6 w-full pt-6 border-t border-gray-100 space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wider flex items-center gap-1.5">
+              🪙 Wallet Balance
+            </span>
+            <span className="text-sm font-extrabold text-[#c322f4]">
+              ₹{(profile.credit !== undefined ? profile.credit : 0).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between px-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+              🔗 Referral Code
+            </span>
+            <span className="text-xs font-extrabold font-mono text-gray-700 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1">
+              {profile.referralCode || "STITCH-XXXXX"}
+            </span>
+          </div>
+        </div>
+
         {isUser ? (
           <button
             type="button"
@@ -447,6 +477,95 @@ export default function ProfileEditor() {
             </button>
           </form>
         )}
+
+        {/* Refer & Earn Premium Dashboard Section */}
+        <div className="mt-12 pt-10 border-t border-gray-100 space-y-6">
+          <div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-[#c322f4]/10 text-[#c322f4] border border-[#c322f4]/20 uppercase tracking-widest mb-3.5">
+              🎁 Refer & Earn
+            </span>
+            <h2 className="font-serif text-[26px] font-extrabold tracking-tight text-gray-950 sm:text-[30px]">
+              Invite Friends & Receive Credits
+            </h2>
+            <p className="mt-2 max-w-[620px] text-xs leading-relaxed text-gray-500">
+              Share the joy of custom tailoring. Get rewarded when your friends join and place their first order on Stitch.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            {/* Promotion Card */}
+            <div className="rounded-2xl bg-gradient-to-tr from-purple-950 to-[#c322f4] p-6 text-white shadow-md flex flex-col justify-between space-y-4">
+              <div>
+                <h3 className="text-lg font-extrabold tracking-tight">How It Works</h3>
+                <ul className="mt-4 space-y-2 text-xs text-purple-100/90 font-medium">
+                  <li className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/30 text-[10px] font-bold">1</span>
+                    <span>Share your unique code with your friends.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/30 text-[10px] font-bold">2</span>
+                    <span>They receive a <strong className="text-white font-bold">₹50 discount</strong> on their first booking.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/30 text-[10px] font-bold">3</span>
+                    <span>Once their payment is confirmed, you get <strong className="text-white font-bold">₹50 credit</strong> automatically.</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="pt-2 text-[10px] text-purple-200/70 font-semibold uppercase tracking-wider">
+                ✨ Unlimited referral rewards
+              </div>
+            </div>
+
+            {/* Code Copy & Wallet Balance */}
+            <div className="rounded-2xl border border-purple-100 bg-purple-50/20 p-6 flex flex-col justify-between space-y-5">
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                  Your Referral Code
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-12 flex items-center justify-between rounded-xl border border-purple-200 bg-white px-4 font-mono text-sm font-extrabold text-purple-950 tracking-wider shadow-inner select-all">
+                    {profile.referralCode || "STITCH-XXXXX"}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyReferral}
+                    className="h-12 w-12 flex items-center justify-center rounded-xl bg-purple-100 text-[#c322f4] hover:bg-[#c322f4] hover:text-white transition-all duration-300 shadow-sm cursor-pointer"
+                  >
+                    {copied ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-purple-100/60 pt-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                    Available Wallet Balance
+                  </span>
+                  <div className="text-2xl font-black text-gray-900 tracking-tight flex items-baseline gap-0.5">
+                    <span className="text-sm font-extrabold text-gray-500">₹</span>
+                    {(profile.credit !== undefined ? profile.credit : 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="h-11 w-11 flex items-center justify-center rounded-full bg-[#c322f4]/10 text-[#c322f4]">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <rect width="20" height="14" x="2" y="5" rx="2" />
+                    <line x1="2" y1="10" x2="22" y2="10" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {isUser && showStatus ? <UserOrderStatus /> : null}
       </div>

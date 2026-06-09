@@ -53,6 +53,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       phoneNumber: String(formData.get("phoneNumber") || ""),
       password: String(formData.get("password") || ""),
       role: role,
+      referralCodeUsed: String(formData.get("referralCode") || "").trim(),
     };
 
     try {
@@ -293,6 +294,27 @@ export default function AuthForm({ mode }: AuthFormProps) {
                     </svg>
                   )}
                 </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Referral Code (Optional)
+              </label>
+              <div className="relative mt-1.5">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                </div>
+                <input
+                  name="referralCode"
+                  type="text"
+                  placeholder="e.g. STITCH-XXXXX"
+                  suppressHydrationWarning
+                  className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                />
               </div>
             </div>
           </>

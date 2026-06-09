@@ -22,6 +22,8 @@ type Tailor = {
   email: string;
   location: string;
   image: string | null;
+  avgRating?: number;
+  reviewCount?: number;
 };
 
 export default function BookingForm({ readOnly = false }: { readOnly?: boolean }) {
@@ -70,7 +72,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
           console.error("Reverse geocoding failed", error);
           const { latitude, longitude } = position.coords;
           updateField(field, `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-          showToast("Failed to resolve address. Setting coordinates instead.", "warning");
+          showToast("Failed to resolve address. Setting coordinates instead.", "error");
         } finally {
           setLocatingField(null);
         }
@@ -93,7 +95,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
 
     if (field === "date") {
       if (value && value < minDate) {
-        showToast("Cannot select a past date", "warning");
+        showToast("Cannot select a past date", "error");
         setBooking((current) => ({ ...current, date: "", time: "" }));
         return;
       }
@@ -105,7 +107,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
         const minPart = String(today.getMinutes()).padStart(2, '0');
         const minTime = `${hh}:${minPart}`;
         if (value < minTime) {
-          showToast("Cannot select a past time for today", "warning");
+          showToast("Cannot select a past time for today", "error");
           setBooking((current) => ({ ...current, time: "" }));
           return;
         }
@@ -118,7 +120,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
       const minPart = String(today.getMinutes()).padStart(2, '0');
       const minTime = `${hh}:${minPart}`;
       if (booking.time < minTime) {
-        showToast("Time reset: cannot select a past time for today", "warning");
+        showToast("Time reset: cannot select a past time for today", "error");
         setBooking((current) => ({ ...current, date: value, time: "" }));
         return;
       }
@@ -292,7 +294,14 @@ function TailorCard({
         )}
       </div>
       <div className="p-5">
-        <h3 className="text-xl font-bold text-[#202635]">{tailor.name}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-xl font-bold text-[#202635] truncate">{tailor.name}</h3>
+          {tailor.avgRating !== undefined && tailor.avgRating > 0 && (
+            <span className="flex items-center gap-1 shrink-0 rounded bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-600 border border-amber-200">
+              ★ {Number(tailor.avgRating).toFixed(1)} <span className="text-gray-400 font-normal">({tailor.reviewCount})</span>
+            </span>
+          )}
+        </div>
         <dl className="mt-4 space-y-2 text-sm">
           <div>
             <dt className="font-bold text-[#202635]">Experience</dt>

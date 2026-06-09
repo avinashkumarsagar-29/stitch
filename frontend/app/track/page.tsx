@@ -26,6 +26,10 @@ type BookingRecord = {
   status: string;
   trackingCode?: string | null;
   createdAt: string;
+  reviewId?: number | null;
+  reviewRating?: number | null;
+  reviewComment?: string | null;
+  isBusiness?: boolean;
 };
 
 type StoredUser = {
@@ -148,6 +152,7 @@ function TrackContent() {
   const router = useRouter();
 
   const bookingIdParam = searchParams.get("id") || "";
+  const typeParam = searchParams.get("type") || "";
   const [searchId, setSearchId] = useState(bookingIdParam);
   const [activeBooking, setActiveBooking] = useState<BookingRecord | null>(null);
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
@@ -155,6 +160,11 @@ function TrackContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListLoading, setIsListLoading] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+
+  const [ratingVal, setRatingVal] = useState<number>(0);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [commentVal, setCommentVal] = useState<string>("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
 
   const currentUser = useSyncExternalStore(subscribe, getCurrentUserSnapshot, () => null);
 
@@ -165,18 +175,64 @@ function TrackContent() {
 
   // Load selected booking details if ID in URL
   useEffect(() => {
-    async function fetchBooking(id: string) {
+    async function fetchBooking(id: string, typeVal: string) {
       setIsLoading(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        if (typeVal === "business") {
+          const bizResponse = await authFetch(`${apiUrl}/api/business-orders/${id}`);
+          const bizData = await bizResponse.json();
+          if (bizResponse.ok && bizData.businessOrder) {
+            const bo = bizData.businessOrder;
+            setActiveBooking({
+              ...bo,
+              isBusiness: true,
+              pickupLocation: bo.location || "",
+              dropoffLocation: bo.location || "",
+              bookingDate: bo.createdAt,
+              bookingTime: "12:00:00",
+              clothCategory: `${bo.quantity}x ${bo.businessType}`,
+              material: bo.companyName,
+            } as any);
+            setRatingVal(0);
+            setHoverRating(0);
+            setCommentVal("");
+            setIsLoading(false);
+            return;
+          }
+        }
+
         const response = await authFetch(`${apiUrl}/api/bookings/${id}?role=${currentUser?.role || 'user'}`);
         const data = await response.json();
 
-        if (!response.ok) {
-          showToast(data.message || "Booking ID not found", "error");
-          setActiveBooking(null);
+        if (response.ok && data.booking) {
+          setActiveBooking({ ...data.booking, isBusiness: false });
+          setRatingVal(0);
+          setHoverRating(0);
+          setCommentVal("");
         } else {
-          setActiveBooking(data.booking);
+          // Fallback to try business order lookup if standard booking fails
+          const bizResponse = await authFetch(`${apiUrl}/api/business-orders/${id}`);
+          const bizData = await bizResponse.json();
+          if (bizResponse.ok && bizData.businessOrder) {
+            const bo = bizData.businessOrder;
+            setActiveBooking({
+              ...bo,
+              isBusiness: true,
+              pickupLocation: bo.location || "",
+              dropoffLocation: bo.location || "",
+              bookingDate: bo.createdAt,
+              bookingTime: "12:00:00",
+              clothCategory: `${bo.quantity}x ${bo.businessType}`,
+              material: bo.companyName,
+            } as any);
+            setRatingVal(0);
+            setHoverRating(0);
+            setCommentVal("");
+          } else {
+            showToast(data.message || "Booking or Business order ID not found", "error");
+            setActiveBooking(null);
+          }
         }
       } catch (error) {
         console.error("Fetch booking error:", error);
@@ -187,13 +243,13 @@ function TrackContent() {
     }
 
     if (bookingIdParam) {
-      fetchBooking(bookingIdParam);
+      fetchBooking(bookingIdParam, typeParam);
     } else {
       setActiveBooking(null);
     }
-  }, [bookingIdParam]);
+  }, [bookingIdParam, typeParam, currentUser]);
 
-  // Load user's bookings if logged in
+  // Load user's bookings & business orders if logged in
   useEffect(() => {
     async function fetchUserBookings() {
       if (!currentUser) {
@@ -203,24 +259,63 @@ function TrackContent() {
       setIsListLoading(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        
+        // Fetch Standard Bookings
         const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
         const data = await response.json();
-
+        let bookingsList: any[] = [];
         if (response.ok && data.bookings) {
-          // If tailor, filter by assigned orders; if customer, filter by userId
-          const isTailor = currentUser.role === "tailor";
-          const filtered = data.bookings.filter((b: BookingRecord) => {
-            if (isTailor) {
-              return (
-                b.tailorEmail === currentUser.email ||
-                b.tailorPhoneNumber === currentUser.phoneNumber
-              );
-            } else {
-              return Number(b.userId) === Number(currentUser.id);
-            }
-          });
-          setUserBookings(filtered);
+          bookingsList = data.bookings.map((b: any) => ({ ...b, isBusiness: false }));
         }
+
+        // Fetch Business Orders
+        let businessList: any[] = [];
+        try {
+          const bizResponse = await authFetch(`${apiUrl}/api/business-orders`);
+          const bizData = await bizResponse.json();
+          if (bizResponse.ok && bizData.businessOrders) {
+            businessList = bizData.businessOrders.map((bo: any) => ({
+              ...bo,
+              isBusiness: true,
+              pickupLocation: bo.location || "",
+              dropoffLocation: bo.location || "",
+              bookingDate: bo.createdAt,
+              bookingTime: "12:00:00",
+              clothCategory: `${bo.quantity}x ${bo.businessType}`,
+              material: bo.companyName,
+            }));
+          }
+        } catch (bizErr) {
+          console.error("Error fetching business orders for tracking:", bizErr);
+        }
+
+        const isTailor = currentUser.role === "tailor";
+        
+        const filteredBookings = bookingsList.filter((b: any) => {
+          if (isTailor) {
+            return (
+              (b.tailorEmail === currentUser.email ||
+               b.tailorPhoneNumber === currentUser.phoneNumber) &&
+              b.status !== "delivered"
+            );
+          } else {
+            return Number(b.userId) === Number(currentUser.id);
+          }
+        });
+
+        const filteredBusiness = businessList.filter((bo: any) => {
+          if (isTailor) {
+            return (
+              (bo.tailorEmail === currentUser.email ||
+               bo.tailorPhoneNumber === currentUser.phoneNumber) &&
+              bo.status !== "delivered"
+            );
+          } else {
+            return Number(bo.userId) === Number(currentUser.id);
+          }
+        });
+
+        setUserBookings([...filteredBookings, ...filteredBusiness]);
       } catch (error) {
         console.error("Fetch user bookings error:", error);
       } finally {
@@ -246,7 +341,12 @@ function TrackContent() {
     setIsSimulating(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await authFetch(`${apiUrl}/api/bookings/${activeBooking.id}/status`, {
+      const isBusiness = !!(activeBooking as any).isBusiness;
+      const endpoint = isBusiness
+        ? `${apiUrl}/api/business-orders/${activeBooking.id}/status`
+        : `${apiUrl}/api/bookings/${activeBooking.id}/status`;
+
+      const response = await authFetch(endpoint, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -263,9 +363,10 @@ function TrackContent() {
         setActiveBooking((prev) => prev ? { ...prev, status } : null);
 
         // Update userBookings list locally
-        setUserBookings((prevList) =>
-          prevList.map((b) => (b.id === activeBooking.id ? { ...b, status } : b))
-        );
+        setUserBookings((prevList) => {
+          const updated = prevList.map((b) => (b.id === activeBooking.id && !!(b as any).isBusiness === isBusiness ? { ...b, status } : b));
+          return isTailor ? updated.filter((b) => b.status !== "delivered") : updated;
+        });
       }
     } catch (error) {
       console.error("Simulation error:", error);
@@ -275,11 +376,15 @@ function TrackContent() {
     }
   }
 
-  async function handleCardStatusUpdate(bookingId: number, status: string) {
+  async function handleCardStatusUpdate(bookingId: number, status: string, isBusiness: boolean) {
     setIsSimulating(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/status`, {
+      const endpoint = isBusiness
+        ? `${apiUrl}/api/business-orders/${bookingId}/status`
+        : `${apiUrl}/api/bookings/${bookingId}/status`;
+
+      const response = await authFetch(endpoint, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -293,9 +398,10 @@ function TrackContent() {
       } else {
         showToast(`Order #${bookingId} status updated to: ${status}`, "success");
         // Update userBookings list locally
-        setUserBookings((prevList) =>
-          prevList.map((b) => (b.id === bookingId ? { ...b, status } : b))
-        );
+        setUserBookings((prevList) => {
+          const updated = prevList.map((b) => (b.id === bookingId && !!(b as any).isBusiness === isBusiness ? { ...b, status } : b));
+          return isTailor ? updated.filter((b) => b.status !== "delivered") : updated;
+        });
       }
     } catch (error) {
       console.error("Card status update error:", error);
@@ -318,6 +424,14 @@ function TrackContent() {
   }
 
   function getEstimatedDeliveryDate(bookingDateStr: string): string {
+    if (activeBooking && (activeBooking as any).isBusiness && (activeBooking as any).targetDeliveryDate) {
+      return new Date((activeBooking as any).targetDeliveryDate).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    }
     if (!bookingDateStr) return "TBD";
     const date = new Date(bookingDateStr);
     date.setDate(date.getDate() + 7);
@@ -327,6 +441,46 @@ function TrackContent() {
       month: "long",
       day: "numeric",
     });
+  }
+  async function handleReviewSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeBooking) return;
+    if (ratingVal < 1 || ratingVal > 5) {
+      showToast("Please select a rating between 1 and 5 stars", "error");
+      return;
+    }
+    setIsSubmittingReview(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const response = await authFetch(`${apiUrl}/api/reviews`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bookingId: activeBooking.id,
+          rating: ratingVal,
+          comment: commentVal,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showToast(data.message || "Failed to submit review", "error");
+      } else {
+        showToast("Thank you for your feedback! Review submitted.", "success");
+        setActiveBooking((prev) => prev ? { 
+          ...prev, 
+          reviewId: data.reviewId, 
+          reviewRating: ratingVal, 
+          reviewComment: commentVal 
+        } : null);
+      }
+    } catch (err) {
+      console.error("Review submission error:", err);
+      showToast("Unable to submit review", "error");
+    } finally {
+      setIsSubmittingReview(false);
+    }
   }
 
   const isTailor = currentUser?.role === "tailor";
@@ -393,7 +547,7 @@ function TrackContent() {
                   <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {userBookings.map((b) => (
                       <TailorOrderCard
-                        key={b.id}
+                        key={`${b.isBusiness ? 'biz' : 'booking'}-${b.id}`}
                         booking={b}
                         onStatusUpdate={handleCardStatusUpdate}
                         isSimulating={isSimulating}
@@ -456,13 +610,13 @@ function TrackContent() {
                     <div className="grid gap-3">
                       {userBookings.map((b) => (
                         <div
-                          key={b.id}
+                          key={`${b.isBusiness ? 'biz' : 'booking'}-${b.id}`}
                           className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-purple-200 transition-all"
                         >
                           <div className="min-w-0 flex-1 pr-4">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-gray-900">
-                                Booking #{b.id} {b.trackingCode && <span className="font-mono text-gray-400 font-normal">({b.trackingCode})</span>}
+                                {b.isBusiness ? `Bulk Inquiry #${b.id}` : `Booking #${b.id}`} {b.trackingCode && <span className="font-mono text-gray-400 font-normal">({b.trackingCode})</span>}
                               </span>
                               <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${b.status === "delivered"
                                 ? "bg-green-50 text-green-700 border border-green-200"
@@ -477,11 +631,11 @@ function TrackContent() {
                               {b.clothCategory || "Details pending"} {b.material ? `(${b.material})` : ""} {b.tailorName ? `• ${b.tailorName}` : ""}
                             </p>
                             <p className="text-[10px] text-gray-400 mt-0.5">
-                              Booked: {new Date(b.bookingDate).toLocaleDateString()}
+                              {b.isBusiness ? "Placed: " : "Booked: "}{new Date(b.bookingDate).toLocaleDateString()}
                             </p>
                           </div>
                           <button
-                            onClick={() => router.push(`/track?id=${b.id}`)}
+                            onClick={() => router.push(`/track?id=${b.id}&type=${b.isBusiness ? 'business' : 'booking'}`)}
                             suppressHydrationWarning
                             className="shrink-0 h-9 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 px-3 text-xs font-bold transition-all cursor-pointer"
                           >
@@ -519,16 +673,20 @@ function TrackContent() {
                 {isTailor ? "← Back to Dashboard" : "← Back to Search"}
               </button>
               <h2 className="mt-2 text-2xl font-serif font-extrabold text-gray-900 tracking-tight sm:text-3xl">
-                {isTailor ? `Update Booking #${activeBooking.id}` : `Tracking Booking #${activeBooking.id}`}
+                {isTailor 
+                  ? `${(activeBooking as any).isBusiness ? "Update Bulk Inquiry" : "Update Booking"} #${activeBooking.id}` 
+                  : `${(activeBooking as any).isBusiness ? "Tracking Bulk Inquiry" : "Tracking Booking"} #${activeBooking.id}`}
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                Booked on {new Date(activeBooking.bookingDate).toLocaleDateString()} at {activeBooking.bookingTime.slice(0, 5)}
+                {(activeBooking as any).isBusiness 
+                  ? `Placed on ${new Date((activeBooking as any).createdAt).toLocaleDateString()}` 
+                  : `Booked on ${new Date(activeBooking.bookingDate).toLocaleDateString()} at ${activeBooking.bookingTime.slice(0, 5)}`}
               </p>
             </div>
 
             <div className="rounded-2xl border border-[#d2a22e]/30 bg-[#d2a22e]/5 px-4 py-3 text-right">
               <p className="text-[9px] font-extrabold uppercase tracking-widest text-[#d2a22e]">
-                Estimated Delivery
+                {activeBooking.isBusiness ? "Target Delivery" : "Estimated Delivery"}
               </p>
               <p className="mt-1 text-sm font-bold text-gray-900">
                 {getEstimatedDeliveryDate(activeBooking.bookingDate)}
@@ -565,6 +723,81 @@ function TrackContent() {
                 You quoted a price of <strong>₹{activeBooking.approxPrice}</strong>. Waiting for the customer to confirm the price and make the payment.
               </p>
             </div>
+          )}
+
+          {/* Order Completion Review prompt */}
+          {activeBooking.status === "delivered" && !isTailor && !(activeBooking as any).isBusiness && (
+            !activeBooking.reviewId ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/10 p-6 shadow-sm animate-fade-in space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">⭐</span>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Rate Your Experience</h4>
+                    <p className="text-xs text-gray-500">How would you rate the tailoring work by <strong>{activeBooking.tailorName || "your tailor partner"}</strong>?</p>
+                  </div>
+                </div>
+                <form onSubmit={handleReviewSubmit} className="space-y-4">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRatingVal(star)}
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        className="text-2xl transition-transform hover:scale-110 focus:outline-none cursor-pointer"
+                      >
+                        {star <= (hoverRating || ratingVal) ? "★" : "☆"}
+                      </button>
+                    ))}
+                    <span className="text-xs font-bold text-gray-600 ml-2">
+                      {ratingVal > 0 ? `${ratingVal} Star${ratingVal > 1 ? 's' : ''}` : "Select stars"}
+                    </span>
+                  </div>
+                  <textarea
+                    placeholder="Share details of your experience (optional, up to 500 characters)..."
+                    value={commentVal}
+                    onChange={(e) => setCommentVal(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    className="w-full rounded-xl border border-gray-200 p-3 text-xs outline-none focus:border-[#c322f4] focus:ring-4 focus:ring-[#c322f4]/10 transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview || ratingVal === 0}
+                    className="h-10 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-5 text-xs font-bold text-white shadow-sm hover:scale-[1.01] transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmittingReview ? "Submitting..." : "Submit Feedback"}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-purple-100 bg-purple-50/20 p-6 shadow-sm animate-fade-in space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">💬</span>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-900">Your Feedback Submitted</h4>
+                    <p className="text-[10px] text-gray-500">Thank you for rating your tailor partner!</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-amber-500 text-sm font-bold">
+                  {Array.from({ length: activeBooking.reviewRating || 0 }).map((_, i) => (
+                    <span key={`star-fill-${i}`}>★</span>
+                  ))}
+                  {Array.from({ length: 5 - (activeBooking.reviewRating || 0) }).map((_, i) => (
+                    <span key={`star-empty-${i}`}>☆</span>
+                  ))}
+                  <span className="text-xs font-bold text-gray-600 ml-2">
+                    {activeBooking.reviewRating} Star{Number(activeBooking.reviewRating) > 1 ? 's' : ''}
+                  </span>
+                </div>
+                {activeBooking.reviewComment && (
+                  <p className="text-xs italic text-gray-600 bg-white/60 p-3 rounded-lg border border-purple-100/30 leading-relaxed">
+                    "{activeBooking.reviewComment}"
+                  </p>
+                )}
+              </div>
+            )
           )}
 
           {/* Visual Timeline Card */}
@@ -682,16 +915,20 @@ function TrackContent() {
 
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
-                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Cloth Category</p>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">
+                      {(activeBooking as any).isBusiness ? "Inquiry Quantity" : "Cloth Category"}
+                    </p>
                     <p className="mt-1 font-semibold text-gray-800">{activeBooking.clothCategory || "Details pending"}</p>
                   </div>
                   <div>
-                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Material</p>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">
+                      {(activeBooking as any).isBusiness ? "Company Name" : "Material"}
+                    </p>
                     <p className="mt-1 font-semibold text-gray-800">{activeBooking.material || "Details pending"}</p>
                   </div>
                   <div>
                     <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Approx Price</p>
-                    <p className="mt-1 font-semibold text-[#c322f4]">{activeBooking.approxPrice ? `₹${activeBooking.approxPrice}` : "TBD"}</p>
+                    <p className="mt-1 font-semibold text-[#c322f4]">{activeBooking.approxPrice ? `₹${Number(activeBooking.approxPrice).toLocaleString("en-IN")}` : "TBD"}</p>
                   </div>
                   <div>
                     <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Current Status</p>
@@ -707,13 +944,17 @@ function TrackContent() {
 
                 <div className="text-xs pt-2 border-t border-gray-50 space-y-2">
                   <div>
-                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Pickup Address</p>
+                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">
+                      {(activeBooking as any).isBusiness ? "Delivery Location" : "Pickup Address"}
+                    </p>
                     <p className="mt-0.5 text-gray-700">{activeBooking.pickupLocation}</p>
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Drop-off Address</p>
-                    <p className="mt-0.5 text-gray-700">{activeBooking.dropoffLocation}</p>
-                  </div>
+                  {!(activeBooking as any).isBusiness && (
+                    <div>
+                      <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Drop-off Address</p>
+                      <p className="mt-0.5 text-gray-700">{activeBooking.dropoffLocation}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -850,7 +1091,7 @@ function TailorOrderCard({
   isSimulating,
 }: {
   booking: BookingRecord;
-  onStatusUpdate: (id: number, status: string) => Promise<void>;
+  onStatusUpdate: (id: number, status: string, isBusiness: boolean) => Promise<void>;
   isSimulating: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -908,13 +1149,17 @@ function TailorOrderCard({
               {booking.clothCategory || "Details pending"} {booking.material ? `(${booking.material})` : ""}
             </p>
             <p className="text-[10px] text-gray-500 font-medium">
-              <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Pickup Location</span>
+              <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">
+                {booking.isBusiness ? "Delivery Location" : "Pickup Location"}
+              </span>
               {booking.pickupLocation}
             </p>
-            <p className="text-[10px] text-gray-500 font-medium">
-              <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Drop-off Location</span>
-              {booking.dropoffLocation}
-            </p>
+            {!booking.isBusiness && (
+              <p className="text-[10px] text-gray-500 font-medium">
+                <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Drop-off Location</span>
+                {booking.dropoffLocation}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -941,7 +1186,7 @@ function TailorOrderCard({
               });
               if (response.ok) {
                 showToast("Price quote submitted!", "success");
-                onStatusUpdate(booking.id, "pending-payment");
+                onStatusUpdate(booking.id, "pending-payment", false);
               } else {
                 showToast("Failed to submit price quote", "error");
               }
@@ -988,7 +1233,7 @@ function TailorOrderCard({
                   <button
                     key={step.id}
                     disabled={isSimulating}
-                    onClick={() => onStatusUpdate(booking.id, step.id)}
+                    onClick={() => onStatusUpdate(booking.id, step.id, !!(booking as any).isBusiness)}
                     suppressHydrationWarning
                     className={`py-1.5 text-[9px] font-extrabold rounded-lg transition-all cursor-pointer ${booking.status === step.id
                       ? "bg-[#c322f4] text-white shadow-sm"

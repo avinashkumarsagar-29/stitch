@@ -6,6 +6,8 @@ export type StoredUser = {
   email?: string;
   phoneNumber?: string;
   role?: string;
+  referralCode?: string;
+  credit?: number;
 };
 
 export type Profile = {
@@ -16,6 +18,8 @@ export type Profile = {
   address: string;
   phone: string;
   image: string;
+  referralCode?: string;
+  credit?: number;
 };
 
 export const placeholderProfileImage =
@@ -29,6 +33,8 @@ export const emptyProfile: Profile = {
   address: "",
   phone: "",
   image: "",
+  referralCode: "",
+  credit: 0,
 };
 
 export function decodeJwt(token: string): any {
@@ -135,6 +141,8 @@ export function getProfileForCurrentUser(): Profile {
     phone: userExt?.phoneNumber || "",
     address: userExt?.address || "",
     image: userExt?.image || "",
+    referralCode: userExt?.referralCode || "",
+    credit: userExt?.credit !== undefined ? Number(userExt.credit) : 0,
   };
 
   if (!savedProfile) {
@@ -149,6 +157,8 @@ export function getProfileForCurrentUser(): Profile {
       ...parsedProfile,
       email: userExt?.email || parsedProfile.email || "",
       phone: userExt?.phoneNumber || parsedProfile.phone || "",
+      referralCode: userExt?.referralCode || parsedProfile.referralCode || "",
+      credit: userExt?.credit !== undefined ? Number(userExt.credit) : (parsedProfile.credit !== undefined ? Number(parsedProfile.credit) : 0),
     };
   } catch {
     return baseProfile;

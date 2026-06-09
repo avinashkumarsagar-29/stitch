@@ -88,6 +88,8 @@ export default function PaymentPage() {
   const [mockOrder, setMockOrder] = useState<any>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
+  const [referralDiscount, setReferralDiscount] = useState<number>(0);
+  const [creditApplied, setCreditApplied] = useState<number>(0);
 
   const currentUser = useSyncExternalStore(
     subscribe,
@@ -126,6 +128,8 @@ export default function PaymentPage() {
           };
           setPendingBooking(pending);
           setBooking(dbBooking);
+          setReferralDiscount(Number(dbBooking.referralDiscount || 0));
+          setCreditApplied(Number(dbBooking.creditApplied || 0));
         } else {
           const stored = sessionStorage.getItem("stitch-pending-booking");
           if (!stored) {
@@ -146,6 +150,8 @@ export default function PaymentPage() {
             return;
           }
           setBooking(bookingData.booking);
+          setReferralDiscount(Number(bookingData.booking.referralDiscount || 0));
+          setCreditApplied(Number(bookingData.booking.creditApplied || 0));
         }
 
         const tailorResponse = await authFetch(`${apiUrl}/api/tailors/${pending.tailorId}`);
@@ -199,7 +205,12 @@ export default function PaymentPage() {
         return;
       }
 
-      if (data.isMock) {
+      setReferralDiscount(Number(data.referralDiscount || 0));
+      setCreditApplied(Number(data.creditApplied || 0));
+
+      if (data.isFree) {
+        await confirmFreeBooking(data);
+      } else if (data.isMock) {
         setMockOrder(data);
         setShowMockModal(true);
         setIsProcessing(false);
@@ -327,6 +338,42 @@ export default function PaymentPage() {
     showToast("Transaction cancelled by user", "error");
   }
 
+  async function confirmFreeBooking(order: any) {
+    if (!currentUser) return;
+    try {
+      setIsProcessing(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      
+      const verifyRes = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          razorpay_order_id: order.id,
+          razorpay_payment_id: "pay_free_" + Math.random().toString(36).substring(2, 11),
+          razorpay_signature: "free_signature_verified",
+          planId: order.planId,
+          userId: currentUser.id,
+          isMock: true,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) {
+        showToast(verifyData.message || "Free payment verification failed", "error");
+        setIsProcessing(false);
+        return;
+      }
+
+      await confirmBookingDetails();
+    } catch (err) {
+      showToast("Unable to verify transaction details", "error");
+      console.error(err);
+      setIsProcessing(false);
+    }
+  }
+
   async function confirmBookingDetails() {
     if (!pendingBooking) return;
 
@@ -448,7 +495,7 @@ export default function PaymentPage() {
   const subtotal = pendingBooking?.approxPrice || 0;
   const gstFee = Math.round(subtotal * 0.18); // 18% GST standard simulation
   const platformFee = 49;
-  const totalAmount = subtotal + gstFee + platformFee;
+  const totalAmount = Math.max(0, subtotal + gstFee + platformFee - referralDiscount - creditApplied);
 
   return (
     <AuthGuard>
@@ -690,6 +737,18 @@ export default function PaymentPage() {
                   <span className="text-gray-400">Platform Handling Fee:</span>
                   <span className="text-gray-800 font-bold">₹{platformFee}</span>
                 </div>
+                {referralDiscount > 0 && (
+                  <div className="flex justify-between pt-2 pb-2 text-emerald-600 font-bold">
+                    <span>Referral Discount:</span>
+                    <span>-₹{referralDiscount}</span>
+                  </div>
+                )}
+                {creditApplied > 0 && (
+                  <div className="flex justify-between pt-2 pb-2 text-emerald-600 font-bold">
+                    <span>Stitch Wallet Credit Used:</span>
+                    <span>-₹{creditApplied}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-3 font-bold text-sm text-gray-950">
                   <span>Total Payable:</span>
                   <span className="text-[#c322f4] font-black text-base">₹{totalAmount}</span>

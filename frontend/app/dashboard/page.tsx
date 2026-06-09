@@ -323,7 +323,7 @@ function DashboardContent() {
                           Send
                         </button>
                       </div>
-                    ) : (
+                    ) : b.status === "delivered" ? null : (
                       <Link
                         href={`/track?id=${b.id}`}
                         className="h-8 px-3 inline-flex items-center justify-center rounded-lg bg-purple-50 border border-purple-200 text-[#c322f4] text-[10px] font-bold hover:bg-purple-100"
