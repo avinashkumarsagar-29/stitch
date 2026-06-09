@@ -12,6 +12,8 @@ import {
   getProfileStorageKey,
   authFetch,
 } from "./profileStorage";
+import Loader from "./Loader";
+
 
 function playNotificationSound() {
   try {
@@ -112,8 +114,10 @@ function getProfileSnapshot() {
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setSidebarOpen(false);
     }
@@ -262,6 +266,10 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     : isLoggedIn
       ? customerLinks
       : customerLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order" && link.label !== "Notifications");
+
+  if (!mounted) {
+    return <Loader text="Preparing Stitch..." centerInViewport={true} />;
+  }
 
   const noLayoutPages = ["/login", "/register"];
   const isNoLayout = noLayoutPages.includes(pathname);

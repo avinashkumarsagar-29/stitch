@@ -113,33 +113,29 @@ export default function UserOrderStatus() {
                   <div key={step.title} className="relative text-center">
                     {index < steps.length - 1 ? (
                       <div
-                        className={`absolute left-[calc(50%+30px)] top-[28px] hidden h-[2px] w-[calc(100%-60px)] md:block ${
-                          index < activeStep
+                        className={`absolute left-[calc(50%+30px)] top-[28px] hidden h-[2px] w-[calc(100%-60px)] md:block ${index < activeStep
                             ? "bg-[#28a745]"
                             : "border-t-2 border-dashed border-[#b8bec8]"
-                        }`}
+                          }`}
                       />
                     ) : null}
                     <div
-                      className={`relative z-10 mx-auto flex h-14 w-14 items-center justify-center rounded-full ${
-                        isDone ? "bg-[#28a745] text-white" : "bg-[#eef0f4] text-[#4b5563]"
-                      }`}
+                      className={`relative z-10 mx-auto flex h-14 w-14 items-center justify-center rounded-full ${isDone ? "bg-[#28a745] text-white" : "bg-[#eef0f4] text-[#4b5563]"
+                        }`}
                     >
                       <Icon />
                     </div>
                     <h3
-                      className={`mt-3 text-sm font-bold ${
-                        isDone ? "text-[#16832e]" : "text-[#202635]"
-                      }`}
+                      className={`mt-3 text-sm font-bold ${isDone ? "text-[#16832e]" : "text-[#202635]"
+                        }`}
                     >
                       {step.title}
                     </h3>
                     <span
-                      className={`mt-2 inline-flex rounded-[8px] px-3 py-1 text-xs font-medium ${
-                        isDone
+                      className={`mt-2 inline-flex rounded-[8px] px-3 py-1 text-xs font-medium ${isDone
                           ? "bg-[#dff4e5] text-[#16832e]"
                           : "bg-[#eef0f4] text-[#4b5563]"
-                      }`}
+                        }`}
                     >
                       {isCurrent ? step.completedLabel : step.upcomingLabel}
                     </span>

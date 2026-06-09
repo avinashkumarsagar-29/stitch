@@ -81,7 +81,7 @@ export default function PaymentPage() {
   const [pendingBooking, setPendingBooking] = useState<PendingBooking | null>(null);
   const [booking, setBooking] = useState<BookingRecord | null>(null);
   const [tailor, setTailor] = useState<Tailor | null>(null);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
@@ -286,7 +286,7 @@ export default function PaymentPage() {
     try {
       setShowMockModal(false);
       setIsProcessing(true);
-      
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
       const response = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
         method: "POST",
@@ -397,7 +397,7 @@ export default function PaymentPage() {
           <div className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-emerald-100 bg-white p-8 md:p-12 text-center shadow-xl space-y-8 animate-fade-in">
             {/* Success color top accent bar */}
             <div className="absolute top-0 left-0 right-0 h-[6px] bg-gradient-to-r from-emerald-400 to-teal-500" />
-            
+
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 border border-emerald-100 text-4xl shadow-inner">
               ✓
             </div>
@@ -471,7 +471,7 @@ export default function PaymentPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 backdrop-blur-sm p-4 animate-fade-in">
             <div className="relative w-full max-w-md bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xl space-y-6">
               <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e] rounded-t-3xl" />
-              
+
               <div className="flex flex-col items-center text-center space-y-3">
                 <span className="text-4xl">💳</span>
                 <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Razorpay Sandbox Simulator</h3>
@@ -503,7 +503,7 @@ export default function PaymentPage() {
                 >
                   Simulate Success
                 </button>
-                
+
                 <button
                   type="button"
                   onClick={handleMockCancel}
@@ -520,16 +520,16 @@ export default function PaymentPage() {
           {/* Left Panel: Checkout & Method Selection */}
           <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 sm:p-8 shadow-sm">
             <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e]" />
-            
+
             <div className="flex items-center gap-2 mb-4">
               <span className="h-2 w-2 rounded-full bg-[#c322f4] animate-pulse" />
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#c322f4]">Secure Checkout</span>
             </div>
-            
+
             <h1 className="text-[28px] font-extrabold tracking-tight text-gray-900 sm:text-[34px] leading-tight">
               Choose Payment Method
             </h1>
-            
+
             <p className="text-xs text-gray-500 mt-2 mb-8">
               All transactions are encrypted and processed securely. Select a payment option below to finalize your booking details.
             </p>
@@ -598,7 +598,7 @@ export default function PaymentPage() {
             {/* Booking Summary Card */}
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-6">
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Order Details</h3>
-              
+
               {/* Selected Tailor Block */}
               {tailor && (
                 <div className="flex items-center gap-3.5 pb-4 border-b border-gray-100">

@@ -207,11 +207,10 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   type="button"
                   onClick={() => setRole("user")}
                   suppressHydrationWarning
-                  className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${
-                    role === "user"
+                  className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${role === "user"
                       ? "border-[#c322f4] bg-[#c322f4]/5 text-[#c322f4] shadow-[0_0_12px_rgba(195,34,244,0.12)]"
                       : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <span className="text-xl mb-1.5">👔</span>
                   <span className="text-xs font-bold block">Customer</span>
@@ -221,11 +220,10 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   type="button"
                   onClick={() => setRole("tailor")}
                   suppressHydrationWarning
-                  className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${
-                    role === "tailor"
+                  className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${role === "tailor"
                       ? "border-[#c322f4] bg-[#c322f4]/5 text-[#c322f4] shadow-[0_0_12px_rgba(195,34,244,0.12)]"
                       : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <span className="text-xl mb-1.5">🧵</span>
                   <span className="text-xs font-bold block">Partner Tailor</span>
@@ -385,15 +383,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
       {!isRegister && isOtpSent ? (
         <button
-                  type="button"
-                  onClick={() => {
-                    setIsOtpSent(false);
-                    setOtp("");
-                    setDevOtp("");
-                  }}
-                  suppressHydrationWarning
-                  className="mt-4 w-full text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors uppercase tracking-wider text-center cursor-pointer"
-                >
+          type="button"
+          onClick={() => {
+            setIsOtpSent(false);
+            setOtp("");
+            setDevOtp("");
+          }}
+          suppressHydrationWarning
+          className="mt-4 w-full text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors uppercase tracking-wider text-center cursor-pointer"
+        >
           ← Change phone number
         </button>
       ) : null}

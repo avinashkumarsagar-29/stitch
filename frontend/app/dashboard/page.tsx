@@ -295,10 +295,10 @@ function DashboardContent() {
 
                   <div className="flex items-center gap-3 self-end sm:self-center">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ${b.status === "delivered"
-                        ? "bg-green-50 text-green-700 border border-green-200"
-                        : b.status === "pending-price"
-                          ? "bg-amber-50 text-amber-700 border border-amber-200"
-                          : "bg-purple-50 text-purple-700 border border-purple-200"
+                      ? "bg-green-50 text-green-700 border border-green-200"
+                      : b.status === "pending-price"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-purple-50 text-purple-700 border border-purple-200"
                       }`}>
                       {b.status === "pending-price" ? "Price Needed" : b.status}
                     </span>

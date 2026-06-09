@@ -53,13 +53,13 @@ export default function ProfileEditor() {
     inseam: "",
   });
   const [isSavingMeasurements, setIsSavingMeasurements] = useState(false);
-  
+
   const userRole = useSyncExternalStore(
     subscribe,
     getUserRole,
     getServerUserRole,
   );
-  
+
   useEffect(() => {
     const user = getCurrentUser();
     if (!user || !user.id) {
@@ -187,11 +187,11 @@ export default function ProfileEditor() {
       // Update both profile storage and user storage
       safeSetLocalStorage(getProfileStorageKey(user), JSON.stringify(data.profile));
       safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
-      
+
       // Dispatch events to trigger UI syncs across components
       window.dispatchEvent(new Event("stitch-profile-change"));
       window.dispatchEvent(new Event("stitch-auth-change"));
-      
+
       setProfile(data.profile);
       showToast("Profile updated successfully", "success");
     } catch (err) {
@@ -323,7 +323,7 @@ export default function ProfileEditor() {
                 value={profile.fullName}
                 onChange={(value) => updateProfile("fullName", value)}
                 placeholder="Enter full name"
-                icon = {
+                icon={
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />

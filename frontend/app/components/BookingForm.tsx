@@ -263,19 +263,17 @@ function BookingPanel({
   readOnly?: boolean;
 }) {
   const isDark = tone === "dark";
-  const inputClass = `mt-2 h-10 w-full rounded-[4px] border px-3 text-xs outline-none ${
-    isDark
+  const inputClass = `mt-2 h-10 w-full rounded-[4px] border px-3 text-xs outline-none ${isDark
       ? "border-[#596173] bg-[#111827] text-white placeholder:text-[#aab2c0] focus:border-[#d779f4]"
       : "border-[#af18d5] bg-white text-[#111827] placeholder:text-[#4b5563] focus:border-[#111827]"
-  }`;
+    }`;
 
   return (
     <form
-      className={`flex min-h-[150px] flex-col gap-4 px-6 py-5 sm:px-10 ${
-        isDark
+      className={`flex min-h-[150px] flex-col gap-4 px-6 py-5 sm:px-10 ${isDark
           ? "bg-[#171d2a] text-white"
           : "bg-gradient-to-r from-[#c91cff] to-[#d72ff4] text-[#0c1020]"
-      }`}
+        }`}
       onSubmit={(event) => {
         event.preventDefault();
         if (readOnly) {

@@ -173,7 +173,7 @@ export default function BookingDetailsPage() {
     setIsSaving(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      
+
       // Save/update body measurements in the database if user is logged in
       const savedUser = localStorage.getItem("stitch-user");
       const user = savedUser ? JSON.parse(savedUser) : null;
