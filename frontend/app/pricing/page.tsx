@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useSyncExternalStore } from "react";
 import { showToast } from "../components/Toast";
-import { safeSetLocalStorage, authFetch } from "../components/profileStorage";
+import { safeSetLocalStorage, authFetch, getCurrentUserRole } from "../components/profileStorage";
 
 const customerPlans = [
   {
@@ -214,7 +214,7 @@ export default function PricingPage() {
 
   const userRole = useSyncExternalStore(
     subscribe,
-    () => localStorage.getItem("stitch-role") || "user",
+    getCurrentUserRole,
     () => "user"
   );
 

@@ -21,6 +21,7 @@ BEGIN
     lastName NVARCHAR(100) NULL,
     address NVARCHAR(255) NULL,
     image NVARCHAR(MAX) NULL,
+    isBanned BIT NOT NULL DEFAULT 0,
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
   );
 END
@@ -53,6 +54,12 @@ GO
 IF COL_LENGTH('dbo.Users', 'image') IS NULL
 BEGIN
   ALTER TABLE dbo.Users ADD image NVARCHAR(MAX) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Users', 'isBanned') IS NULL
+BEGIN
+  ALTER TABLE dbo.Users ADD isBanned BIT NOT NULL DEFAULT 0;
 END
 GO
 
@@ -173,6 +180,7 @@ BEGIN
     image NVARCHAR(MAX) NULL,
     [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free',
     status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+    rejectionReason NVARCHAR(500) NULL,
     createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
   );
 END
@@ -187,6 +195,12 @@ GO
 IF COL_LENGTH('dbo.JoinApplications', 'phoneNumber') IS NULL
 BEGIN
   ALTER TABLE dbo.JoinApplications ADD phoneNumber NVARCHAR(20) NOT NULL DEFAULT '';
+END
+GO
+
+IF COL_LENGTH('dbo.JoinApplications', 'rejectionReason') IS NULL
+BEGIN
+  ALTER TABLE dbo.JoinApplications ADD rejectionReason NVARCHAR(500) NULL;
 END
 GO
 
@@ -326,6 +340,23 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('dbo.Payments', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.Payments (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    userId INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    planPurchased NVARCHAR(100) NOT NULL,
+    razorpayOrderId NVARCHAR(100) NULL,
+    razorpayPaymentId NVARCHAR(100) NULL,
+    status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+    createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_Payments_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
+  );
+END
+GO
+
+
 SELECT * FROM dbo.Users ORDER BY createdAt DESC;
 SELECT * FROM dbo.LoginOtps ORDER BY createdAt DESC;
 SELECT * FROM dbo.Bookings ORDER BY createdAt DESC;
@@ -335,4 +366,16 @@ BEGIN
   SELECT * FROM dbo.Measurements ORDER BY updatedAt DESC;
 END
 GO
+
+-- =========================================================================
+-- ADMIN UTILITIES
+-- =========================================================================
+-- Note: Registration only allows 'user' or 'tailor'. 
+-- To test the Admin Dashboard, register a normal account first,
+-- then promote that user account using the queries below:
+--
+-- UPDATE Users SET role = 'admin' WHERE email = 'your-registered-email@example.com';
+-- OR
+-- UPDATE Users SET role = 'admin' WHERE phoneNumber = 'your-registered-phone-number';
+-- =========================================================================
 

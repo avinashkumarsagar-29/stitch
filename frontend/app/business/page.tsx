@@ -3,7 +3,7 @@
 import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { showToast } from "../components/Toast";
-import { authFetch, getCurrentUser } from "../components/profileStorage";
+import { authFetch, getCurrentUser, getCurrentUserRole } from "../components/profileStorage";
 
 interface BusinessOrder {
   id: number;
@@ -122,7 +122,7 @@ export default function BusinessPage() {
 
   const userRole = useSyncExternalStore(
     subscribe,
-    () => localStorage.getItem("stitch-role") || "user",
+    getCurrentUserRole,
     () => "user"
   );
 

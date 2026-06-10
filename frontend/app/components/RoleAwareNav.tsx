@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
+import { getCurrentUserRole } from "./profileStorage";
 import AuthActions from "./AuthActions";
 
 const userLinks = [
-  { label: "Home", href: "/" },
+  { label: "Home", href: "/Home" },
   { label: "About us", href: "/about" },
   { label: "Collection", href: "/collection" },
   { label: "Careers", href: "/careers" },
@@ -13,7 +14,7 @@ const userLinks = [
 ];
 
 const tailorLinks = [
-  { label: "Home", href: "/" },
+  { label: "Home", href: "/trailor/Home" },
   { label: "About us", href: "/about" },
   { label: "Careers", href: "/careers" },
   { label: "Blog", href: "/blog" },
@@ -30,7 +31,7 @@ function subscribe(callback: () => void) {
 }
 
 function getUserRole() {
-  return localStorage.getItem("stitch-role") || "user";
+  return getCurrentUserRole();
 }
 
 function getServerUserRole() {
@@ -109,11 +110,10 @@ export default function RoleAwareNav({
 
       {/* Mobile Drawer Panel */}
       <div
-        className={`fixed top-[76px] left-0 right-0 z-50 bg-white border-b border-gray-100 px-6 py-8 md:hidden transition-all duration-300 ease-in-out shadow-lg ${
-          isOpen
+        className={`fixed top-[76px] left-0 right-0 z-50 bg-white border-b border-gray-100 px-6 py-8 md:hidden transition-all duration-300 ease-in-out shadow-lg ${isOpen
             ? "translate-y-0 opacity-100 pointer-events-auto"
             : "-translate-y-4 opacity-0 pointer-events-none"
-        }`}
+          }`}
       >
         <div className="flex flex-col gap-5 text-sm font-bold text-gray-900">
           {links.map((link) => (
@@ -121,11 +121,10 @@ export default function RoleAwareNav({
               key={link.href}
               href={link.href}
               onClick={() => setIsOpen(false)}
-              className={`pb-2.5 border-b border-gray-50 transition-colors ${
-                link.href === activeHref
+              className={`pb-2.5 border-b border-gray-50 transition-colors ${link.href === activeHref
                   ? "text-[#c322f4]"
                   : "text-gray-700 hover:text-gray-900"
-              }`}
+                }`}
             >
               {link.label}
             </Link>

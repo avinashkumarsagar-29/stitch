@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import BookingForm from "./components/BookingForm";
+import { getCurrentUserRole } from "./components/profileStorage";
 
 const workSteps = [
   {
@@ -126,7 +127,7 @@ const footerColumns = [
 export default function Home() {
   const getUserRole = () => {
     if (typeof window === "undefined") return "user";
-    return localStorage.getItem("stitch-role") || "user";
+    return getCurrentUserRole();
   };
 
   const getIsLoggedIn = () => {

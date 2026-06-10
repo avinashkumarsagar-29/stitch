@@ -132,7 +132,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
       localStorage.setItem("stitch-role", data.user.role || "user");
       showToast(data.message, "success");
       window.dispatchEvent(new Event("stitch-auth-change"));
-      router.push("/");
+      const roleRedirects: Record<string, string> = {
+        admin: "/admin",
+        tailor: "/trailor/Home",
+        user: "/Home",
+      };
+      router.push(roleRedirects[data.user.role] || "/Home");
     } catch {
       showToast("Unable to connect to backend server", "error");
     }

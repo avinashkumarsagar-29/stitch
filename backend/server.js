@@ -179,6 +179,7 @@ async function ensureJoinTable(pool) {
         image NVARCHAR(MAX) NULL,
         [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free',
         status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+        rejectionReason NVARCHAR(500) NULL,
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
       );
     END
@@ -204,6 +205,89 @@ async function ensureJoinTable(pool) {
       ALTER TABLE dbo.JoinApplications ADD [plan] NVARCHAR(50) NOT NULL DEFAULT 'Free';
     END
   `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.JoinApplications', 'rejectionReason') IS NULL
+    BEGIN
+      ALTER TABLE dbo.JoinApplications ADD rejectionReason NVARCHAR(500) NULL;
+    END
+  `);
+}
+
+async function ensurePaymentsTable(pool) {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.Payments', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.Payments (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        userId INT NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        planPurchased NVARCHAR(100) NOT NULL,
+        razorpayOrderId NVARCHAR(100) NULL,
+        razorpayPaymentId NVARCHAR(100) NULL,
+        status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+        createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT FK_Payments_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
+      );
+    END
+  `);
+
+  // Seed some mock payments if empty
+  const countRes = await pool.request().query("SELECT COUNT(*) AS cnt FROM dbo.Payments");
+  if (countRes.recordset[0].cnt === 0) {
+    const usersRes = await pool.request().query("SELECT TOP 5 id FROM dbo.Users");
+    const userIds = usersRes.recordset.map(r => r.id);
+    if (userIds.length > 0) {
+      const u1 = userIds[0];
+      const u2 = userIds[1] || u1;
+      const u3 = userIds[2] || u1;
+
+      await pool.request()
+        .input("u1", sql.Int, u1)
+        .input("u2", sql.Int, u2)
+        .input("u3", sql.Int, u3)
+        .query(`
+          INSERT INTO dbo.Payments (userId, amount, planPurchased, razorpayOrderId, razorpayPaymentId, status, createdAt)
+          VALUES 
+            (@u1, 999.00, 'Pro', 'order_mock_pro1', 'pay_mock_pro1', 'verified', DATEADD(day, -5, SYSUTCDATETIME())),
+            (@u2, 299.00, 'Plus', 'order_mock_plus1', 'pay_mock_plus1', 'verified', DATEADD(day, -3, SYSUTCDATETIME())),
+            (@u3, 499.00, 'booking_1', 'order_mock_book1', 'pay_mock_book1', 'verified', DATEADD(day, -1, SYSUTCDATETIME())),
+            (@u1, 299.00, 'Plus', 'order_mock_fail', NULL, 'failed', DATEADD(hour, -2, SYSUTCDATETIME())),
+            (@u2, 0.00, 'Free', 'free_mock_1', 'free_activation', 'verified', DATEADD(day, -10, SYSUTCDATETIME()))
+        `);
+    }
+  }
+}
+
+async function logPayment(pool, userId, amount, planPurchased, razorpayOrderId, razorpayPaymentId, status) {
+  await ensurePaymentsTable(pool);
+  
+  if (razorpayOrderId) {
+    const existing = await pool.request()
+      .input("orderId", sql.NVarChar(100), razorpayOrderId)
+      .query("SELECT id FROM Payments WHERE razorpayOrderId = @orderId");
+    
+    if (existing.recordset.length > 0) {
+      await pool.request()
+        .input("orderId", sql.NVarChar(100), razorpayOrderId)
+        .input("paymentId", sql.NVarChar(100), razorpayPaymentId || null)
+        .input("status", sql.NVarChar(50), status)
+        .query("UPDATE Payments SET razorpayPaymentId = @paymentId, status = @status, createdAt = SYSUTCDATETIME() WHERE razorpayOrderId = @orderId");
+      return;
+    }
+  }
+  
+  await pool.request()
+    .input("userId", sql.Int, userId)
+    .input("amount", sql.Decimal(10,2), amount)
+    .input("planPurchased", sql.NVarChar(100), planPurchased)
+    .input("orderId", sql.NVarChar(100), razorpayOrderId || null)
+    .input("paymentId", sql.NVarChar(100), razorpayPaymentId || null)
+    .input("status", sql.NVarChar(50), status)
+    .query(`
+      INSERT INTO Payments (userId, amount, planPurchased, razorpayOrderId, razorpayPaymentId, status)
+      VALUES (@userId, @amount, @planPurchased, @orderId, @paymentId, @status)
+    `);
 }
 
 async function ensureMeasurementsTable(pool) {
@@ -240,6 +324,37 @@ async function ensureReviewsTable(pool) {
       );
     END
   `);
+
+  // Seed mock reviews if empty
+  const countRes = await pool.request().query("SELECT COUNT(*) AS cnt FROM dbo.Reviews");
+  if (countRes.recordset[0].cnt === 0) {
+    const usersRes = await pool.request().query("SELECT TOP 5 id FROM dbo.Users");
+    const tailorsRes = await pool.request().query("SELECT TOP 5 id FROM dbo.JoinApplications WHERE status = 'approved'");
+    
+    const userIds = usersRes.recordset.map(r => r.id);
+    const tailorIds = tailorsRes.recordset.map(r => r.id);
+
+    if (userIds.length > 0 && tailorIds.length > 0) {
+      const u1 = userIds[0];
+      const u2 = userIds[1] || u1;
+      const t1 = tailorIds[0];
+      const t2 = tailorIds[1] || t1;
+
+      await pool.request()
+        .input("u1", sql.Int, u1)
+        .input("u2", sql.Int, u2)
+        .input("t1", sql.Int, t1)
+        .input("t2", sql.Int, t2)
+        .query(`
+          INSERT INTO dbo.Reviews (bookingId, userId, tailorApplicationId, rating, comment, createdAt)
+          VALUES 
+            (1, @u1, @t1, 5, 'Absolutely incredible fit! The stitching is precise and the fabric feels premium.', DATEADD(day, -4, SYSUTCDATETIME())),
+            (2, @u2, @t1, 4, 'Very good service, pickup was on time. The waist was slightly loose but acceptable.', DATEADD(day, -3, SYSUTCDATETIME())),
+            (3, @u1, @t2, 5, 'Highly recommend this tailor! Completed my alterations in less than 24 hours.', DATEADD(day, -2, SYSUTCDATETIME())),
+            (4, @u2, @t2, 1, 'Fake profile review or abusive comment. Do not recommend this tailor.', DATEADD(hour, -5, SYSUTCDATETIME()))
+        `);
+    }
+  }
 }
 
 async function ensureReferralsTable(pool) {
@@ -256,6 +371,39 @@ async function ensureReferralsTable(pool) {
       );
     END
   `);
+
+  // Seed mock referrals if empty
+  const countRes = await pool.request().query("SELECT COUNT(*) AS cnt FROM dbo.Referrals");
+  if (countRes.recordset[0].cnt === 0) {
+    const usersRes = await pool.request().query("SELECT TOP 5 id FROM dbo.Users");
+    const userIds = usersRes.recordset.map(r => r.id);
+    if (userIds.length > 1) {
+      const u1 = userIds[0];
+      const u2 = userIds[1];
+      const u3 = userIds[2] || u1;
+
+      await pool.request()
+        .input("u1", sql.Int, u1)
+        .input("u2", sql.Int, u2)
+        .input("u3", sql.Int, u3)
+        .query(`
+          INSERT INTO dbo.Referrals (referrerUserId, referredUserId, referralCode, rewardGranted, createdAt)
+          VALUES 
+            (@u1, @u2, 'REF-MOCK1', 1, DATEADD(day, -10, SYSUTCDATETIME())),
+            (@u2, @u3, 'REF-MOCK2', 0, DATEADD(day, -2, SYSUTCDATETIME())),
+            (@u1, @u3, 'REF-MOCK1', 0, DATEADD(hour, -4, SYSUTCDATETIME()))
+        `);
+
+      // Add seed credits
+      await pool.request()
+        .input("u1", sql.Int, u1)
+        .input("u2", sql.Int, u2)
+        .query(`
+          UPDATE dbo.Users SET credit = 100.00 WHERE id = @u1;
+          UPDATE dbo.Users SET credit = 50.00 WHERE id = @u2;
+        `);
+    }
+  }
 }
 
 async function ensureBusinessOrdersTable(pool) {
@@ -369,6 +517,7 @@ async function ensureAuthTables(pool) {
         lastName NVARCHAR(100) NULL,
         address NVARCHAR(255) NULL,
         image NVARCHAR(MAX) NULL,
+        isBanned BIT NOT NULL DEFAULT 0,
         createdAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
       );
     END
@@ -413,6 +562,13 @@ async function ensureAuthTables(pool) {
     IF COL_LENGTH('dbo.Users', 'image') IS NULL
     BEGIN
       ALTER TABLE dbo.Users ADD image NVARCHAR(MAX) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Users', 'isBanned') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Users ADD isBanned BIT NOT NULL DEFAULT 0;
     END
   `);
 
@@ -567,7 +723,7 @@ function createAuthToken(user) {
   });
 }
 
-function authenticateApiRequest(request, response, next) {
+async function authenticateApiRequest(request, response, next) {
   const authHeader = request.get("authorization") || "";
   const [scheme, token] = authHeader.split(" ");
 
@@ -579,6 +735,20 @@ function authenticateApiRequest(request, response, next) {
 
   try {
     request.user = verifyJwt(token);
+    const userId = Number(request.user.id);
+    if (userId) {
+      const pool = await getSqlPool();
+      const banCheck = await pool
+        .request()
+        .input("userId", sql.Int, userId)
+        .query("SELECT isBanned FROM Users WHERE id = @userId");
+      const user = banCheck.recordset[0];
+      if (user && user.isBanned) {
+        return response.status(403).json({
+          message: "Forbidden: Your account has been deactivated.",
+        });
+      }
+    }
     return next();
   } catch (error) {
     return response.status(401).json({
@@ -609,7 +779,52 @@ function isAuthenticatedTailor(request) {
 }
 
 function canAccessUser(request, userId) {
-  return getAuthenticatedUserId(request) === Number(userId);
+  return getAuthenticatedUserId(request) === Number(userId) || request.user?.role === "admin";
+}
+
+async function ensureAppSettingsTable(pool) {
+  await pool.request().query(`
+    IF OBJECT_ID('dbo.AppSettings', 'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.AppSettings (
+        [key] NVARCHAR(100) NOT NULL PRIMARY KEY,
+        [value] NVARCHAR(1000) NOT NULL,
+        updatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+      );
+    END
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM dbo.AppSettings WHERE [key] = 'disableNewRegistrations')
+    BEGIN
+      INSERT INTO dbo.AppSettings ([key], [value]) VALUES ('disableNewRegistrations', 'false');
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.AppSettings WHERE [key] = 'maintenanceMode')
+    BEGIN
+      INSERT INTO dbo.AppSettings ([key], [value]) VALUES ('maintenanceMode', 'false');
+    END
+  `);
+}
+
+async function getAppSettings(pool) {
+  await ensureAppSettingsTable(pool);
+  const result = await pool.request().query(`
+    SELECT [key], [value]
+    FROM dbo.AppSettings
+    WHERE [key] IN ('disableNewRegistrations', 'maintenanceMode')
+  `);
+
+  return result.recordset.reduce(
+    (settings, row) => ({
+      ...settings,
+      [row.key]: String(row.value).toLowerCase() === "true",
+    }),
+    {
+      disableNewRegistrations: false,
+      maintenanceMode: false,
+    },
+  );
 }
 
 function formatSmsPhoneNumber(phoneNumber) {
@@ -967,6 +1182,13 @@ app.post("/api/auth/register", async (request, response) => {
     await ensureAuthTables(pool);
     await ensureReferralsTable(pool);
 
+    const appSettings = await getAppSettings(pool);
+    if (appSettings.disableNewRegistrations) {
+      return response.status(503).json({
+        message: "New registrations are temporarily disabled",
+      });
+    }
+
     let referrerUserId = null;
     if (referralCodeUsed) {
       const referrerResult = await pool
@@ -1084,7 +1306,7 @@ app.post("/api/auth/request-otp", async (request, response) => {
       .request()
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .query(`
-        SELECT id, fullName, email, phoneNumber
+        SELECT id, fullName, email, phoneNumber, isBanned
         FROM Users
         WHERE phoneNumber = @phoneNumber
       `);
@@ -1094,6 +1316,12 @@ app.post("/api/auth/request-otp", async (request, response) => {
     if (!user) {
       return response.status(404).json({
         message: "Phone number is not registered",
+      });
+    }
+
+    if (user.isBanned) {
+      return response.status(403).json({
+        message: "Your account has been deactivated.",
       });
     }
 
@@ -1202,12 +1430,18 @@ app.post("/api/auth/verify-otp", async (request, response) => {
       .request()
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
       .query(`
-        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image, referralCode, credit
+        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image, referralCode, credit, isBanned
         FROM Users
         WHERE phoneNumber = @phoneNumber
       `);
 
     const user = userResult.recordset[0];
+
+    if (user && user.isBanned) {
+      return response.status(403).json({
+        message: "Your account has been deactivated.",
+      });
+    }
 
     return response.json({
       message: "Login successful",
@@ -1240,6 +1474,1239 @@ app.post("/api/auth/verify-otp", async (request, response) => {
 });
 
 app.use("/api", authenticateApiRequest);
+
+app.use("/api", async (request, response, next) => {
+  if (request.user?.role === "admin") {
+    return next();
+  }
+
+  try {
+    const pool = await getSqlPool();
+    const appSettings = await getAppSettings(pool);
+    if (appSettings.maintenanceMode) {
+      return response.status(503).json({
+        message: "Stitch is temporarily in maintenance mode",
+      });
+    }
+    return next();
+  } catch (error) {
+    console.error("Maintenance mode check error:", error);
+    return response.status(500).json({
+      message: "Unable to verify application availability",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.get("/api/admin/summary", requireAdmin, async (_request, response) => {
+  try {
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+    await ensureBookingsTable(pool);
+    await ensureJoinTable(pool);
+
+    const userStatsResult = await pool.request().query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) AS users,
+        SUM(CASE WHEN role = 'tailor' THEN 1 ELSE 0 END) AS tailors,
+        SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admins
+      FROM Users
+    `);
+
+    const bookingStatsResult = await pool.request().query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status IN ('pending', 'pending-price', 'pending-payment') THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN status IN ('booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery') THEN 1 ELSE 0 END) AS booked,
+        SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
+      FROM Bookings
+    `);
+
+    const revenueResult = await pool.request().query(`
+      SELECT
+        COALESCE(SUM(
+          CASE
+            WHEN status IN ('booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered')
+            THEN
+              CASE
+                WHEN (COALESCE(approxPrice, 0) + ROUND(COALESCE(approxPrice, 0) * 0.18, 0) + 49 - COALESCE(referralDiscount, 0) - COALESCE(creditApplied, 0)) < 0
+                THEN 0
+                ELSE (COALESCE(approxPrice, 0) + ROUND(COALESCE(approxPrice, 0) * 0.18, 0) + 49 - COALESCE(referralDiscount, 0) - COALESCE(creditApplied, 0))
+              END
+            ELSE 0
+          END
+        ), 0) AS totalCollected
+      FROM Bookings
+    `);
+
+    const applicationsResult = await pool.request().query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
+        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected
+      FROM JoinApplications
+    `);
+
+    const recentUsersResult = await pool.request().query(`
+      SELECT TOP 5 id, fullName, role, createdAt
+      FROM Users
+      ORDER BY createdAt DESC
+    `);
+
+    const recentBookingsResult = await pool.request().query(`
+      SELECT TOP 5 b.id, b.status, b.approxPrice, b.createdAt, u.fullName
+      FROM Bookings b
+      LEFT JOIN Users u ON u.id = b.userId
+      ORDER BY b.createdAt DESC
+    `);
+
+    const recentApplicationsResult = await pool.request().query(`
+      SELECT TOP 5 id, firstName, lastName, status, createdAt
+      FROM JoinApplications
+      ORDER BY createdAt DESC
+    `);
+
+    const recentActivity = [
+      ...recentBookingsResult.recordset.map((booking) => ({
+        id: `booking-${booking.id}`,
+        type: "booking",
+        title: `Booking #${booking.id} ${booking.status || "created"}`,
+        detail: booking.fullName ? `Customer: ${booking.fullName}` : "Customer booking activity",
+        amount: booking.approxPrice !== undefined && booking.approxPrice !== null ? Number(booking.approxPrice) : null,
+        createdAt: booking.createdAt,
+      })),
+      ...recentApplicationsResult.recordset.map((application) => ({
+        id: `application-${application.id}`,
+        type: "application",
+        title: `${[application.firstName, application.lastName].filter(Boolean).join(" ") || "Tailor"} application`,
+        detail: `Status: ${application.status || "pending"}`,
+        amount: null,
+        createdAt: application.createdAt,
+      })),
+      ...recentUsersResult.recordset.map((user) => ({
+        id: `user-${user.id}`,
+        type: "user",
+        title: `${user.fullName || "New user"} joined`,
+        detail: `Role: ${user.role || "user"}`,
+        amount: null,
+        createdAt: user.createdAt,
+      })),
+    ]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 8);
+
+    const userStats = userStatsResult.recordset[0] || {};
+    const bookingStats = bookingStatsResult.recordset[0] || {};
+    const revenueStats = revenueResult.recordset[0] || {};
+    const applicationStats = applicationsResult.recordset[0] || {};
+
+    return response.json({
+      users: {
+        total: Number(userStats.total || 0),
+        users: Number(userStats.users || 0),
+        tailors: Number(userStats.tailors || 0),
+        admins: Number(userStats.admins || 0),
+      },
+      bookings: {
+        total: Number(bookingStats.total || 0),
+        pending: Number(bookingStats.pending || 0),
+        booked: Number(bookingStats.booked || 0),
+        delivered: Number(bookingStats.delivered || 0),
+        cancelled: Number(bookingStats.cancelled || 0),
+      },
+      revenue: {
+        totalCollected: Number(revenueStats.totalCollected || 0),
+        currency: "INR",
+      },
+      applications: {
+        total: Number(applicationStats.total || 0),
+        pending: Number(applicationStats.pending || 0),
+        approved: Number(applicationStats.approved || 0),
+        rejected: Number(applicationStats.rejected || 0),
+      },
+      recentActivity,
+    });
+  } catch (error) {
+    console.error("Admin summary error:", error);
+    return response.status(500).json({
+      message: "Unable to load admin summary",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.get("/api/admin/settings", requireAdmin, async (_request, response) => {
+  try {
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+    const settings = await getAppSettings(pool);
+
+    const adminsResult = await pool.request().query(`
+      SELECT id, fullName, email, phoneNumber, role, isBanned, createdAt
+      FROM Users
+      WHERE role = 'admin'
+      ORDER BY createdAt DESC
+    `);
+
+    const healthResult = await pool.request().query("SELECT DB_NAME() AS databaseName");
+
+    return response.json({
+      settings,
+      admins: adminsResult.recordset,
+      backendHealth: {
+        status: "ok",
+        database: healthResult.recordset[0]?.databaseName || "unknown",
+        checkedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Admin settings load error:", error);
+    return response.status(500).json({
+      message: "Unable to load admin settings",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.patch("/api/admin/settings", requireAdmin, async (request, response) => {
+  try {
+    const pool = await getSqlPool();
+    await ensureAppSettingsTable(pool);
+
+    const allowedKeys = ["disableNewRegistrations", "maintenanceMode"];
+    for (const key of allowedKeys) {
+      if (Object.prototype.hasOwnProperty.call(request.body, key)) {
+        await pool
+          .request()
+          .input("key", sql.NVarChar(100), key)
+          .input("value", sql.NVarChar(1000), request.body[key] ? "true" : "false")
+          .query(`
+            UPDATE dbo.AppSettings
+            SET [value] = @value, updatedAt = SYSUTCDATETIME()
+            WHERE [key] = @key
+          `);
+      }
+    }
+
+    const settings = await getAppSettings(pool);
+    return response.json({
+      message: "Settings updated",
+      settings,
+    });
+  } catch (error) {
+    console.error("Admin settings update error:", error);
+    return response.status(500).json({
+      message: "Unable to update admin settings",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.post("/api/admin/admins", requireAdmin, async (request, response) => {
+  try {
+    const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
+    if (!phoneNumber) {
+      return response.status(400).json({
+        message: "Phone number is required",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+
+    const result = await pool
+      .request()
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .query(`
+        UPDATE Users
+        SET role = 'admin'
+        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.isBanned, INSERTED.createdAt
+        WHERE phoneNumber = @phoneNumber
+      `);
+
+    const admin = result.recordset[0];
+    if (!admin) {
+      return response.status(404).json({
+        message: "No user found with that phone number",
+      });
+    }
+
+    return response.json({
+      message: "Admin account added",
+      admin,
+    });
+  } catch (error) {
+    console.error("Admin account create error:", error);
+    return response.status(500).json({
+      message: "Unable to create admin account",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.delete("/api/admin/admins/:userId", requireAdmin, async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    if (!userId) {
+      return response.status(400).json({
+        message: "User ID is required",
+      });
+    }
+
+    if (userId === getAuthenticatedUserId(request)) {
+      return response.status(400).json({
+        message: "You cannot remove your own admin access",
+      });
+    }
+
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+
+    const adminCountResult = await pool.request().query("SELECT COUNT(*) AS count FROM Users WHERE role = 'admin'");
+    if (Number(adminCountResult.recordset[0]?.count || 0) <= 1) {
+      return response.status(400).json({
+        message: "At least one admin account is required",
+      });
+    }
+
+    const result = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        UPDATE Users
+        SET role = 'user'
+        OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.isBanned, INSERTED.createdAt
+        WHERE id = @userId AND role = 'admin'
+      `);
+
+    if (!result.recordset[0]) {
+      return response.status(404).json({
+        message: "Admin account not found",
+      });
+    }
+
+    return response.json({
+      message: "Admin access removed",
+      user: result.recordset[0],
+    });
+  } catch (error) {
+    console.error("Admin account remove error:", error);
+    return response.status(500).json({
+      message: "Unable to remove admin access",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
+app.get("/api/admin/users", requireAdmin, async (request, response) => {
+  try {
+    const roleFilter = request.query.role || "";
+    const planFilter = request.query.plan || "";
+    const searchQuery = request.query.search || "";
+
+    const pool = await getSqlPool();
+    await ensureAuthTables(pool);
+
+    let query = `
+      SELECT id, fullName, email, phoneNumber, role, [plan], isBanned, createdAt
+      FROM Users
+      WHERE 1=1
+    `;
+    const req = pool.request();
+
+    if (roleFilter) {
+      query += " AND role = @role";
+      req.input("role", sql.NVarChar(50), roleFilter);
+    }
+    if (planFilter) {
+      query += " AND [plan] = @plan";
+      req.input("plan", sql.NVarChar(50), planFilter);
+    }
+    if (searchQuery) {
+      query += " AND (fullName LIKE @search OR email LIKE @search OR phoneNumber LIKE @search)";
+      req.input("search", sql.NVarChar(255), `%${searchQuery}%`);
+    }
+
+    query += " ORDER BY createdAt DESC";
+
+    const result = await req.query(query);
+    return response.json({ users: result.recordset });
+  } catch (error) {
+    console.error("Admin users list error:", error);
+    return response.status(500).json({
+      message: "Unable to load users",
+      detail: error.message
+    });
+  }
+});
+
+app.patch("/api/admin/users/:userId/role", requireAdmin, async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    const newRole = String(request.body.role || "").trim().toLowerCase();
+
+    if (!["user", "tailor", "admin"].includes(newRole)) {
+      return response.status(400).json({ message: "Invalid role value. Must be 'user', 'tailor', or 'admin'" });
+    }
+
+    const pool = await getSqlPool();
+    await pool.request()
+      .input("userId", sql.Int, userId)
+      .input("role", sql.NVarChar(50), newRole)
+      .query("UPDATE Users SET role = @role WHERE id = @userId");
+
+    return response.json({ message: `User role successfully updated to ${newRole}` });
+  } catch (error) {
+    console.error("Admin user role update error:", error);
+    return response.status(500).json({
+      message: "Unable to update user role",
+      detail: error.message
+    });
+  }
+});
+
+app.patch("/api/admin/users/:userId/ban", requireAdmin, async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    const isBanned = !!request.body.isBanned;
+
+    const pool = await getSqlPool();
+    await pool.request()
+      .input("userId", sql.Int, userId)
+      .input("isBanned", sql.Bit, isBanned ? 1 : 0)
+      .query("UPDATE Users SET isBanned = @isBanned WHERE id = @userId");
+
+    return response.json({ message: isBanned ? "User account deactivated" : "User account activated" });
+  } catch (error) {
+    console.error("Admin user ban update error:", error);
+    return response.status(500).json({
+      message: "Unable to update user ban status",
+      detail: error.message
+    });
+  }
+});
+
+app.get("/api/admin/users/:userId/bookings", requireAdmin, async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    const pool = await getSqlPool();
+
+    // First fetch the user details to see if they are a tailor
+    const userResult = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT email, phoneNumber, role FROM Users WHERE id = @userId");
+    const user = userResult.recordset[0];
+
+    if (!user) {
+      return response.status(404).json({ message: "User not found" });
+    }
+
+    const userEmail = user.email ? user.email.toLowerCase().trim() : "";
+    const userPhone = user.phoneNumber ? user.phoneNumber.trim() : "";
+    const isTailor = user.role === "tailor";
+
+    let bookingsQuery = `
+      SELECT id, userId, pickupLocation, dropoffLocation, bookingDate, bookingTime, tailorName, tailorEmail, clothCategory, approxPrice, status, trackingCode, createdAt
+      FROM Bookings
+      WHERE userId = @userId
+    `;
+
+    const req = pool.request().input("userId", sql.Int, userId);
+
+    if (isTailor) {
+      bookingsQuery += `
+        OR (tailorEmail = @tailorEmail OR tailorPhoneNumber = @tailorPhone)
+      `;
+      req.input("tailorEmail", sql.NVarChar(255), userEmail);
+      req.input("tailorPhone", sql.NVarChar(20), userPhone);
+    }
+
+    bookingsQuery += " ORDER BY createdAt DESC";
+    const bookingsResult = await req.query(bookingsQuery);
+
+    let businessQuery = `
+      SELECT id, userId, companyName, contactName, email, phoneNumber, businessType, quantity, approxPrice, status, targetDeliveryDate, createdAt
+      FROM BusinessOrders
+      WHERE userId = @userId
+    `;
+    const reqBiz = pool.request().input("userId", sql.Int, userId);
+
+    if (isTailor) {
+      businessQuery += `
+        OR (tailorEmail = @tailorEmail OR tailorPhoneNumber = @tailorPhone)
+      `;
+      reqBiz.input("tailorEmail", sql.NVarChar(255), userEmail);
+      reqBiz.input("tailorPhone", sql.NVarChar(20), userPhone);
+    }
+
+    businessQuery += " ORDER BY createdAt DESC";
+    const businessResult = await reqBiz.query(businessQuery);
+
+    return response.json({
+      bookings: bookingsResult.recordset,
+      businessOrders: businessResult.recordset
+    });
+  } catch (error) {
+    console.error("Admin user bookings load error:", error);
+    return response.status(500).json({
+      message: "Unable to load user bookings history",
+      detail: error.message
+    });
+  }
+});
+
+app.patch("/api/admin/join/:applicationId/approve", requireAdmin, async (request, response) => {
+  try {
+    const applicationId = Number(request.params.applicationId);
+    if (!applicationId) {
+      return response.status(400).json({ message: "Application ID is required" });
+    }
+
+    const pool = await getSqlPool();
+    const appResult = await pool.request()
+      .input("id", sql.Int, applicationId)
+      .query("SELECT * FROM JoinApplications WHERE id = @id");
+    
+    const appRecord = appResult.recordset[0];
+    if (!appRecord) {
+      return response.status(404).json({ message: "Application not found" });
+    }
+
+    if (appRecord.status === "approved") {
+      return response.status(400).json({ message: "Application is already approved" });
+    }
+
+    await pool.request()
+      .input("id", sql.Int, applicationId)
+      .query("UPDATE JoinApplications SET status = 'approved', rejectionReason = NULL WHERE id = @id");
+
+    const email = appRecord.email ? appRecord.email.toLowerCase().trim() : "";
+    const phoneNumber = appRecord.phoneNumber ? appRecord.phoneNumber.trim() : "";
+    
+    const userCheck = await pool.request()
+      .input("email", sql.NVarChar(255), email)
+      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+      .query("SELECT id FROM Users WHERE (email = @email AND @email <> '') OR (phoneNumber = @phoneNumber AND @phoneNumber <> '')");
+
+    let promoted = false;
+    if (userCheck.recordset.length > 0) {
+      const userId = userCheck.recordset[0].id;
+      const fullName = `${appRecord.firstName} ${appRecord.lastName}`.trim();
+      
+      await pool.request()
+        .input("userId", sql.Int, userId)
+        .input("fullName", sql.NVarChar(150), fullName)
+        .input("firstName", sql.NVarChar(100), appRecord.firstName)
+        .input("lastName", sql.NVarChar(100), appRecord.lastName)
+        .input("address", sql.NVarChar(255), appRecord.location)
+        .input("image", sql.NVarChar(sql.MAX), appRecord.image)
+        .input("plan", sql.NVarChar(50), appRecord.plan || "Free")
+        .query(`
+          UPDATE Users
+          SET 
+            role = 'tailor',
+            fullName = @fullName,
+            firstName = @firstName,
+            lastName = @lastName,
+            address = @address,
+            image = @image,
+            [plan] = @plan
+          WHERE id = @userId
+        `);
+      promoted = true;
+    }
+
+    return response.json({ 
+      message: "Application approved successfully",
+      promoted
+    });
+  } catch (error) {
+    console.error("Approve tailor application error:", error);
+    return response.status(500).json({
+      message: "Unable to approve application",
+      detail: error.message
+    });
+  }
+});
+
+app.patch("/api/admin/join/:applicationId/reject", requireAdmin, async (request, response) => {
+  try {
+    const applicationId = Number(request.params.applicationId);
+    const reason = String(request.body.reason || "").trim();
+
+    if (!applicationId) {
+      return response.status(400).json({ message: "Application ID is required" });
+    }
+    if (!reason) {
+      return response.status(400).json({ message: "Rejection reason is required" });
+    }
+
+    const pool = await getSqlPool();
+    const appResult = await pool.request()
+      .input("id", sql.Int, applicationId)
+      .query("SELECT * FROM JoinApplications WHERE id = @id");
+    
+    const appRecord = appResult.recordset[0];
+    if (!appRecord) {
+      return response.status(404).json({ message: "Application not found" });
+    }
+
+    await pool.request()
+      .input("id", sql.Int, applicationId)
+      .input("reason", sql.NVarChar(500), reason)
+      .query("UPDATE JoinApplications SET status = 'rejected', rejectionReason = @reason WHERE id = @id");
+
+    return response.json({ message: "Application rejected successfully" });
+  } catch (error) {
+    console.error("Reject tailor application error:", error);
+    return response.status(500).json({
+      message: "Unable to reject application",
+      detail: error.message
+    });
+  }
+});
+
+app.get("/api/admin/bookings", requireAdmin, async (request, response) => {
+  try {
+    const status = String(request.query.status || "").trim();
+    const search = String(request.query.search || "").trim();
+    
+    const pool = await getSqlPool();
+    await ensureBookingsTable(pool);
+    
+    let query = `
+      SELECT 
+        b.id,
+        b.userId,
+        b.pickupLocation,
+        b.dropoffLocation,
+        b.bookingDate,
+        b.bookingTime,
+        b.tailorName,
+        b.tailorEmail,
+        b.tailorPhoneNumber,
+        b.clothCategory,
+        b.clothImage,
+        b.material,
+        b.approxPrice,
+        b.status,
+        b.trackingCode,
+        b.createdAt,
+        u.fullName AS customerName,
+        u.email AS customerEmail,
+        u.phoneNumber AS customerPhone
+      FROM Bookings b
+      LEFT JOIN Users u ON b.userId = u.id
+      WHERE 1=1
+    `;
+
+    const req = pool.request();
+    if (status) {
+      query += " AND b.status = @status";
+      req.input("status", sql.NVarChar(50), status);
+    }
+    if (search) {
+      query += " AND (u.fullName LIKE @search OR b.tailorName LIKE @search OR b.trackingCode LIKE @search OR b.clothCategory LIKE @search)";
+      req.input("search", sql.NVarChar(100), `%${search}%`);
+    }
+
+    query += " ORDER BY b.createdAt DESC";
+    const result = await req.query(query);
+
+    return response.json({ bookings: result.recordset });
+  } catch (error) {
+    console.error("Admin bookings fetch error:", error);
+    return response.status(500).json({
+      message: "Unable to load bookings",
+      detail: error.message,
+    });
+  }
+});
+
+app.get("/api/admin/bookings/:bookingId", requireAdmin, async (request, response) => {
+  try {
+    const bookingId = Number(request.params.bookingId);
+    if (!bookingId) {
+      return response.status(400).json({ message: "Booking ID is required" });
+    }
+
+    const pool = await getSqlPool();
+    const result = await pool.request()
+      .input("bookingId", sql.Int, bookingId)
+      .query(`
+        SELECT 
+          b.*,
+          u.fullName AS customerName,
+          u.email AS customerEmail,
+          u.phoneNumber AS customerPhone
+        FROM Bookings b
+        LEFT JOIN Users u ON b.userId = u.id
+        WHERE b.id = @bookingId
+      `);
+
+    const booking = result.recordset[0];
+    if (!booking) {
+      return response.status(404).json({ message: "Booking not found" });
+    }
+
+    let measurements = null;
+    if (booking.userId) {
+      const measurementsResult = await pool.request()
+        .input("userId", sql.Int, booking.userId)
+        .query("SELECT * FROM Measurements WHERE userId = @userId");
+      measurements = measurementsResult.recordset[0] || null;
+    }
+
+    return response.json({ booking, measurements });
+  } catch (error) {
+    console.error("Admin booking detail error:", error);
+    return response.status(500).json({
+      message: "Unable to load booking details",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/admin/bookings/:bookingId/status", requireAdmin, async (request, response) => {
+  try {
+    const bookingId = Number(request.params.bookingId);
+    const { status, trackingCode, approxPrice } = request.body;
+
+    if (!bookingId) {
+      return response.status(400).json({ message: "Booking ID is required" });
+    }
+    if (!status) {
+      return response.status(400).json({ message: "Status is required" });
+    }
+
+    const pool = await getSqlPool();
+    const checkResult = await pool.request()
+      .input("id", sql.Int, bookingId)
+      .query("SELECT id FROM Bookings WHERE id = @id");
+    
+    if (checkResult.recordset.length === 0) {
+      return response.status(404).json({ message: "Booking not found" });
+    }
+
+    let updateQuery = "UPDATE Bookings SET status = @status";
+    const req = pool.request()
+      .input("id", sql.Int, bookingId)
+      .input("status", sql.NVarChar(50), status);
+
+    if (trackingCode !== undefined) {
+      updateQuery += ", trackingCode = @trackingCode";
+      req.input("trackingCode", sql.NVarChar(10), trackingCode || null);
+    }
+
+    if (approxPrice !== undefined) {
+      updateQuery += ", approxPrice = @approxPrice";
+      req.input("approxPrice", sql.Decimal(10, 2), approxPrice !== null && approxPrice !== "" ? Number(approxPrice) : null);
+    }
+
+    updateQuery += " WHERE id = @id";
+    await req.query(updateQuery);
+
+    return response.json({ message: "Booking updated successfully" });
+  } catch (error) {
+    console.error("Admin override booking status error:", error);
+    return response.status(500).json({
+      message: "Unable to update booking status",
+      detail: error.message,
+    });
+  }
+});
+
+app.get("/api/admin/business-orders", requireAdmin, async (request, response) => {
+  try {
+    const status = String(request.query.status || "").trim();
+    const search = String(request.query.search || "").trim();
+
+    const pool = await getSqlPool();
+    await ensureBusinessOrdersTable(pool);
+
+    let query = `
+      SELECT bo.*, u.fullName AS userFullName
+      FROM BusinessOrders bo
+      LEFT JOIN Users u ON u.id = bo.userId
+      WHERE 1=1
+    `;
+
+    const req = pool.request();
+    if (status) {
+      query += " AND bo.status = @status";
+      req.input("status", sql.NVarChar(50), status);
+    }
+    if (search) {
+      query += " AND (bo.companyName LIKE @search OR bo.contactName LIKE @search OR bo.email LIKE @search OR bo.tailorName LIKE @search OR bo.businessType LIKE @search)";
+      req.input("search", sql.NVarChar(100), `%${search}%`);
+    }
+
+    query += " ORDER BY bo.createdAt DESC";
+    const result = await req.query(query);
+
+    return response.json({ businessOrders: result.recordset });
+  } catch (error) {
+    console.error("Admin business orders fetch error:", error);
+    return response.status(500).json({
+      message: "Unable to load business orders",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/admin/business-orders/:orderId", requireAdmin, async (request, response) => {
+  try {
+    const orderId = Number(request.params.orderId);
+    const { status, approxPrice, targetDeliveryDate, tailorId } = request.body;
+
+    if (!orderId) {
+      return response.status(400).json({ message: "Order ID is required" });
+    }
+
+    const pool = await getSqlPool();
+    await ensureBusinessOrdersTable(pool);
+
+    const orderCheck = await pool.request()
+      .input("id", sql.Int, orderId)
+      .query("SELECT id FROM BusinessOrders WHERE id = @id");
+    if (orderCheck.recordset.length === 0) {
+      return response.status(404).json({ message: "Business order not found" });
+    }
+
+    let tailorName = undefined;
+    let tailorEmail = undefined;
+    let tailorPhoneNumber = undefined;
+
+    if (tailorId !== undefined) {
+      if (tailorId === null || tailorId === "") {
+        tailorName = null;
+        tailorEmail = null;
+        tailorPhoneNumber = null;
+      } else {
+        const tailorRes = await pool.request()
+          .input("tailorId", sql.Int, Number(tailorId))
+          .query("SELECT firstName + ' ' + lastName AS fullName, email, phoneNumber FROM JoinApplications WHERE id = @tailorId");
+        if (tailorRes.recordset.length > 0) {
+          const t = tailorRes.recordset[0];
+          tailorName = t.fullName;
+          tailorEmail = t.email;
+          tailorPhoneNumber = t.phoneNumber;
+        } else {
+          return response.status(400).json({ message: "Invalid tailor selection" });
+        }
+      }
+    }
+
+    let updateQuery = "UPDATE BusinessOrders SET id = id";
+    const req = pool.request().input("id", sql.Int, orderId);
+
+    if (status !== undefined) {
+      updateQuery += ", status = @status";
+      req.input("status", sql.NVarChar(50), status);
+      if (status === "delivered") {
+        updateQuery += ", deliveredAt = SYSUTCDATETIME()";
+      }
+    }
+
+    if (approxPrice !== undefined) {
+      updateQuery += ", approxPrice = @approxPrice";
+      req.input("approxPrice", sql.Decimal(10, 2), approxPrice !== null && approxPrice !== "" ? Number(approxPrice) : null);
+    }
+
+    if (targetDeliveryDate !== undefined) {
+      updateQuery += ", targetDeliveryDate = @targetDeliveryDate";
+      req.input("targetDeliveryDate", sql.Date, targetDeliveryDate ? new Date(targetDeliveryDate) : null);
+    }
+
+    if (tailorId !== undefined) {
+      updateQuery += `, tailorApplicationId = @tailorId, tailorName = @tailorName, tailorEmail = @tailorEmail, tailorPhoneNumber = @tailorPhoneNumber`;
+      req.input("tailorId", sql.Int, tailorId ? Number(tailorId) : null);
+      req.input("tailorName", sql.NVarChar(200), tailorName);
+      req.input("tailorEmail", sql.NVarChar(255), tailorEmail);
+      req.input("tailorPhoneNumber", sql.NVarChar(20), tailorPhoneNumber);
+    }
+
+    updateQuery += " WHERE id = @id";
+    await req.query(updateQuery);
+
+    return response.json({ message: "Business order updated successfully" });
+  } catch (error) {
+    console.error("Admin business order update error:", error);
+    return response.status(500).json({
+      message: "Unable to update business order",
+      detail: error.message,
+    });
+  }
+});
+
+app.get("/api/admin/payments", requireAdmin, async (request, response) => {
+  try {
+    const status = String(request.query.status || "").trim();
+    const search = String(request.query.search || "").trim();
+    const startDate = String(request.query.startDate || "").trim();
+    const endDate = String(request.query.endDate || "").trim();
+
+    const pool = await getSqlPool();
+    await ensurePaymentsTable(pool);
+
+    let query = `
+      SELECT p.*, u.fullName AS customerName, u.email AS customerEmail, u.phoneNumber AS customerPhone
+      FROM Payments p
+      LEFT JOIN Users u ON u.id = p.userId
+      WHERE 1=1
+    `;
+
+    const req = pool.request();
+    if (status) {
+      query += " AND p.status = @status";
+      req.input("status", sql.NVarChar(50), status);
+    }
+    if (search) {
+      query += " AND (u.fullName LIKE @search OR u.email LIKE @search OR p.planPurchased LIKE @search OR p.razorpayOrderId LIKE @search OR p.razorpayPaymentId LIKE @search)";
+      req.input("search", sql.NVarChar(100), `%${search}%`);
+    }
+    if (startDate) {
+      query += " AND p.createdAt >= @startDate";
+      req.input("startDate", sql.DateTime2, new Date(startDate));
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setDate(end.getDate() + 1);
+      query += " AND p.createdAt < @endDate";
+      req.input("endDate", sql.DateTime2, end);
+    }
+
+    query += " ORDER BY p.createdAt DESC";
+    const result = await req.query(query);
+
+    const breakdownQuery = await pool.request().query(`
+      SELECT 
+        planPurchased,
+        SUM(amount) AS totalAmount
+      FROM Payments
+      WHERE status = 'verified'
+      GROUP BY planPurchased
+    `);
+
+    let freeRevenue = 0;
+    let plusRevenue = 0;
+    let proRevenue = 0;
+    let bookingsRevenue = 0;
+
+    breakdownQuery.recordset.forEach((row) => {
+      const plan = String(row.planPurchased).toLowerCase();
+      const amt = Number(row.totalAmount || 0);
+
+      if (plan === "free") {
+        freeRevenue += amt;
+      } else if (plan === "plus") {
+        plusRevenue += amt;
+      } else if (plan === "pro") {
+        proRevenue += amt;
+      } else {
+        bookingsRevenue += amt;
+      }
+    });
+
+    return response.json({
+      payments: result.recordset,
+      breakdown: {
+        free: freeRevenue,
+        plus: plusRevenue,
+        pro: proRevenue,
+        bookings: bookingsRevenue,
+        total: freeRevenue + plusRevenue + proRevenue + bookingsRevenue
+      }
+    });
+  } catch (error) {
+    console.error("Admin payments fetch error:", error);
+    return response.status(500).json({
+      message: "Unable to load payments dashboard",
+      detail: error.message,
+    });
+  }
+});
+
+app.get("/api/admin/reviews", requireAdmin, async (request, response) => {
+  try {
+    const search = String(request.query.search || "").trim();
+    const rating = request.query.rating ? Number(request.query.rating) : null;
+
+    const pool = await getSqlPool();
+    await ensureReviewsTable(pool);
+
+    let query = `
+      SELECT 
+        r.id,
+        r.bookingId,
+        r.userId,
+        r.tailorApplicationId,
+        r.rating,
+        r.comment,
+        r.createdAt,
+        u.fullName AS customerName,
+        u.email AS customerEmail,
+        ja.firstName + ' ' + ja.lastName AS tailorName,
+        ja.email AS tailorEmail
+      FROM Reviews r
+      LEFT JOIN Users u ON u.id = r.userId
+      LEFT JOIN JoinApplications ja ON ja.id = r.tailorApplicationId
+      WHERE 1=1
+    `;
+
+    const req = pool.request();
+    if (rating) {
+      query += " AND r.rating = @rating";
+      req.input("rating", sql.Int, rating);
+    }
+    if (search) {
+      query += " AND (u.fullName LIKE @search OR ja.firstName LIKE @search OR ja.lastName LIKE @search OR r.comment LIKE @search)";
+      req.input("search", sql.NVarChar(100), `%${search}%`);
+    }
+
+    query += " ORDER BY r.createdAt DESC";
+    const reviewsResult = await req.query(query);
+
+    const averagesResult = await pool.request().query(`
+      SELECT 
+        ja.id AS tailorId,
+        ja.firstName + ' ' + ja.lastName AS tailorName,
+        ja.email AS tailorEmail,
+        AVG(CAST(r.rating AS DECIMAL(10,2))) AS averageRating,
+        COUNT(r.id) AS reviewCount
+      FROM Reviews r
+      JOIN JoinApplications ja ON r.tailorApplicationId = ja.id
+      GROUP BY ja.id, ja.firstName, ja.lastName, ja.email
+      ORDER BY averageRating DESC
+    `);
+
+    return response.json({
+      reviews: reviewsResult.recordset,
+      averages: averagesResult.recordset
+    });
+  } catch (error) {
+    console.error("Admin reviews fetch error:", error);
+    return response.status(500).json({
+      message: "Unable to load reviews dashboard",
+      detail: error.message,
+    });
+  }
+});
+
+app.delete("/api/admin/reviews/:reviewId", requireAdmin, async (request, response) => {
+  try {
+    const reviewId = Number(request.params.reviewId);
+    if (!reviewId) {
+      return response.status(400).json({ message: "Review ID is required" });
+    }
+
+    const pool = await getSqlPool();
+    await ensureReviewsTable(pool);
+
+    const checkResult = await pool.request()
+      .input("id", sql.Int, reviewId)
+      .query("SELECT id FROM Reviews WHERE id = @id");
+    if (checkResult.recordset.length === 0) {
+      return response.status(404).json({ message: "Review not found" });
+    }
+
+    await pool.request()
+      .input("id", sql.Int, reviewId)
+      .query("DELETE FROM Reviews WHERE id = @id");
+
+    return response.json({ message: "Review deleted successfully" });
+  } catch (error) {
+    console.error("Admin review delete error:", error);
+    return response.status(500).json({
+      message: "Unable to delete review",
+      detail: error.message,
+    });
+  }
+});
+
+app.get("/api/admin/referrals", requireAdmin, async (request, response) => {
+  try {
+    const pool = await getSqlPool();
+    await ensureReferralsTable(pool);
+
+    const referralsResult = await pool.request().query(`
+      SELECT 
+        r.id,
+        r.referrerUserId,
+        r.referredUserId,
+        r.referralCode,
+        r.rewardGranted,
+        r.createdAt,
+        u1.fullName AS referrerName,
+        u1.email AS referrerEmail,
+        u1.credit AS referrerCredit,
+        u2.fullName AS referredName,
+        u2.email AS referredEmail,
+        u2.credit AS referredCredit
+      FROM Referrals r
+      LEFT JOIN Users u1 ON u1.id = r.referrerUserId
+      LEFT JOIN Users u2 ON u2.id = r.referredUserId
+      ORDER BY r.createdAt DESC
+    `);
+
+    const usersResult = await pool.request().query(`
+      SELECT id, fullName, email, phoneNumber, credit, role
+      FROM Users
+      ORDER BY credit DESC, fullName ASC
+    `);
+
+    return response.json({
+      referrals: referralsResult.recordset,
+      users: usersResult.recordset
+    });
+  } catch (error) {
+    console.error("Admin referrals fetch error:", error);
+    return response.status(500).json({
+      message: "Unable to load referrals dashboard",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/admin/referrals/:referralId/grant", requireAdmin, async (request, response) => {
+  try {
+    const referralId = Number(request.params.referralId);
+    const amount = Number(request.body.amount || 50.00);
+
+    if (!referralId) {
+      return response.status(400).json({ message: "Referral ID is required" });
+    }
+    if (isNaN(amount) || amount <= 0) {
+      return response.status(400).json({ message: "Amount must be a positive number" });
+    }
+
+    const pool = await getSqlPool();
+    await ensureReferralsTable(pool);
+
+    const refCheck = await pool.request()
+      .input("id", sql.Int, referralId)
+      .query("SELECT * FROM Referrals WHERE id = @id");
+    const ref = refCheck.recordset[0];
+    if (!ref) {
+      return response.status(404).json({ message: "Referral relationship not found" });
+    }
+
+    await pool.request()
+      .input("userId", sql.Int, ref.referrerUserId)
+      .input("amount", sql.Decimal(10,2), amount)
+      .query("UPDATE Users SET credit = credit + @amount WHERE id = @userId");
+
+    await pool.request()
+      .input("id", sql.Int, referralId)
+      .query("UPDATE Referrals SET rewardGranted = 1 WHERE id = @id");
+
+    return response.json({ message: `Reward credit of ₹${amount} granted successfully` });
+  } catch (error) {
+    console.error("Admin grant referral reward error:", error);
+    return response.status(500).json({
+      message: "Unable to grant reward credit",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/admin/referrals/:referralId/revoke", requireAdmin, async (request, response) => {
+  try {
+    const referralId = Number(request.params.referralId);
+    const amount = Number(request.body.amount || 50.00);
+
+    if (!referralId) {
+      return response.status(400).json({ message: "Referral ID is required" });
+    }
+    if (isNaN(amount) || amount <= 0) {
+      return response.status(400).json({ message: "Amount must be a positive number" });
+    }
+
+    const pool = await getSqlPool();
+    await ensureReferralsTable(pool);
+
+    const refCheck = await pool.request()
+      .input("id", sql.Int, referralId)
+      .query("SELECT * FROM Referrals WHERE id = @id");
+    const ref = refCheck.recordset[0];
+    if (!ref) {
+      return response.status(404).json({ message: "Referral relationship not found" });
+    }
+
+    await pool.request()
+      .input("userId", sql.Int, ref.referrerUserId)
+      .input("amount", sql.Decimal(10,2), amount)
+      .query("UPDATE Users SET credit = CASE WHEN credit - @amount < 0.00 THEN 0.00 ELSE credit - @amount END WHERE id = @userId");
+
+    await pool.request()
+      .input("id", sql.Int, referralId)
+      .query("UPDATE Referrals SET rewardGranted = 0 WHERE id = @id");
+
+    return response.json({ message: `Reward credit of ₹${amount} revoked successfully` });
+  } catch (error) {
+    console.error("Admin revoke referral reward error:", error);
+    return response.status(500).json({
+      message: "Unable to revoke reward credit",
+      detail: error.message,
+    });
+  }
+});
+
+app.patch("/api/admin/users/:userId/credit", requireAdmin, async (request, response) => {
+  try {
+    const userId = Number(request.params.userId);
+    const credit = Number(request.body.credit);
+
+    if (!userId) {
+      return response.status(400).json({ message: "User ID is required" });
+    }
+    if (isNaN(credit) || credit < 0) {
+      return response.status(400).json({ message: "Credit must be a non-negative number" });
+    }
+
+    const pool = await getSqlPool();
+    const userCheck = await pool.request()
+      .input("id", sql.Int, userId)
+      .query("SELECT id FROM Users WHERE id = @id");
+    if (userCheck.recordset.length === 0) {
+      return response.status(404).json({ message: "User not found" });
+    }
+
+    await pool.request()
+      .input("id", sql.Int, userId)
+      .input("credit", sql.Decimal(10,2), credit)
+      .query("UPDATE Users SET credit = @credit WHERE id = @id");
+
+    return response.json({ message: "User credit balance updated successfully" });
+  } catch (error) {
+    console.error("Admin user credit update error:", error);
+    return response.status(500).json({
+      message: "Unable to update user credit balance",
+      detail: error.message,
+    });
+  }
+});
 
 app.get("/api/users/:userId/profile", async (request, response) => {
   try {
@@ -2403,8 +3870,7 @@ app.post("/api/join", async (request, response) => {
             firstName = @firstName,
             lastName = @lastName,
             address = @address,
-            image = @image,
-            role = 'tailor'
+            image = @image
           OUTPUT 
             INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan],
             INSERTED.firstName, INSERTED.lastName, INSERTED.address, INSERTED.image
@@ -2472,6 +3938,7 @@ app.get("/api/join", requireAuth, requireAdmin, async (_request, response) => {
         image,
         [plan],
         status,
+        rejectionReason,
         createdAt
       FROM JoinApplications
       ORDER BY createdAt DESC
@@ -2788,8 +4255,10 @@ app.post("/api/payments/create-order", async (request, response) => {
     }
 
     if (finalPrice === 0) {
+      const freeOrderId = "order_free_" + Math.random().toString(36).substring(2, 11);
+      await logPayment(pool, userId, 0, planId, freeOrderId, null, 'pending');
       return response.json({
-        id: "order_free_" + Math.random().toString(36).substring(2, 11),
+        id: freeOrderId,
         amount: 0,
         currency: "INR",
         isMock: true,
@@ -2809,8 +4278,10 @@ app.post("/api/payments/create-order", async (request, response) => {
 
     if (!isRazorpayConfigured) {
       // Return a Mock Order for developer testing
+      const mockOrderId = "order_mock_" + Math.random().toString(36).substring(2, 11);
+      await logPayment(pool, userId, finalPrice, planId, mockOrderId, null, 'pending');
       return response.json({
-        id: "order_mock_" + Math.random().toString(36).substring(2, 11),
+        id: mockOrderId,
         amount: Math.round(finalPrice * 100),
         currency: "INR",
         isMock: true,
@@ -2844,6 +4315,8 @@ app.post("/api/payments/create-order", async (request, response) => {
         detail: orderData.error,
       });
     }
+
+    await logPayment(pool, userId, finalPrice, planId, orderData.id, null, 'pending');
 
     return response.json({
       id: orderData.id,
@@ -2927,6 +4400,13 @@ app.post("/api/payments/verify-payment", async (request, response) => {
         }
       }
 
+      let amountVal = 0;
+      if (planId === "Pro") amountVal = 999.00;
+      else if (planId === "Plus") amountVal = 299.00;
+      else if (planId === "Alterations") amountVal = 499.00;
+
+      await logPayment(pool, userId, amountVal, planId, razorpay_order_id, razorpay_payment_id || "mock_payment", "verified");
+
       return response.json({
         success: true,
         message: planId.startsWith("booking_") ? "Mock payment verified and booking confirmed" : "Mock payment verified and subscription activated",
@@ -2942,16 +4422,24 @@ app.post("/api/payments/verify-payment", async (request, response) => {
       });
     }
 
+    let amountVal = 0;
+    if (planId === "Pro") amountVal = 999.00;
+    else if (planId === "Plus") amountVal = 299.00;
+    else if (planId === "Alterations") amountVal = 499.00;
+
     const crypto = require("crypto");
     const hmac = crypto.createHmac("sha256", keySecret);
     hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
     const generated_signature = hmac.digest("hex");
 
     if (generated_signature !== razorpay_signature) {
+      await logPayment(pool, userId, amountVal, planId, razorpay_order_id, razorpay_payment_id, "failed");
       return response.status(400).json({
         message: "Invalid payment signature. Payment verification failed.",
       });
     }
+
+    await logPayment(pool, userId, amountVal, planId, razorpay_order_id, razorpay_payment_id, "verified");
 
     if (!planId.startsWith("booking_")) {
       // Signature matches, update plan in Users table
@@ -2989,6 +4477,12 @@ app.post("/api/payments/verify-payment", async (request, response) => {
     });
   } catch (error) {
     console.error("Verify payment error:", error);
+    try {
+      const pool = await getSqlPool();
+      await logPayment(pool, request.body.userId || 0, 0, request.body.planId || "unknown", request.body.razorpay_order_id || "unknown", request.body.razorpay_payment_id || "unknown", "failed");
+    } catch (e) {
+      console.error("Failed to log failed payment error:", e);
+    }
     return response.status(500).json({
       message: "Unable to verify payment signature",
       detail: error.message,
@@ -3041,6 +4535,8 @@ app.post("/api/payments/activate-free-plan", async (request, response) => {
           WHERE email = @email OR phoneNumber = @phoneNumber
         `);
     }
+
+    await logPayment(pool, userId, 0, planToActivate, "free_" + Date.now(), "free_activation", "verified");
 
     return response.json({
       success: true,

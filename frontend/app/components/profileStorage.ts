@@ -96,6 +96,11 @@ export function getCurrentUser(): StoredUser | null {
   return cachedUser;
 }
 
+export function getCurrentUserRole(): string {
+  const user = getCurrentUser();
+  return user?.role || "user";
+}
+
 export function getAuthToken() {
   if (typeof window === "undefined") {
     return "";
@@ -232,3 +237,21 @@ export function safeSetLocalStorage(key: string, value: string) {
     }
   }
 }
+
+export function clearUserDataOnLogout() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("stitch-auth");
+  localStorage.removeItem("stitch-role");
+  localStorage.removeItem("stitch-user");
+  localStorage.removeItem("stitch-token");
+  localStorage.removeItem("stitch-last-phone");
+
+  // Clear all profile cache keys
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("stitch-profile-")) {
+      localStorage.removeItem(key);
+    }
+  }
+}
+

@@ -11,6 +11,8 @@ import {
   getCurrentUser,
   getProfileStorageKey,
   authFetch,
+  clearUserDataOnLogout,
+  getCurrentUserRole,
 } from "./profileStorage";
 import { showToast } from "./Toast";
 
@@ -56,7 +58,7 @@ function playNotificationSound() {
 
 // Links configuration
 const userLinks = [
-  { label: "Home", href: "/", icon: "🏠" },
+  { label: "Home", href: "/Home", icon: "🏠" },
   { label: "Book Now", href: "/booking", icon: "✂️" },
   { label: "Track Order", href: "/track", icon: "📦" },
   { label: "Notifications", href: "/notifications", icon: "🔔" },
@@ -67,7 +69,6 @@ const userLinks = [
 ];
 
 const tailorLinks = [
-  { label: "Home", href: "/", icon: "🏠" },
   { label: "My Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Update Order", href: "/track", icon: "📦" },
   { label: "Notifications", href: "/notifications", icon: "🔔" },
@@ -75,6 +76,18 @@ const tailorLinks = [
   { label: "Join Stitch", href: "/join", icon: "🤝" },
   { label: "About us", href: "/about", icon: "✨" },
   { label: "Pricing", href: "/pricing", icon: "🏷️" }
+];
+
+const adminLinks = [
+  { label: "Dashboard", href: "/admin", icon: "📊" },
+  { label: "User Management", href: "/admin/users", icon: "👥" },
+  { label: "Tailor Applications", href: "/admin/applications", icon: "✂️" },
+  { label: "Bookings Management", href: "/admin/bookings", icon: "📦" },
+  { label: "Business Orders", href: "/admin/business-orders", icon: "💼" },
+  { label: "Payments & Revenue", href: "/admin/payments", icon: "💳" },
+  { label: "Reviews & Ratings", href: "/admin/reviews", icon: "⭐" },
+  { label: "Referral Credits", href: "/admin/referrals", icon: "🎁" },
+  { label: "Settings", href: "/admin/settings", icon: "⚙️" },
 ];
 
 const communityLinks = [
@@ -99,7 +112,7 @@ function getSnapshot() {
 }
 
 function getUserRole() {
-  return localStorage.getItem("stitch-role") || "user";
+  return getCurrentUserRole();
 }
 
 let cachedProfile = emptyProfile;
@@ -323,7 +336,11 @@ export default function Sidebar({
   }, [isLoggedIn, userRole, profile.address]);
 
   const isTailor = userRole === "tailor";
-  const links = isTailor
+  const isAdmin = userRole === "admin";
+  const homeHref = isAdmin ? "/admin" : isTailor ? "/trailor/Home" : isLoggedIn ? "/Home" : "/";
+  const links = isAdmin
+    ? adminLinks
+    : isTailor
     ? tailorLinks
     : isLoggedIn
       ? userLinks
@@ -338,10 +355,7 @@ export default function Sidebar({
 
   function handleLogout() {
     sessionStorage.setItem("stitch-logout", "true");
-    localStorage.removeItem("stitch-auth");
-    localStorage.removeItem("stitch-role");
-    localStorage.removeItem("stitch-user");
-    localStorage.removeItem("stitch-token");
+    clearUserDataOnLogout();
     showToast("Logout successfully", "success");
     window.dispatchEvent(new Event("stitch-auth-change"));
     handleLinkClick();
@@ -364,7 +378,7 @@ export default function Sidebar({
       >
         {/* Top Brand Header */}
         <div className="flex h-[76px] items-center justify-between border-b border-gray-100 px-6">
-          <Link href="/" className="flex items-end gap-1.5" onClick={handleLinkClick}>
+          <Link href={homeHref} className="flex items-end gap-1.5" onClick={handleLinkClick}>
             <span className="relative flex h-10 w-8 items-center justify-center text-3xl font-black leading-none text-[#0c1b24]">
               S
               <span className="absolute left-[19px] top-0 h-6 w-[2px] rounded-full bg-[#d2a22e]" />
@@ -416,7 +430,7 @@ export default function Sidebar({
                     {profile.fullName || "My Account"}
                   </p>
                   <p className="text-[9px] font-semibold uppercase tracking-wider text-[#c322f4] mt-0.5">
-                    {isTailor ? "✂️ Tailor Partner" : "👔 Customer"}
+                    {isAdmin ? "⚙️ Admin" : isTailor ? "✂️ Tailor Partner" : "👔 Customer"}
                   </p>
                 </div>
                 <span className="text-[10px] text-gray-400 font-bold transition-transform">
@@ -427,6 +441,7 @@ export default function Sidebar({
               {/* Expandable profile submenu */}
               {profileOpen && (
                 <div className="mt-3 pt-3 border-t border-gray-100/70 flex flex-col gap-1 text-xs">
+                  {!isAdmin && (
                   <Link
                     href="/profile"
                     onClick={handleLinkClick}
@@ -437,6 +452,7 @@ export default function Sidebar({
                   >
                     <span>👤</span> Profile Settings
                   </Link>
+                  )}
                   <button
                     type="button"
                     onClick={handleLogout}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
+import { getCurrentUserRole } from "./profileStorage";
 
 function subscribe(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -14,7 +15,7 @@ function subscribe(callback: () => void) {
 }
 
 function getUserRole() {
-  return localStorage.getItem("stitch-role") || "user";
+  return getCurrentUserRole();
 }
 
 function getServerUserRole() {

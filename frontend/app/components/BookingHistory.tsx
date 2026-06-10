@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { showToast } from "./Toast";
-import { getCurrentUser, authFetch } from "./profileStorage";
+import { getCurrentUser, authFetch, getCurrentUserRole } from "./profileStorage";
 
 type BookingRecord = {
   id: number;
@@ -29,7 +29,12 @@ export default function BookingHistory() {
       try {
         const apiUrl =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const userRole = localStorage.getItem("stitch-role") || "user";
+        const userRole = getCurrentUserRole();
+        if (userRole === "admin") {
+          setBookings([]);
+          return;
+        }
+
         const response = await authFetch(`${apiUrl}/api/bookings?role=${userRole}`);
         const data = await response.json();
 
@@ -41,7 +46,7 @@ export default function BookingHistory() {
         const user = getCurrentUser();
         const allBookings: BookingRecord[] = data.bookings || [];
         if (user) {
-          const userRole = localStorage.getItem("stitch-role") || "user";
+          const userRole = getCurrentUserRole();
           if (userRole === "tailor") {
             setBookings(allBookings.filter((b) =>
               (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === user.email?.toLowerCase().trim()) ||
@@ -63,6 +68,10 @@ export default function BookingHistory() {
 
     fetchBookings();
   }, []);
+
+  if (getCurrentUserRole() === "admin") {
+    return null;
+  }
 
   return (
     <section className="mt-12 rounded-lg bg-white p-6 shadow-sm">

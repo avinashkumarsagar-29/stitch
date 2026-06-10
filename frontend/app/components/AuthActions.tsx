@@ -10,6 +10,8 @@ import {
   emptyProfile,
   getCurrentUser,
   getProfileStorageKey,
+  clearUserDataOnLogout,
+  getCurrentUserRole,
 } from "./profileStorage";
 import { showToast } from "./Toast";
 
@@ -51,7 +53,7 @@ function getProfileSnapshot() {
 }
 
 function getUserRole() {
-  return localStorage.getItem("stitch-role") || "user";
+  return getCurrentUserRole();
 }
 
 function getServerSnapshot() {
@@ -88,10 +90,7 @@ export default function AuthActions({ isMobile = false }: { isMobile?: boolean }
 
   function handleLogout() {
     sessionStorage.setItem("stitch-logout", "true");
-    localStorage.removeItem("stitch-auth");
-    localStorage.removeItem("stitch-role");
-    localStorage.removeItem("stitch-user");
-    localStorage.removeItem("stitch-token");
+    clearUserDataOnLogout();
     showToast("Logout successfully", "success");
     window.dispatchEvent(new Event("stitch-auth-change"));
     router.push("/");

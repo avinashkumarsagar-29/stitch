@@ -11,6 +11,7 @@ import {
   getCurrentUser,
   getProfileStorageKey,
   authFetch,
+  getCurrentUserRole,
 } from "./profileStorage";
 import Loader from "./Loader";
 
@@ -56,6 +57,7 @@ function playNotificationSound() {
 }
 
 const customerLinks = [
+  { label: "Home", href: "/Home" },
   { label: "Book Now", href: "/booking" },
   { label: "Track Order", href: "/track" },
   { label: "About us", href: "/about" },
@@ -68,6 +70,12 @@ const tailorLinks = [
   { label: "About us", href: "/about" },
   { label: "Careers", href: "/careers" },
   { label: "Blog", href: "/blog" },
+];
+
+const adminLinks = [
+  { label: "Dashboard", href: "/admin" },
+  { label: "User Management", href: "/admin/users" },
+  { label: "Bookings Management", href: "/admin/bookings" },
 ];
 
 function subscribe(callback: () => void) {
@@ -87,7 +95,7 @@ function getSnapshot() {
 }
 
 function getUserRole() {
-  return localStorage.getItem("stitch-role") || "user";
+  return getCurrentUserRole();
 }
 
 let cachedProfile = emptyProfile;
@@ -312,11 +320,15 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     const interval = setInterval(checkNotifications, 10000);
     return () => clearInterval(interval);
   }, [isLoggedIn, isTailor, profile.address]);
-  const links = isTailor
-    ? tailorLinks
-    : isLoggedIn
-      ? customerLinks
-      : customerLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order" && link.label !== "Notifications");
+  const isAdmin = userRole === "admin";
+  const homeHref = isAdmin ? "/admin" : isTailor ? "/trailor/Home" : isLoggedIn ? "/Home" : "/";
+  const links = isAdmin
+    ? adminLinks
+    : isTailor
+      ? tailorLinks
+      : isLoggedIn
+        ? customerLinks
+        : customerLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order" && link.label !== "Notifications");
 
   if (!mounted) {
     return <Loader text="Preparing Stitch..." centerInViewport={true} />;
@@ -355,7 +367,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
             {/* Logo Brand Block - hide on desktop if sidebar is open to avoid duplication */}
             <Link
-              href="/"
+              href={homeHref}
               className={`flex items-end gap-1.5 ml-2 transition-all duration-300 ${sidebarOpen ? "md:opacity-0 md:pointer-events-none" : ""
                 }`}
               aria-label="Stitch home"

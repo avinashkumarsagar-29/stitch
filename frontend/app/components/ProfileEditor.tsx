@@ -11,6 +11,7 @@ import {
   safeSetLocalStorage,
   type Profile,
   authFetch,
+  getCurrentUserRole,
 } from "./profileStorage";
 import { showToast } from "./Toast";
 import UserOrderStatus from "./UserOrderStatus";
@@ -26,7 +27,7 @@ function subscribe(callback: () => void) {
 }
 
 function getUserRole() {
-  return localStorage.getItem("stitch-role") || "user";
+  return getCurrentUserRole();
 }
 
 function getServerUserRole() {
