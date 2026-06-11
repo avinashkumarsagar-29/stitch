@@ -64,8 +64,8 @@ const customerLinks = [
 ];
 
 const tailorLinks = [
+   { label: "Join Stitch", href: "/join" },
   { label: "Update Order", href: "/track" },
-  { label: "Join Stitch", href: "/join" },
   { label: "Pricing", href: "/pricing" },
   { label: "About us", href: "/about" },
   { label: "Careers", href: "/careers" },

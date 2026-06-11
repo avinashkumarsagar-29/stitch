@@ -134,7 +134,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       window.dispatchEvent(new Event("stitch-auth-change"));
       const roleRedirects: Record<string, string> = {
         admin: "/admin",
-        tailor: "/trailor/Home",
+        tailor: "/join",
         user: "/Home",
       };
       router.push(roleRedirects[data.user.role] || "/Home");

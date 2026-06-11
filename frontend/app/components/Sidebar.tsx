@@ -60,20 +60,20 @@ function playNotificationSound() {
 const userLinks = [
   { label: "Home", href: "/Home", icon: "🏠" },
   { label: "Book Now", href: "/booking", icon: "✂️" },
+   { label: "Notifications", href: "/notifications", icon: "🔔" },
+   { label: "Business Orders", href: "/business", icon: "🏢" },
   { label: "Track Order", href: "/track", icon: "📦" },
-  { label: "Notifications", href: "/notifications", icon: "🔔" },
-  { label: "Business Orders", href: "/business", icon: "🏢" },
   { label: "Collection", href: "/collection", icon: "🧵" },
   { label: "About us", href: "/about", icon: "✨" },
   { label: "Pricing", href: "/pricing", icon: "🏷️ ️" }
 ];
 
 const tailorLinks = [
-  { label: "My Dashboard", href: "/dashboard", icon: "📊" },
-  { label: "Update Order", href: "/track", icon: "📦" },
+  {label: "Join Stitch", href: "/join", icon: "🤝"},
   { label: "Notifications", href: "/notifications", icon: "🔔" },
   { label: "Business Orders", href: "/business", icon: "🏢" },
-  { label: "Join Stitch", href: "/join", icon: "🤝" },
+  { label: "Update Order", href: "/track", icon: "📦" },
+   { label: "My Dashboard", href: "/dashboard", icon: "📊" },
   { label: "About us", href: "/about", icon: "✨" },
   { label: "Pricing", href: "/pricing", icon: "🏷️" }
 ];

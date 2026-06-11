@@ -69,7 +69,8 @@ export default function BookingHistory() {
     fetchBookings();
   }, []);
 
-  if (getCurrentUserRole() === "admin") {
+  const currentRole = getCurrentUserRole();
+  if (currentRole === "admin" || currentRole === "tailor") {
     return null;
   }
 
