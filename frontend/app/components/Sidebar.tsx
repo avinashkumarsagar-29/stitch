@@ -317,7 +317,10 @@ export default function Sidebar({
             const matching = data.bookings.filter(
               (b: any) => Number(b.userId) === Number(currentUser.id) && b.status === "pending-payment"
             );
-            const newCount = matching.length + businessCount;
+            const confirmed = data.bookings.filter(
+              (b: any) => Number(b.userId) === Number(currentUser.id) && b.status === "booked"
+            );
+            const newCount = matching.length + confirmed.length * 2 + businessCount;
             if (newCount > prevCountRef.current) {
               playNotificationSound();
             }

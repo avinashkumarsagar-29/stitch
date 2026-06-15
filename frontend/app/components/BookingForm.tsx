@@ -24,6 +24,9 @@ type Tailor = {
   image: string | null;
   avgRating?: number;
   reviewCount?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  distance?: number | null;
 };
 
 export default function BookingForm({ readOnly = false }: { readOnly?: boolean }) {
@@ -40,6 +43,46 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
   const [searchedLocation, setSearchedLocation] = useState("");
   const [currentBookingId, setCurrentBookingId] = useState<number | null>(null);
 
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [dropoffCoords, setDropoffCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  const geocodeAddress = async (address: string) => {
+    if (!address || address.trim().length < 3) return null;
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
+        {
+          headers: {
+            "User-Agent": "StitchTailoringApp/1.0"
+          }
+        }
+      );
+      const data = await response.json();
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lon: parseFloat(data[0].lon),
+          display_name: data[0].display_name
+        };
+      }
+    } catch (error) {
+      console.error("Geocoding failed:", error);
+    }
+    return null;
+  };
+
+  const handleAddressBlur = async (field: "pickup" | "dropoff", val: string) => {
+    if (!val || val.trim().length < 3) return;
+    const coords = await geocodeAddress(val);
+    if (coords) {
+      if (field === "pickup") {
+        setPickupCoords({ lat: coords.lat, lon: coords.lon });
+      } else {
+        setDropoffCoords({ lat: coords.lat, lon: coords.lon });
+      }
+    }
+  };
+
   const handleUseCurrentLocation = (field: "pickup" | "dropoff") => {
     if (typeof window === "undefined" || !navigator.geolocation) {
       showToast("Geolocation is not supported by your browser", "error");
@@ -51,7 +94,8 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          // Reverse geocode using Nominatim OpenStreetMap
+          const coords = { lat: latitude, lon: longitude };
+
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
             {
@@ -61,12 +105,15 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
             }
           );
           const data = await response.json();
-          if (data && data.display_name) {
-            updateField(field, data.display_name);
-            showToast("Location detected successfully!", "success");
+          const displayName = data && data.display_name ? data.display_name : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          
+          updateField(field, displayName);
+          showToast("Location detected successfully!", "success");
+
+          if (field === "pickup") {
+            setPickupCoords(coords);
           } else {
-            updateField(field, `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-            showToast("Location coordinates set", "success");
+            setDropoffCoords(coords);
           }
         } catch (error) {
           console.error("Reverse geocoding failed", error);
@@ -143,6 +190,35 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+      let pickupLat = pickupCoords?.lat;
+      let pickupLon = pickupCoords?.lon;
+      if (!pickupLat || !pickupLon) {
+        const coords = await geocodeAddress(booking.pickup);
+        if (coords) {
+          pickupLat = coords.lat;
+          pickupLon = coords.lon;
+          setPickupCoords({ lat: coords.lat, lon: coords.lon });
+        }
+      }
+
+      let dropoffLat = dropoffCoords?.lat;
+      let dropoffLon = dropoffCoords?.lon;
+      if (!dropoffLat || !dropoffLon) {
+        const coords = await geocodeAddress(booking.dropoff);
+        if (coords) {
+          dropoffLat = coords.lat;
+          dropoffLon = coords.lon;
+          setDropoffCoords({ lat: coords.lat, lon: coords.lon });
+        }
+      }
+
+      if (!pickupLat || !pickupLon) {
+        showToast("Unable to geocode pickup address. Please check input.", "error");
+        setIsSubmitting(false);
+        return;
+      }
+
       const response = await authFetch(`${apiUrl}/api/bookings`, {
         method: "POST",
         headers: {
@@ -159,16 +235,18 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
 
       if (!response.ok) {
         showToast(data.message || "Unable to save booking", "error");
+        setIsSubmitting(false);
         return;
       }
 
       const tailorResponse = await authFetch(
-        `${apiUrl}/api/tailors?location=${encodeURIComponent(booking.pickup)}`,
+        `${apiUrl}/api/tailors?lat=${pickupLat}&lon=${pickupLon}`,
       );
       const tailorData = await tailorResponse.json();
 
       if (!tailorResponse.ok) {
         showToast(tailorData.message || "Unable to search tailors", "error");
+        setIsSubmitting(false);
         return;
       }
 
@@ -176,6 +254,8 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
       setTailors(matchedTailors);
       setSearchedLocation(booking.pickup);
       setCurrentBookingId(data.booking?.id || null);
+
+
       showToast(
         matchedTailors.length
           ? "Available tailors found"
@@ -208,6 +288,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
           date={booking.date}
           time={booking.time}
           onLocationChange={(value) => updateField("pickup", value)}
+          onLocationBlur={() => handleAddressBlur("pickup", booking.pickup)}
           onDateChange={(value) => updateField("date", value)}
           onTimeChange={(value) => updateField("time", value)}
           onUseCurrentLocation={() => handleUseCurrentLocation("pickup")}
@@ -221,6 +302,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
           date={booking.date}
           time={booking.time}
           onLocationChange={(value) => updateField("dropoff", value)}
+          onLocationBlur={() => handleAddressBlur("dropoff", booking.dropoff)}
           onDateChange={(value) => updateField("date", value)}
           onTimeChange={(value) => updateField("time", value)}
           onSearch={handleSearch}
@@ -323,6 +405,12 @@ function TailorCard({
             <dt className="font-bold text-[#202635]">Location</dt>
             <dd className="text-[#4b5563]">{tailor.location}</dd>
           </div>
+          {tailor.distance !== undefined && tailor.distance !== null && (
+            <div>
+              <dt className="font-bold text-[#c322f4]">Distance</dt>
+              <dd className="font-semibold text-[#c322f4]">{tailor.distance} km away</dd>
+            </div>
+          )}
         </dl>
         <button
           type="button"
@@ -343,6 +431,7 @@ function BookingPanel({
   date,
   time,
   onLocationChange,
+  onLocationBlur,
   onDateChange,
   onTimeChange,
   onSearch,
@@ -357,6 +446,7 @@ function BookingPanel({
   date: string;
   time: string;
   onLocationChange: (value: string) => void;
+  onLocationBlur?: () => void;
   onDateChange: (value: string) => void;
   onTimeChange: (value: string) => void;
   onSearch?: () => void;
@@ -415,6 +505,7 @@ function BookingPanel({
               type="text"
               value={location}
               onChange={(event) => onLocationChange(event.target.value)}
+              onBlur={onLocationBlur}
               placeholder={isDark ? "Enter drop-off" : "Enter pickup"}
               readOnly={readOnly}
               className={`${isDark
@@ -478,10 +569,10 @@ function BookingPanel({
           <button
             type="submit"
             disabled={isSubmitting || readOnly}
-            className="h-10 rounded-[4px] bg-white px-8 text-sm font-medium text-[#111827] disabled:opacity-70"
+            className="h-10 rounded-[4px] bg-white px-8 text-sm font-medium text-[#111827] disabled:opacity-70 cursor-pointer"
             suppressHydrationWarning
           >
-            {isSubmitting ? "Searching..." : "Search"}
+            {isSubmitting ? "Finding Tailors..." : "Find Tailors"}
           </button>
         ) : null}
       </div>

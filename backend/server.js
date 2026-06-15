@@ -8,6 +8,7 @@ const https = require("https");
 const nodemailer = require("nodemailer");
 const fs = require("fs");
 const path = require("path");
+// Database connection helper
 const { getSqlPool, sql } = require("./db");
 
 const app = express();
@@ -261,12 +262,12 @@ async function ensurePaymentsTable(pool) {
 
 async function logPayment(pool, userId, amount, planPurchased, razorpayOrderId, razorpayPaymentId, status) {
   await ensurePaymentsTable(pool);
-  
+
   if (razorpayOrderId) {
     const existing = await pool.request()
       .input("orderId", sql.NVarChar(100), razorpayOrderId)
       .query("SELECT id FROM Payments WHERE razorpayOrderId = @orderId");
-    
+
     if (existing.recordset.length > 0) {
       await pool.request()
         .input("orderId", sql.NVarChar(100), razorpayOrderId)
@@ -276,10 +277,10 @@ async function logPayment(pool, userId, amount, planPurchased, razorpayOrderId, 
       return;
     }
   }
-  
+
   await pool.request()
     .input("userId", sql.Int, userId)
-    .input("amount", sql.Decimal(10,2), amount)
+    .input("amount", sql.Decimal(10, 2), amount)
     .input("planPurchased", sql.NVarChar(100), planPurchased)
     .input("orderId", sql.NVarChar(100), razorpayOrderId || null)
     .input("paymentId", sql.NVarChar(100), razorpayPaymentId || null)
@@ -330,7 +331,7 @@ async function ensureReviewsTable(pool) {
   if (countRes.recordset[0].cnt === 0) {
     const usersRes = await pool.request().query("SELECT TOP 5 id FROM dbo.Users");
     const tailorsRes = await pool.request().query("SELECT TOP 5 id FROM dbo.JoinApplications WHERE status = 'approved'");
-    
+
     const userIds = usersRes.recordset.map(r => r.id);
     const tailorIds = tailorsRes.recordset.map(r => r.id);
 
@@ -1382,7 +1383,7 @@ app.post("/api/auth/verify-otp", async (request, response) => {
           AND expiresAt > SYSUTCDATETIME()
         ORDER BY createdAt DESC
       `);
-    
+
     const activeOtp = activeOtpResult.recordset[0];
 
     if (!activeOtp) {
@@ -1987,7 +1988,7 @@ app.patch("/api/admin/join/:applicationId/approve", requireAdmin, async (request
     const appResult = await pool.request()
       .input("id", sql.Int, applicationId)
       .query("SELECT * FROM JoinApplications WHERE id = @id");
-    
+
     const appRecord = appResult.recordset[0];
     if (!appRecord) {
       return response.status(404).json({ message: "Application not found" });
@@ -2003,7 +2004,7 @@ app.patch("/api/admin/join/:applicationId/approve", requireAdmin, async (request
 
     const email = appRecord.email ? appRecord.email.toLowerCase().trim() : "";
     const phoneNumber = appRecord.phoneNumber ? appRecord.phoneNumber.trim() : "";
-    
+
     const userCheck = await pool.request()
       .input("email", sql.NVarChar(255), email)
       .input("phoneNumber", sql.NVarChar(20), phoneNumber)
@@ -2013,7 +2014,7 @@ app.patch("/api/admin/join/:applicationId/approve", requireAdmin, async (request
     if (userCheck.recordset.length > 0) {
       const userId = userCheck.recordset[0].id;
       const fullName = `${appRecord.firstName} ${appRecord.lastName}`.trim();
-      
+
       await pool.request()
         .input("userId", sql.Int, userId)
         .input("fullName", sql.NVarChar(150), fullName)
@@ -2037,7 +2038,7 @@ app.patch("/api/admin/join/:applicationId/approve", requireAdmin, async (request
       promoted = true;
     }
 
-    return response.json({ 
+    return response.json({
       message: "Application approved successfully",
       promoted
     });
@@ -2066,7 +2067,7 @@ app.patch("/api/admin/join/:applicationId/reject", requireAdmin, async (request,
     const appResult = await pool.request()
       .input("id", sql.Int, applicationId)
       .query("SELECT * FROM JoinApplications WHERE id = @id");
-    
+
     const appRecord = appResult.recordset[0];
     if (!appRecord) {
       return response.status(404).json({ message: "Application not found" });
@@ -2091,10 +2092,10 @@ app.get("/api/admin/bookings", requireAdmin, async (request, response) => {
   try {
     const status = String(request.query.status || "").trim();
     const search = String(request.query.search || "").trim();
-    
+
     const pool = await getSqlPool();
     await ensureBookingsTable(pool);
-    
+
     let query = `
       SELECT 
         b.id,
@@ -2204,7 +2205,7 @@ app.patch("/api/admin/bookings/:bookingId/status", requireAdmin, async (request,
     const checkResult = await pool.request()
       .input("id", sql.Int, bookingId)
       .query("SELECT id FROM Bookings WHERE id = @id");
-    
+
     if (checkResult.recordset.length === 0) {
       return response.status(404).json({ message: "Booking not found" });
     }
@@ -2614,7 +2615,7 @@ app.patch("/api/admin/referrals/:referralId/grant", requireAdmin, async (request
 
     await pool.request()
       .input("userId", sql.Int, ref.referrerUserId)
-      .input("amount", sql.Decimal(10,2), amount)
+      .input("amount", sql.Decimal(10, 2), amount)
       .query("UPDATE Users SET credit = credit + @amount WHERE id = @userId");
 
     await pool.request()
@@ -2656,7 +2657,7 @@ app.patch("/api/admin/referrals/:referralId/revoke", requireAdmin, async (reques
 
     await pool.request()
       .input("userId", sql.Int, ref.referrerUserId)
-      .input("amount", sql.Decimal(10,2), amount)
+      .input("amount", sql.Decimal(10, 2), amount)
       .query("UPDATE Users SET credit = CASE WHEN credit - @amount < 0.00 THEN 0.00 ELSE credit - @amount END WHERE id = @userId");
 
     await pool.request()
@@ -2695,7 +2696,7 @@ app.patch("/api/admin/users/:userId/credit", requireAdmin, async (request, respo
 
     await pool.request()
       .input("id", sql.Int, userId)
-      .input("credit", sql.Decimal(10,2), credit)
+      .input("credit", sql.Decimal(10, 2), credit)
       .query("UPDATE Users SET credit = @credit WHERE id = @id");
 
     return response.json({ message: "User credit balance updated successfully" });
@@ -3120,17 +3121,7 @@ app.get("/api/bookings", async (request, response) => {
     const authenticatedUserId = getAuthenticatedUserId(request);
     const userRole = request.user?.role || "user";
 
-    if (userRole === "user") {
-      await pool
-        .request()
-        .input("userId", sql.Int, authenticatedUserId)
-        .query(`
-          DELETE FROM Bookings
-          WHERE userId = @userId
-            AND status IN ('delivered', 'out-for-delivery')
-            AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
-        `);
-    }
+    // Removed auto-deletion of delivered/out-for-delivery bookings to prevent loss of order history and tracking capability.
 
     let result;
     if (userRole === "tailor") {
@@ -3253,22 +3244,12 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
     const authenticatedUserId = getAuthenticatedUserId(request);
     const userRole = request.user?.role || "user";
 
-    if (userRole === "user") {
-      await pool
-        .request()
-        .input("userId", sql.Int, authenticatedUserId)
-        .query(`
-          DELETE FROM Bookings
-          WHERE userId = @userId
-            AND status IN ('delivered', 'out-for-delivery')
-            AND createdAt < DATEADD(hour, -24, SYSUTCDATETIME())
-        `);
-    }
+    // Removed auto-deletion of delivered/out-for-delivery bookings to prevent loss of order history and tracking capability.
     const result = await pool
-        .request()
-        .input("bookingIdNum", sql.Int, bookingIdNum)
-        .input("bookingIdStr", sql.NVarChar(255), bookingIdParam)
-        .query(`
+      .request()
+      .input("bookingIdNum", sql.Int, bookingIdNum)
+      .input("bookingIdStr", sql.NVarChar(255), bookingIdParam)
+      .query(`
           SELECT TOP 1
             b.id,
             b.userId,
@@ -3336,7 +3317,7 @@ app.get("/api/bookings/:bookingId", async (request, response) => {
         const referralRes = await pool.request()
           .input("userId", sql.Int, userId)
           .query("SELECT TOP 1 id FROM Referrals WHERE referredUserId = @userId");
-        
+
         if (referralRes.recordset.length > 0) {
           const bookedCountResult = await pool.request()
             .input("userId", sql.Int, userId)
@@ -3959,13 +3940,64 @@ app.get("/api/join", requireAuth, requireAdmin, async (_request, response) => {
   }
 });
 
+const geocodeCache = {};
+
+async function geocodeAddress(address) {
+  if (!address || address.length < 3) return null;
+  const cleanAddress = address.trim();
+  if (geocodeCache[cleanAddress]) {
+    return geocodeCache[cleanAddress];
+  }
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanAddress)}&format=json&limit=1`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "StitchTailoringApp/1.0"
+      }
+    });
+    const data = await res.json();
+    if (data && data.length > 0) {
+      const coords = {
+        lat: parseFloat(data[0].lat),
+        lon: parseFloat(data[0].lon)
+      };
+      geocodeCache[cleanAddress] = coords;
+      return coords;
+    }
+  } catch (error) {
+    console.error("Geocoding failed for:", cleanAddress, error);
+  }
+  return null;
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
 app.get("/api/tailors", async (request, response) => {
   try {
+    const latStr = request.query.lat;
+    const lonStr = request.query.lon;
     const location = String(request.query.location || "").trim().toLowerCase();
 
-    if (!location) {
+    const isCoordsSearch = latStr !== undefined && lonStr !== undefined;
+    const searchLat = isCoordsSearch ? parseFloat(latStr) : null;
+    const searchLon = isCoordsSearch ? parseFloat(lonStr) : null;
+
+    if (!location && !isCoordsSearch) {
       return response.status(400).json({
-        message: "Pickup location is required",
+        message: "Pickup location or lat/lon coordinates are required",
       });
     }
 
@@ -3989,52 +4021,97 @@ app.get("/api/tailors", async (request, response) => {
         COUNT(r.id) AS reviewCount
       FROM JoinApplications ja
       LEFT JOIN Reviews r ON ja.id = r.tailorApplicationId
-      WHERE ja.status = 'pending'
+      WHERE ja.status IN ('approved', 'pending')
       GROUP BY 
         ja.id, ja.firstName, ja.lastName, ja.email, ja.phoneNumber, 
         ja.experience, ja.location, ja.image, ja.[plan], ja.status, ja.createdAt
     `);
-    const searchWords = location
-      .split(/[\s,.-]+/)
-      .map((word) => word.trim())
-      .filter((word) => word.length >= 3);
     const planWeights = {
       'Pro': 3,
       'Plus': 2,
       'Free': 1
     };
-    const tailors = result.recordset
-      .filter((tailor) => {
-        const tailorLocation = String(tailor.location || "").toLowerCase();
 
-        return (
-          tailorLocation.includes(location) ||
-          location.includes(tailorLocation) ||
-          searchWords.some((word) => tailorLocation.includes(word))
-        );
-      })
-      .map((tailor) => ({
-        id: tailor.id,
-        name: `${tailor.firstName} ${tailor.lastName}`.trim(),
-        email: tailor.email,
-        phoneNumber: tailor.phoneNumber,
-        experience: tailor.experience,
-        location: tailor.location,
-        image: tailor.image,
-        plan: tailor.plan || "Free",
-        avgRating: Number(tailor.avgRating || 0),
-        reviewCount: Number(tailor.reviewCount || 0),
-      }))
-      .sort((a, b) => {
-        const ratingA = a.avgRating || 0;
-        const ratingB = b.avgRating || 0;
-        if (ratingB !== ratingA) {
-          return ratingB - ratingA;
+    let tailors = [];
+
+    if (isCoordsSearch) {
+      const tailorsWithDistancePromises = result.recordset.map(async (tailor) => {
+        const tailorCoords = await geocodeAddress(tailor.location);
+        let distance = null;
+        if (tailorCoords) {
+          distance = calculateDistance(searchLat, searchLon, tailorCoords.lat, tailorCoords.lon);
         }
-        const weightA = planWeights[a.plan] || 1;
-        const weightB = planWeights[b.plan] || 1;
-        return weightB - weightA;
+        return {
+          id: tailor.id,
+          name: `${tailor.firstName} ${tailor.lastName}`.trim(),
+          email: tailor.email,
+          phoneNumber: tailor.phoneNumber,
+          experience: tailor.experience,
+          location: tailor.location,
+          image: tailor.image,
+          plan: tailor.plan || "Free",
+          avgRating: Number(tailor.avgRating || 0),
+          reviewCount: Number(tailor.reviewCount || 0),
+          latitude: tailorCoords ? tailorCoords.lat : null,
+          longitude: tailorCoords ? tailorCoords.lon : null,
+          distance: distance !== null ? Number(distance.toFixed(2)) : null,
+        };
       });
+
+      const resolvedTailors = await Promise.all(tailorsWithDistancePromises);
+      tailors = resolvedTailors
+        .filter((t) => t.distance !== null)
+        .sort((a, b) => {
+          if (a.distance !== b.distance) {
+            return a.distance - b.distance;
+          }
+          const ratingA = a.avgRating || 0;
+          const ratingB = b.avgRating || 0;
+          if (ratingB !== ratingA) {
+            return ratingB - ratingA;
+          }
+          const weightA = planWeights[a.plan] || 1;
+          const weightB = planWeights[b.plan] || 1;
+          return weightB - weightA;
+        });
+    } else {
+      const searchWords = location
+        .split(/[\s,.-]+/)
+        .map((word) => word.trim())
+        .filter((word) => word.length >= 3);
+      tailors = result.recordset
+        .filter((tailor) => {
+          const tailorLocation = String(tailor.location || "").toLowerCase();
+
+          return (
+            tailorLocation.includes(location) ||
+            location.includes(tailorLocation) ||
+            searchWords.some((word) => tailorLocation.includes(word))
+          );
+        })
+        .map((tailor) => ({
+          id: tailor.id,
+          name: `${tailor.firstName} ${tailor.lastName}`.trim(),
+          email: tailor.email,
+          phoneNumber: tailor.phoneNumber,
+          experience: tailor.experience,
+          location: tailor.location,
+          image: tailor.image,
+          plan: tailor.plan || "Free",
+          avgRating: Number(tailor.avgRating || 0),
+          reviewCount: Number(tailor.reviewCount || 0),
+        }))
+        .sort((a, b) => {
+          const ratingA = a.avgRating || 0;
+          const ratingB = b.avgRating || 0;
+          if (ratingB !== ratingA) {
+            return ratingB - ratingA;
+          }
+          const weightA = planWeights[a.plan] || 1;
+          const weightB = planWeights[b.plan] || 1;
+          return weightB - weightA;
+        });
+    }
 
     return response.json({
       tailors,
@@ -4211,7 +4288,7 @@ app.post("/api/payments/create-order", async (request, response) => {
       const referralRes = await pool.request()
         .input("userId", sql.Int, userId)
         .query("SELECT TOP 1 id FROM Referrals WHERE referredUserId = @userId");
-      
+
       if (referralRes.recordset.length > 0) {
         const bookedCountResult = await pool.request()
           .input("userId", sql.Int, userId)

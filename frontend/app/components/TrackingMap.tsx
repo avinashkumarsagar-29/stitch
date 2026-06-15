@@ -118,11 +118,10 @@ export default function TrackingMap({
       });
       mapRef.current = mapInstance;
 
-      // Sleek Grey Map Tiles (CartoDB Positron)
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: '&copy; CartoDB',
-        subdomains: 'abcd',
-        maxZoom: 20
+      // OpenStreetMap Map Tiles
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
       }).addTo(mapInstance);
 
       // Create Custom Icons using SVG

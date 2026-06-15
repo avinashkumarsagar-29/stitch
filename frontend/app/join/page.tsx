@@ -21,6 +21,7 @@ export default function JoinPage() {
   });
   const [imagePreview, setImagePreview] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -50,6 +51,56 @@ export default function JoinPage() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   }
+
+  const handleUseCurrentLocation = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      showToast("Geolocation is not supported by your browser", "error");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+            {
+              headers: {
+                "User-Agent": "StitchTailoringApp/1.0"
+              }
+            }
+          );
+          const data = await response.json();
+          const displayName = data && data.display_name ? data.display_name : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          
+          setFormData((prev) => ({ ...prev, location: displayName }));
+          showToast("Location detected successfully!", "success");
+        } catch (error) {
+          console.warn("Reverse geocoding failed", error);
+          const { latitude, longitude } = position.coords;
+          setFormData((prev) => ({ ...prev, location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` }));
+          showToast("Failed to resolve address. Setting coordinates instead.", "error");
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.warn("Geolocation warning:", error.code, error.message);
+        let errorMsg = "Failed to retrieve your current location";
+        if (error.code === 1) {
+          errorMsg = "Location access denied. Please enable location permission in your browser.";
+        } else if (error.code === 2) {
+          errorMsg = "Position unavailable. Please try again or type manually.";
+        } else if (error.code === 3) {
+          errorMsg = "Location request timed out. Please try again or type manually.";
+        }
+        showToast(errorMsg, "error");
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: false, timeout: 8000 }
+    );
+  };
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -262,6 +313,15 @@ export default function JoinPage() {
                       onChange={handleInputChange}
                       placeholder="City/location"
                       required
+                      onActionClick={handleUseCurrentLocation}
+                      isActionLoading={isLocating}
+                      actionTitle="Use Current Location"
+                      actionIcon={
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1 1 15 0Z" />
+                        </svg>
+                      }
                     />
                   </div>
 
@@ -481,6 +541,10 @@ function FormInput({
   type = "text",
   required = false,
   onChange,
+  onActionClick,
+  actionIcon,
+  isActionLoading = false,
+  actionTitle,
 }: {
   label: string;
   name: string;
@@ -489,22 +553,48 @@ function FormInput({
   type?: string;
   required?: boolean;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onActionClick?: () => void;
+  actionIcon?: React.ReactNode;
+  isActionLoading?: boolean;
+  actionTitle?: string;
 }) {
   return (
     <div>
       <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest block mb-2">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        suppressHydrationWarning
-        className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm placeholder-gray-400 outline-none focus:border-[#c322f4] focus:ring-4 focus:ring-[#c322f4]/10 transition-all duration-200"
-      />
+      <div className="relative">
+        <input
+          type={type}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          required={required}
+          suppressHydrationWarning
+          className={`w-full h-12 rounded-xl border border-gray-200 bg-white pl-4 ${
+            onActionClick ? "pr-12" : "pr-4"
+          } text-sm placeholder-gray-400 outline-none focus:border-[#c322f4] focus:ring-4 focus:ring-[#c322f4]/10 transition-all duration-200`}
+        />
+        {onActionClick && (
+          <button
+            type="button"
+            onClick={onActionClick}
+            disabled={isActionLoading}
+            title={actionTitle}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-[#c322f4] hover:bg-purple-50 disabled:opacity-50 transition-all duration-200 cursor-pointer"
+          >
+            {isActionLoading ? (
+              <svg className="animate-spin h-4 w-4 text-[#c322f4]" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              actionIcon
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

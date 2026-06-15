@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
@@ -323,6 +324,10 @@ function NotificationsContent() {
       (b) => Number(b.userId) === Number(currentUser.id) && b.status === "pending-payment"
     );
 
+    const confirmedBookings = bookings.filter(
+      (b) => Number(b.userId) === Number(currentUser.id) && b.status === "booked"
+    );
+
     const customerBizNotifications = businessOrders.filter(
       (bo) => Number(bo.userId) === Number(currentUser.id) && bo.status === "quoted"
     );
@@ -337,7 +342,7 @@ function NotificationsContent() {
             </svg>
             Loading your quotes...
           </div>
-        ) : (customerNotifications.length > 0 || customerBizNotifications.length > 0) ? (
+        ) : (customerNotifications.length > 0 || confirmedBookings.length > 0 || customerBizNotifications.length > 0) ? (
           <div className="space-y-4">
             {/* Standard bookings */}
             {customerNotifications.map((b) => (
@@ -364,6 +369,57 @@ function NotificationsContent() {
                     style={{ backgroundColor: "#00b894", borderRadius: "14px", fontSize: "11px" }}
                   >
                     Confirm & Pay Now
+                  </Link>
+                </div>
+              </div>
+            ))}
+
+            {confirmedBookings.map((b) => (
+              <div key={`confirmed-${b.id}`} className="space-y-3">
+                <div
+                  className="rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 md:p-6 gap-4 border"
+                  style={{ backgroundColor: "#f4faf6", borderColor: "#ccead6", borderWidth: "1px" }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      <span className="text-sm font-bold text-emerald-950">
+                        Order Confirmed!
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs md:text-sm text-gray-600 leading-relaxed">
+                      Your order <strong className="text-gray-800 font-semibold">#{b.trackingCode || b.id}</strong> has been confirmed by <strong className="text-gray-800 font-semibold">{b.tailorName || "your tailor partner"}</strong>.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/track?id=${b.trackingCode || b.id}`}
+                    className="w-full sm:w-auto h-11 px-6 inline-flex items-center justify-center font-bold text-white transition-all text-center cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
+                    style={{ backgroundColor: "#00b894", borderRadius: "14px", fontSize: "11px" }}
+                  >
+                    Track Order
+                  </Link>
+                </div>
+
+                <div
+                  className="rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 md:p-6 gap-4 border"
+                  style={{ backgroundColor: "#f8f5ff", borderColor: "#e9d5ff", borderWidth: "1px" }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#c322f4] animate-pulse" />
+                      <span className="text-sm font-bold text-purple-950">
+                        Rider Coming to Your Doorstep
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs md:text-sm text-gray-600 leading-relaxed">
+                      A Stitch rider is coming to your pickup address to collect your garment for order <strong className="text-gray-800 font-semibold">#{b.trackingCode || b.id}</strong>.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/track?id=${b.trackingCode || b.id}`}
+                    className="w-full sm:w-auto h-11 px-6 inline-flex items-center justify-center font-bold text-white transition-all text-center cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] bg-[#c322f4] rounded-[14px] text-[11px]"
+                  >
+                    View Pickup Status
                   </Link>
                 </div>
               </div>
@@ -487,7 +543,15 @@ function NotificationsContent() {
                     </div>
                     <div>
                       <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Booking Time</span>
-                      <span className="text-gray-700 font-medium">{b.bookingTime.slice(0, 5)}</span>
+                      <span className="text-gray-700 font-medium">
+                        {(() => {
+                          const t = String(b.bookingTime || "");
+                          if (t.includes("T")) {
+                            return t.split("T")[1]?.slice(0, 5) || t.slice(0, 5);
+                          }
+                          return t.slice(0, 5);
+                        })()}
+                      </span>
                     </div>
                   </div>
 
@@ -503,6 +567,40 @@ function NotificationsContent() {
                     <span className="text-gray-700 font-medium block bg-gray-50/50 p-2 rounded-lg border border-gray-100 mt-1">
                       📍 {b.dropoffLocation}
                     </span>
+                  </div>
+
+                  {/* Garment Preview Section */}
+                  <div>
+                    <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block mb-1">Garment Preview</span>
+                    <div className="flex gap-4 items-center bg-purple-50/20 border border-purple-100/30 p-3 rounded-xl mt-1">
+                      {b.clothImage ? (
+                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-white">
+                          <Image
+                            src={b.clothImage}
+                            alt="Cloth Preview"
+                            fill
+                            sizes="64px"
+                            unoptimized
+                            className="object-cover rounded-lg"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-16 w-16 shrink-0 rounded-lg bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center p-1">
+                          <span className="text-xl">🧵</span>
+                          <span className="text-[7px] text-gray-400 font-bold mt-0.5">No Image</span>
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <span className="text-[10px] font-extrabold text-[#c322f4] uppercase tracking-wider block">
+                          {b.clothCategory || "Details pending"}
+                        </span>
+                        {b.material && (
+                          <span className="text-xs font-bold text-gray-800 block">
+                            Material: {b.material}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {(b.chest || b.waist || b.hip || b.shoulder || b.inseam) ? (
