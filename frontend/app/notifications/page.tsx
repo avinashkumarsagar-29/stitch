@@ -388,11 +388,11 @@ function NotificationsContent() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs md:text-sm text-gray-600 leading-relaxed">
-                      Your order <strong className="text-gray-800 font-semibold">#{b.trackingCode || b.id}</strong> has been confirmed by <strong className="text-gray-800 font-semibold">{b.tailorName || "your tailor partner"}</strong>.
+                      Your order <strong className="text-gray-800 font-semibold">#{b.trackingCode || `ST-${1000 + b.id}`}</strong> has been confirmed by <strong className="text-gray-800 font-semibold">{b.tailorName || "your tailor partner"}</strong>.
                     </p>
                   </div>
                   <Link
-                    href={`/track?id=${b.trackingCode || b.id}`}
+                    href={`/track?id=${b.trackingCode || `ST-${1000 + b.id}`}`}
                     className="w-full sm:w-auto h-11 px-6 inline-flex items-center justify-center font-bold text-white transition-all text-center cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
                     style={{ backgroundColor: "#00b894", borderRadius: "14px", fontSize: "11px" }}
                   >
@@ -412,11 +412,11 @@ function NotificationsContent() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs md:text-sm text-gray-600 leading-relaxed">
-                      A Stitch rider is coming to your pickup address to collect your garment for order <strong className="text-gray-800 font-semibold">#{b.trackingCode || b.id}</strong>.
+                      A Stitch rider is coming to your pickup address to collect your garment for order <strong className="text-gray-800 font-semibold">#{b.trackingCode || `ST-${1000 + b.id}`}</strong>.
                     </p>
                   </div>
                   <Link
-                    href={`/track?id=${b.trackingCode || b.id}`}
+                    href={`/track?id=${b.trackingCode || `ST-${1000 + b.id}`}`}
                     className="w-full sm:w-auto h-11 px-6 inline-flex items-center justify-center font-bold text-white transition-all text-center cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] bg-[#c322f4] rounded-[14px] text-[11px]"
                   >
                     View Pickup Status
@@ -520,7 +520,7 @@ function NotificationsContent() {
               <div>
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                   <div>
-                    <span className="text-xs font-black text-gray-900">Order #{b.id}</span>
+                    <span className="text-xs font-black text-gray-900">Order #{b.trackingCode || `ST-${1000 + b.id}`}</span>
                     <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
                       Booked on: {new Date(b.bookingDate).toLocaleDateString()}
                     </p>
@@ -721,7 +721,7 @@ function NotificationsContent() {
               <div>
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                   <div>
-                    <span className="text-xs font-black text-gray-900">Bulk Inquiry #{bo.id}</span>
+                    <span className="text-xs font-black text-gray-900">Bulk Inquiry #BIZ-{1000 + bo.id}</span>
                     <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
                       Received on: {new Date(bo.createdAt).toLocaleDateString()}
                     </p>

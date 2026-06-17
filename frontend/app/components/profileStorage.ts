@@ -120,11 +120,33 @@ export function authHeaders(headers?: HeadersInit) {
   return nextHeaders;
 }
 
-export function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-  return fetch(input, {
+export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const response = await fetch(input, {
     ...init,
     headers: authHeaders(init.headers),
   });
+
+  if (response.status === 401 || response.status === 403) {
+    try {
+      const clone = response.clone();
+      const data = await clone.json();
+      if (data && (
+        data.message === "Invalid or expired authentication token" ||
+        data.message === "Authentication required" ||
+        data.message === "Forbidden: Your account has been deactivated." ||
+        String(data.message).includes("deactivated")
+      )) {
+        clearUserDataOnLogout();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("stitch-auth-change"));
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  return response;
 }
 
 export function getProfileStorageKey(user: StoredUser | null = getCurrentUser()) {

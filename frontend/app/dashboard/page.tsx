@@ -287,7 +287,7 @@ function DashboardContent() {
                       </div>
                     )}
                     <div className="space-y-1 text-xs">
-                      <p className="font-bold text-gray-900">Order #{b.id} - {b.clothCategory || "Cloth details pending"}</p>
+                      <p className="font-bold text-gray-900">Order #{b.trackingCode || `ST-${1000 + b.id}`} - {b.clothCategory || "Cloth details pending"}</p>
                       <p className="text-gray-500">Customer: <strong className="text-gray-800 font-semibold">{b.fullName || "Guest"}</strong></p>
                       <p className="text-gray-400 font-semibold">{new Date(b.bookingDate).toLocaleDateString()} at {b.bookingTime.slice(0, 5)}</p>
                     </div>

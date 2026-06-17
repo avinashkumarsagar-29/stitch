@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useSyncExternalStore, useEffect, useRef } from "react";
 import Sidebar from "./Sidebar";
 import Link from "next/link";
@@ -14,6 +14,8 @@ import {
   getCurrentUserRole,
 } from "./profileStorage";
 import Loader from "./Loader";
+import JoinDrawer from "./JoinDrawer";
+import { showToast } from "./Toast";
 
 
 function playNotificationSound() {

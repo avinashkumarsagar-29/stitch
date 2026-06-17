@@ -201,42 +201,66 @@ export default function BusinessPage() {
     }
 
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          // Reverse geocode using Nominatim OpenStreetMap
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
-            {
-              headers: {
-                "User-Agent": "StitchTailoringApp/1.0"
-              }
+
+    const successCallback = async (position: any) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        // Reverse geocode using Nominatim OpenStreetMap
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+          {
+            headers: {
+              "User-Agent": "StitchTailoringApp/1.0"
             }
-          );
-          const data = await response.json();
-          if (data && data.display_name) {
-            setLocation(data.display_name);
-            showToast("Location detected successfully!", "success");
-          } else {
-            setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-            showToast("Location coordinates set", "success");
           }
-        } catch (error) {
-          console.error("Reverse geocoding failed", error);
-          const { latitude, longitude } = position.coords;
+        );
+        const data = await response.json();
+        if (data && data.display_name) {
+          setLocation(data.display_name);
+          showToast("Location detected successfully!", "success");
+        } else {
           setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-          showToast("Failed to resolve address. Setting coordinates instead.", "error");
-        } finally {
-          setIsLocating(false);
+          showToast("Location coordinates set", "success");
+        }
+      } catch (error) {
+        console.error("Reverse geocoding failed", error);
+        const { latitude, longitude } = position.coords;
+        setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        showToast("Failed to resolve address. Setting coordinates instead.", "error");
+      } finally {
+        setIsLocating(false);
+      }
+    };
+
+    const errorCallback = (error: any) => {
+      console.warn("Geolocation warning:", error.code, error.message);
+      let errorMsg = "Failed to retrieve your current location";
+      if (error.code === 1) {
+        errorMsg = "Location access denied. Please enable location permission in your browser.";
+      } else if (error.code === 2) {
+        errorMsg = "Position unavailable. Please try again or type manually.";
+      } else if (error.code === 3) {
+        errorMsg = "Location request timed out. Please try again or type manually.";
+      }
+      showToast(errorMsg, "error");
+      setIsLocating(false);
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      successCallback,
+      (error) => {
+        if (error.code !== 1) {
+          console.warn("High accuracy geolocation failed, trying low accuracy fallback...", error);
+          navigator.geolocation.getCurrentPosition(
+            successCallback,
+            errorCallback,
+            { enableHighAccuracy: false, timeout: 15000 }
+          );
+        } else {
+          errorCallback(error);
         }
       },
-      (error) => {
-        console.error("Geolocation error", error);
-        showToast(error.message || "Failed to retrieve your current location", "error");
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 5000 }
     );
   };
 
@@ -389,8 +413,8 @@ export default function BusinessPage() {
       status === "booked"
         ? "Are you sure you want to accept this quote and book this order?"
         : status === "cancelled"
-        ? "Are you sure you want to cancel this inquiry?"
-        : "Confirm status transition?";
+          ? "Are you sure you want to cancel this inquiry?"
+          : "Confirm status transition?";
     setConfirmAction({ orderId, status, message });
   };
 
@@ -1038,18 +1062,17 @@ export default function BusinessPage() {
 
       {/* Confirmation Toaster Notification */}
       {confirmAction && (
-        <div 
+        <div
           className="fixed bottom-6 right-6 z-50 w-full max-w-md md:max-w-sm bg-white/95 backdrop-blur-md border border-gray-200 rounded-2xl p-5 shadow-2xl animate-fade-in-up"
           role="dialog"
           aria-labelledby="confirm-toast-title"
           aria-describedby="confirm-toast-desc"
         >
           <div className="flex gap-4">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-              confirmAction.status === 'booked' 
-                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${confirmAction.status === 'booked'
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                 : 'bg-red-50 text-red-600 border border-red-100'
-            }`}>
+              }`}>
               {confirmAction.status === 'booked' ? (
                 <svg className="h-5 w-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1068,7 +1091,7 @@ export default function BusinessPage() {
               <p id="confirm-toast-desc" className="mt-1 text-xs text-gray-600 leading-relaxed">
                 {confirmAction.message}
               </p>
-              
+
               <div className="mt-4 flex items-center gap-3 justify-end">
                 <button
                   onClick={() => setConfirmAction(null)}
@@ -1082,11 +1105,10 @@ export default function BusinessPage() {
                     setConfirmAction(null);
                     await handleUpdateStatus(orderId, status);
                   }}
-                  className={`px-4 py-1.5 text-white rounded-xl text-[11px] font-bold transition cursor-pointer shadow-sm ${
-                    confirmAction.status === 'booked'
+                  className={`px-4 py-1.5 text-white rounded-xl text-[11px] font-bold transition cursor-pointer shadow-sm ${confirmAction.status === 'booked'
                       ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200/50'
                       : 'bg-red-500 hover:bg-red-600 shadow-red-200/50'
-                  }`}
+                    }`}
                 >
                   Confirm
                 </button>

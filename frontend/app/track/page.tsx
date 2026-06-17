@@ -674,8 +674,8 @@ function TrackContent() {
               </button>
               <h2 className="mt-2 text-2xl font-serif font-extrabold text-gray-900 tracking-tight sm:text-3xl">
                 {isTailor 
-                  ? `${(activeBooking as any).isBusiness ? "Update Bulk Inquiry" : "Update Booking"} #${activeBooking.id}` 
-                  : `${(activeBooking as any).isBusiness ? "Tracking Bulk Inquiry" : "Tracking Booking"} #${activeBooking.id}`}
+                  ? `${(activeBooking as any).isBusiness ? "Update Bulk Inquiry" : "Update Booking"}` 
+                  : `${(activeBooking as any).isBusiness ? "Tracking Bulk Inquiry" : "Tracking Booking"}`}
               </h2>
               <p className="text-xs text-gray-500 mt-1">
                 {(activeBooking as any).isBusiness 
@@ -972,17 +972,6 @@ function TrackContent() {
                         <p className="text-base font-bold text-gray-800">{activeBooking.tailorName}</p>
                         <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mt-0.5">✂️ Expert Tailoring Partner</p>
                       </div>
-
-                      <div className="text-xs space-y-2 pt-2">
-                        <div className="flex justify-between border-b border-gray-50 pb-1.5">
-                          <span className="font-semibold text-gray-400">Phone</span>
-                          <span className="text-gray-700 font-medium">{activeBooking.tailorPhoneNumber || "N/A"}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-50 pb-1.5">
-                          <span className="font-semibold text-gray-400">Email</span>
-                          <span className="text-gray-700 font-medium truncate max-w-[200px]">{activeBooking.tailorEmail || "N/A"}</span>
-                        </div>
-                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-6">
@@ -1110,7 +1099,7 @@ function TailorOrderCard({
       <div>
         <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
           <div>
-            <span className="text-xs font-black text-gray-900">Order #{booking.id}</span>
+            <span className="text-xs font-black text-gray-900">Order #{booking.trackingCode || (booking.isBusiness ? `BIZ-${1000 + booking.id}` : `ST-${1000 + booking.id}`)}</span>
             <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
               Booked: {new Date(booking.bookingDate).toLocaleDateString()}
             </p>
@@ -1213,48 +1202,13 @@ function TailorOrderCard({
           </form>
         </div>
       ) : (
-        <div className="pt-3 border-t border-gray-50 mt-2 space-y-3">
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            suppressHydrationWarning
-            className="w-full h-9 rounded-xl border border-purple-100 bg-purple-50/30 hover:bg-purple-50 text-purple-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+        <div className="pt-3 border-t border-gray-50 mt-2">
+          <Link
+            href={`/track?id=${booking.id}`}
+            className="w-full h-10 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-xs font-extrabold uppercase tracking-widest text-white shadow-md shadow-[#c322f4]/10 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            ⚙️ {expanded ? "Hide Status Controls" : "Update Status"}
-          </button>
-
-          {expanded && (
-            <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100/50 space-y-2.5 animate-fade-in">
-              <p className="text-[9px] font-extrabold uppercase tracking-widest text-purple-700">
-                Select Current Stage
-              </p>
-              <div className="grid grid-cols-3 gap-1">
-                {steps.map((step) => (
-                  <button
-                    key={step.id}
-                    disabled={isSimulating}
-                    onClick={() => onStatusUpdate(booking.id, step.id, !!(booking as any).isBusiness)}
-                    suppressHydrationWarning
-                    className={`py-1.5 text-[9px] font-extrabold rounded-lg transition-all cursor-pointer ${booking.status === step.id
-                      ? "bg-[#c322f4] text-white shadow-sm"
-                      : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                      }`}
-                  >
-                    {step.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="pt-2 border-t border-purple-100/30">
-                <Link
-                  href={`/track?id=${booking.id}`}
-                  className="block text-center text-[9px] font-extrabold uppercase tracking-wider text-purple-600 hover:underline"
-                >
-                  👁️ View Tracking Page
-                </Link>
-              </div>
-            </div>
-          )}
+            👁️ Track & Update Status
+          </Link>
         </div>
       )}
     </div>

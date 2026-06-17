@@ -166,7 +166,7 @@ export default function Home() {
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm animate-fade-in">
         {/* Top brand color indicator bar */}
         <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e]" />
-        
+
         <div className="grid gap-8 md:grid-cols-[1.3fr_1fr] items-center">
           <div className="space-y-6">
             <div className="flex items-center gap-2">
@@ -175,17 +175,17 @@ export default function Home() {
                 ✨ India&apos;s Premium Tech-Atelier
               </span>
             </div>
-            
+
             <h1 className="font-serif text-[30px] font-extrabold uppercase leading-[1.2] tracking-wide text-gray-900 sm:text-[38px] lg:text-[44px]">
               With each stitch, we don&apos;t just sew clothes
               <br className="hidden md:inline" />{" "}
               <span className="bg-gradient-to-r from-[#c322f4] to-[#d2a22e] bg-clip-text text-transparent">—we sew memories.</span>
             </h1>
-            
+
             <p className="max-w-[480px] pl-4 border-l-2 border-[#c322f4] text-xs leading-relaxed text-gray-500">
               With Stitch, you get access to <span className="text-[#c322f4] font-semibold">fast, affordable, and expert</span> custom tailoring services directly at your location.
             </p>
-            
+
             <div className="flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-[#c322f4]/5 text-[#c322f4] border border-[#c322f4]/10">
                 Focused fit guarantee
@@ -243,11 +243,10 @@ export default function Home() {
               key={service.title}
               onClick={() => setActiveService(index)}
               suppressHydrationWarning
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
-                activeService === index
-                  ? "bg-[#c322f4] text-white shadow-md shadow-[#c322f4]/15"
-                  : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50 hover:text-gray-800"
-              }`}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${activeService === index
+                ? "bg-[#c322f4] text-white shadow-md shadow-[#c322f4]/15"
+                : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50 hover:text-gray-800"
+                }`}
             >
               {service.title}
             </button>
@@ -353,7 +352,7 @@ export default function Home() {
             Join Stitch
           </h2>
           <p className="mx-auto mt-4 max-w-[650px] text-xs leading-relaxed text-gray-500">
-            Earn on your own schedule by joining India&apos;s leading <span className="text-[#c322f4] font-semibold">custom tailoring platform</span>. 
+            Earn on your own schedule by joining India&apos;s leading <span className="text-[#c322f4] font-semibold">custom tailoring platform</span>.
             No boss, no stress—just your craft, your talent, and a path to financial freedom.
           </p>
         </div>

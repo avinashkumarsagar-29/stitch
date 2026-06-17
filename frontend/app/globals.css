@@ -62,7 +62,27 @@ body {
   overflow-x: hidden;
 }
 
-body, div, header, aside, main, section, nav, a, button, h1, h2, h3, h4, h5, h6, p, span, label, input, select, textarea {
+body,
+div,
+header,
+aside,
+main,
+section,
+nav,
+a,
+button,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+label,
+input,
+select,
+textarea {
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -77,25 +97,28 @@ iframe {
   max-width: 100%;
 }
 
-#toast-container > .toast {
+#toast-container>.toast {
   border-radius: 6px;
   box-shadow: 0 10px 25px rgb(0 0 0 / 18%);
   opacity: 1;
 }
 
-#toast-container > .toast-success {
+#toast-container>.toast-success {
   background-color: #16a34a;
 }
 
-#toast-container > .toast-error {
+#toast-container>.toast-error {
   background-color: #dc2626;
 }
 
 /* Custom Visual Utilities for Premium Interaction */
 @keyframes glowPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(195, 34, 244, 0.15), 0 0 20px rgba(195, 34, 244, 0.05);
   }
+
   50% {
     box-shadow: 0 0 15px rgba(195, 34, 244, 0.35), 0 0 30px rgba(195, 34, 244, 0.15);
   }
@@ -119,6 +142,7 @@ iframe {
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -129,8 +153,8 @@ iframe {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
-

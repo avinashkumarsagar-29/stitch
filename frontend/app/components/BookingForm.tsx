@@ -90,46 +90,70 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
     }
 
     setLocatingField(field);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const coords = { lat: latitude, lon: longitude };
 
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
-            {
-              headers: {
-                "User-Agent": "StitchTailoringApp/1.0"
-              }
+    const successCallback = async (position: any) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        const coords = { lat: latitude, lon: longitude };
+
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+          {
+            headers: {
+              "User-Agent": "StitchTailoringApp/1.0"
             }
-          );
-          const data = await response.json();
-          const displayName = data && data.display_name ? data.display_name : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-          
-          updateField(field, displayName);
-          showToast("Location detected successfully!", "success");
-
-          if (field === "pickup") {
-            setPickupCoords(coords);
-          } else {
-            setDropoffCoords(coords);
           }
-        } catch (error) {
-          console.error("Reverse geocoding failed", error);
-          const { latitude, longitude } = position.coords;
-          updateField(field, `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-          showToast("Failed to resolve address. Setting coordinates instead.", "error");
-        } finally {
-          setLocatingField(null);
+        );
+        const data = await response.json();
+        const displayName = data && data.display_name ? data.display_name : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        
+        updateField(field, displayName);
+        showToast("Location detected successfully!", "success");
+
+        if (field === "pickup") {
+          setPickupCoords(coords);
+        } else {
+          setDropoffCoords(coords);
+        }
+      } catch (error) {
+        console.error("Reverse geocoding failed", error);
+        const { latitude, longitude } = position.coords;
+        updateField(field, `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        showToast("Failed to resolve address. Setting coordinates instead.", "error");
+      } finally {
+        setLocatingField(null);
+      }
+    };
+
+    const errorCallback = (error: any) => {
+      console.warn("Geolocation warning:", error.code, error.message);
+      let errorMsg = "Failed to retrieve your current location";
+      if (error.code === 1) {
+        errorMsg = "Location access denied. Please enable location permission in your browser.";
+      } else if (error.code === 2) {
+        errorMsg = "Position unavailable. Please try again or type manually.";
+      } else if (error.code === 3) {
+        errorMsg = "Location request timed out. Please try again or type manually.";
+      }
+      showToast(errorMsg, "error");
+      setLocatingField(null);
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      successCallback,
+      (error) => {
+        if (error.code !== 1) {
+          console.warn("High accuracy geolocation failed, trying low accuracy fallback...", error);
+          navigator.geolocation.getCurrentPosition(
+            successCallback,
+            errorCallback,
+            { enableHighAccuracy: false, timeout: 15000 }
+          );
+        } else {
+          errorCallback(error);
         }
       },
-      (error) => {
-        console.error("Geolocation error", error);
-        showToast(error.message || "Failed to retrieve your current location", "error");
-        setLocatingField(null);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 5000 }
     );
   };
 
@@ -314,23 +338,29 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
       </div>
 
       {!readOnly && searchedLocation ? (
-        <section className="mt-8">
-          <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-[#171d2a]">
-                Available tailors
+        <section className="mt-10 border-t border-gray-150 pt-8 animate-fade-in">
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#c322f4] animate-pulse" />
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#c322f4]">
+                  📍 Nearby Partners
+                </span>
+              </div>
+              <h2 className="font-serif text-2xl font-extrabold text-[#171d2a] tracking-tight">
+                Available Tailors
               </h2>
-              <p className="text-sm text-[#4b5563]">
-                Showing matches near {searchedLocation}
+              <p className="text-xs text-gray-500 max-w-xl">
+                Showing matches near <span className="font-semibold text-gray-700">{searchedLocation}</span>
               </p>
             </div>
-            <span className="text-sm font-bold text-[#c322f4]">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-purple-50 text-[#c322f4] border border-purple-100/50 shrink-0">
               {tailors.length} found
             </span>
           </div>
 
           {tailors.length ? (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {tailors.map((tailor) => (
                 <TailorCard
                   key={tailor.id}
@@ -340,8 +370,10 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
               ))}
             </div>
           ) : (
-            <div className="rounded-[8px] border border-[#e5e7eb] bg-white p-6 text-sm text-[#4b5563]">
-              No tailors are available at this pickup location yet.
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 max-w-md mx-auto space-y-3">
+              <span className="text-3xl block">🔍</span>
+              <p className="font-semibold text-gray-700">No tailors available here</p>
+              <p className="text-xs text-gray-400">Try choosing a different pickup or drop-off location nearby.</p>
             </div>
           )}
         </section>
@@ -357,67 +389,115 @@ function TailorCard({
   tailor: Tailor;
   onBook: (tailor: Tailor) => void;
 }) {
+  const exp = (tailor.experience || "").toLowerCase();
+  const expBadgeStyles =
+    exp === "beginner" ? "bg-blue-50/90 text-blue-700 border-blue-100" :
+    exp === "intermediate" ? "bg-emerald-50/90 text-emerald-700 border-emerald-100" :
+    exp === "advanced" ? "bg-purple-50/90 text-purple-700 border-purple-100" :
+    exp === "expert" ? "bg-amber-50/90 text-amber-700 border-amber-100" :
+    "bg-gray-50/90 text-gray-700 border-gray-200";
+
+  const ratingVal = tailor.avgRating !== undefined ? Number(tailor.avgRating) : 0;
+  const reviewCountVal = tailor.reviewCount !== undefined ? tailor.reviewCount : 0;
+
   return (
-    <article className="overflow-hidden rounded-[8px] border border-[#e5e7eb] bg-white shadow-sm">
-      <div className="relative h-44 bg-[#f3f4f6]">
-        {tailor.image ? (
-          <Image
-            src={tailor.image}
-            alt={`${tailor.name} previous work`}
-            fill
-            sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
-            unoptimized={tailor.image.startsWith("data:")}
-            className="object-cover"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-[#f3f4f6] text-sm font-bold text-[#6b7280]">
-            No work image
-          </div>
-        )}
-      </div>
-      <div className="p-5">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-xl font-bold text-[#202635] truncate">{tailor.name}</h3>
-          {tailor.avgRating !== undefined && tailor.avgRating > 0 && (
-            <span className="flex items-center gap-1 shrink-0 rounded bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-600 border border-amber-200">
-              ★ {Number(tailor.avgRating).toFixed(1)} <span className="text-gray-400 font-normal">({tailor.reviewCount})</span>
+    <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+      <div>
+        <div className="relative h-48 bg-gray-50 overflow-hidden">
+          {/* Experience Badge */}
+          <span className={`absolute top-3.5 left-3.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider shadow-sm border z-10 backdrop-blur-[2px] ${expBadgeStyles}`}>
+            {tailor.experience || "Tailor"}
+          </span>
+
+          {/* Image Overlay Rating Badge */}
+          {ratingVal > 0 && (
+            <span className="absolute top-3.5 right-3.5 flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-[2px] px-2.5 py-1 text-[10px] font-black text-amber-600 shadow-sm border border-amber-100 z-10">
+              ★ {ratingVal.toFixed(1)} <span className="text-gray-400 font-normal">({reviewCountVal})</span>
             </span>
           )}
-        </div>
-        <dl className="mt-4 space-y-2 text-sm">
-          <div>
-            <dt className="font-bold text-[#202635]">Experience</dt>
-            <dd className="capitalize text-[#4b5563]">{tailor.experience}</dd>
-          </div>
-          <div>
-            <dt className="font-bold text-[#202635]">Phone</dt>
-            <dd className="text-[#4b5563]">
-              {tailor.phoneNumber || "Not provided"}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-bold text-[#202635]">Email</dt>
-            <dd className="break-words text-[#4b5563]">
-              {tailor.email || "Not provided"}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-bold text-[#202635]">Location</dt>
-            <dd className="text-[#4b5563]">{tailor.location}</dd>
-          </div>
-          {tailor.distance !== undefined && tailor.distance !== null && (
-            <div>
-              <dt className="font-bold text-[#c322f4]">Distance</dt>
-              <dd className="font-semibold text-[#c322f4]">{tailor.distance} km away</dd>
+
+          {tailor.image ? (
+            <Image
+              src={tailor.image}
+              alt={`${tailor.name} previous work`}
+              fill
+              sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+              unoptimized={tailor.image.startsWith("data:")}
+              className="object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-50/60 via-fuchsia-50/40 to-amber-50/20 flex flex-col items-center justify-center p-4">
+              <div className="w-12 h-12 rounded-full bg-purple-100/60 flex items-center justify-center mb-2.5 text-[#c322f4]/70">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.3 14.285L9 20.571M15.3 14.285a3 3 0 11-4.243-4.243 3 3 0 014.243 4.243zM9 20.571a3 3 0 11-4.243-4.242 3 3 0 014.243 4.242zM15 9l4.5-4.5M19.5 4.5a1.5 1.5 0 10-2.121-2.121M12 12l2.25-2.25" />
+                </svg>
+              </div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#c322f4]/60">
+                Stitch Partner
+              </span>
             </div>
           )}
-        </dl>
+        </div>
+
+        <div className="p-6">
+          {/* Rating row at the top of the card details */}
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-100/60 shadow-sm">
+              <svg className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <span className="text-xs font-black text-amber-700">
+                {ratingVal > 0 ? ratingVal.toFixed(1) : "0.0"}
+              </span>
+            </div>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+              {reviewCountVal} {reviewCountVal === 1 ? "review" : "reviews"}
+            </span>
+          </div>
+
+          <h3 className="text-lg font-extrabold text-gray-900 truncate capitalize leading-tight mb-4">
+            {tailor.name}
+          </h3>
+
+          <div className="space-y-3 text-xs text-gray-500">
+            <div className="flex items-center gap-2.5">
+              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.387a20.373 20.373 0 0 1-9.351-9.351c-.155-.44.01-.928.387-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+              </svg>
+              <span className="truncate">{tailor.phoneNumber || "Not provided"}</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H4.5a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5H4.5a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+              </svg>
+              <span className="truncate">{tailor.email || "Not provided"}</span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1 1 15 0Z" />
+              </svg>
+              <span className="line-clamp-2 text-gray-600">{tailor.location}</span>
+            </div>
+            {tailor.distance !== undefined && tailor.distance !== null && (
+              <div className="flex items-center gap-1.5 font-extrabold text-[#c322f4] bg-[#c322f4]/5 rounded-lg py-1.5 px-3 w-fit border border-[#c322f4]/10">
+                <svg className="w-3.5 h-3.5 text-[#c322f4] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8m-3-12.142L3.91 7.248A1.25 1.25 0 003 8.36V19.5a1.25 1.25 0 001.25 1.25h15.5a1.25 1.25 0 001.25-1.25V8.36a1.25 1.25 0 00-.91-1.112L12 4.608z" />
+                </svg>
+                <span>{Number(tailor.distance).toFixed(2)} km away</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6 pt-0">
         <button
           type="button"
           onClick={() => onBook(tailor)}
-          className="mt-5 h-11 w-full rounded-[6px] bg-[#d779f4] text-sm font-bold text-[#151320] shadow-sm"
+          className="w-full h-11 rounded-xl bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-xs font-extrabold uppercase tracking-widest text-white shadow-md shadow-[#c322f4]/10 hover:shadow-lg hover:shadow-[#c322f4]/25 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 cursor-pointer"
         >
-          Book
+          Book Tailor
         </button>
       </div>
     </article>

@@ -752,6 +752,7 @@ async function authenticateApiRequest(request, response, next) {
     }
     return next();
   } catch (error) {
+    console.error("JWT validation error:", error);
     return response.status(401).json({
       message: "Invalid or expired authentication token",
     });
@@ -1285,22 +1286,24 @@ app.post("/api/auth/request-otp", async (request, response) => {
     const pool = await getSqlPool();
     await ensureAuthTables(pool);
 
-    // Rate Limiting Check: Max 3 OTP requests in the last 10 minutes
-    const recentOtpsResult = await pool
-      .request()
-      .input("phoneNumber", sql.NVarChar(20), phoneNumber)
-      .query(`
-        SELECT COUNT(*) AS count
-        FROM LoginOtps
-        WHERE phoneNumber = @phoneNumber
-          AND createdAt > DATEADD(minute, -10, SYSUTCDATETIME())
-      `);
-    const requestCount = recentOtpsResult.recordset[0].count;
+    // Rate Limiting Check: Max 3 OTP requests in the last 10 minutes (only in production)
+    if (process.env.NODE_ENV === "production") {
+      const recentOtpsResult = await pool
+        .request()
+        .input("phoneNumber", sql.NVarChar(20), phoneNumber)
+        .query(`
+          SELECT COUNT(*) AS count
+          FROM LoginOtps
+          WHERE phoneNumber = @phoneNumber
+            AND createdAt > DATEADD(minute, -10, SYSUTCDATETIME())
+        `);
+      const requestCount = recentOtpsResult.recordset[0].count;
 
-    if (requestCount >= 3) {
-      return response.status(429).json({
-        message: "Too many OTP requests. Please wait before requesting another OTP.",
-      });
+      if (requestCount >= 3) {
+        return response.status(429).json({
+          message: "Too many OTP requests. Please wait before requesting another OTP.",
+        });
+      }
     }
 
     const userResult = await pool
@@ -4478,9 +4481,11 @@ app.post("/api/payments/verify-payment", async (request, response) => {
       }
 
       let amountVal = 0;
-      if (planId === "Pro") amountVal = 999.00;
+      if (planId === "Pro") amountVal = 799.00;
       else if (planId === "Plus") amountVal = 299.00;
-      else if (planId === "Alterations") amountVal = 499.00;
+      else if (planId === "Alterations") amountVal = 0.00;
+      else if (planId === "Custom") amountVal = 199.00;
+      else if (planId === "Bespoke") amountVal = 299.00;
 
       await logPayment(pool, userId, amountVal, planId, razorpay_order_id, razorpay_payment_id || "mock_payment", "verified");
 
@@ -4500,9 +4505,11 @@ app.post("/api/payments/verify-payment", async (request, response) => {
     }
 
     let amountVal = 0;
-    if (planId === "Pro") amountVal = 999.00;
+    if (planId === "Pro") amountVal = 799.00;
     else if (planId === "Plus") amountVal = 299.00;
-    else if (planId === "Alterations") amountVal = 499.00;
+    else if (planId === "Alterations") amountVal = 0.00;
+    else if (planId === "Custom") amountVal = 199.00;
+    else if (planId === "Bespoke") amountVal = 299.00;
 
     const crypto = require("crypto");
     const hmac = crypto.createHmac("sha256", keySecret);

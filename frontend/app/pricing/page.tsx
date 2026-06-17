@@ -9,10 +9,10 @@ const customerPlans = [
   {
     id: "Alterations",
     name: "Alterations & Repair",
-    priceMonthly: "₹199",
-    priceYearly: "₹159",
-    priceNumMonthly: 199,
-    priceNumYearly: 159,
+    priceMonthly: "Free",
+    priceYearly: "Free",
+    priceNumMonthly: 0,
+    priceNumYearly: 0,
     period: "garment",
     description: "Perfect for adjusting existing clothes to get your exact fit.",
     features: [
@@ -30,10 +30,10 @@ const customerPlans = [
   {
     id: "Custom",
     name: "Custom Sewing",
-    priceMonthly: "₹599",
-    priceYearly: "₹479",
-    priceNumMonthly: 599,
-    priceNumYearly: 479,
+    priceMonthly: "₹199",
+    priceYearly: "₹159",
+    priceNumMonthly: 199,
+    priceNumYearly: 159,
     period: "garment",
     description: "Have your raw fabrics custom-stitched into premium garments.",
     features: [
@@ -52,10 +52,10 @@ const customerPlans = [
   {
     id: "Bespoke",
     name: "Bespoke Designer",
-    priceMonthly: "₹1,499",
-    priceYearly: "₹1,199",
-    priceNumMonthly: 1499,
-    priceNumYearly: 1199,
+    priceMonthly: "₹299",
+    priceYearly: "₹239",
+    priceNumMonthly: 299,
+    priceNumYearly: 239,
     period: "garment",
     description: "Premium designer wear, wedding attire, and luxury suits.",
     features: [
@@ -201,7 +201,7 @@ function getServerUserSnapshot() {
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [activePlanType, setActivePlanType] = useState<"customer" | "tailor">("customer");
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
   const [mockOrder, setMockOrder] = useState<any>(null);
@@ -271,7 +271,7 @@ export default function PricingPage() {
         }
 
         showToast("Free Tier subscription active!", "success");
-        
+
         // Update local storage
         const updatedUser = { ...currentUser, plan: planId };
         safeSetLocalStorage("stitch-user", JSON.stringify(updatedUser));
@@ -339,7 +339,7 @@ export default function PricingPage() {
           // Clear query params so it doesn't trigger again on reload/navigation
           const newUrl = window.location.pathname;
           window.history.replaceState({}, document.title, newUrl);
-          
+
           handleCheckout(tier);
         }
       }
@@ -389,7 +389,7 @@ export default function PricingPage() {
           }
 
           showToast("Payment verified! Subscription activated.", "success");
-          
+
           // Update local storage
           const updatedUser = { ...currentUser, plan: planId };
           safeSetLocalStorage("stitch-user", JSON.stringify(updatedUser));
@@ -424,7 +424,7 @@ export default function PricingPage() {
   // Handle sandbox success verification simulator
   async function handleMockSuccess() {
     if (!mockOrder) return;
-    
+
     try {
       setShowMockModal(false);
       setIsProcessing(true);
@@ -494,7 +494,7 @@ export default function PricingPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 backdrop-blur-sm p-4 animate-fade-in">
           <div className="relative w-full max-w-md bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xl space-y-6">
             <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e] rounded-t-3xl" />
-            
+
             <div className="flex flex-col items-center text-center space-y-3">
               <span className="text-4xl">💳</span>
               <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Razorpay Sandbox Simulator</h3>
@@ -526,7 +526,7 @@ export default function PricingPage() {
               >
                 Simulate Success
               </button>
-              
+
               <button
                 type="button"
                 onClick={handleMockCancel}
@@ -542,7 +542,7 @@ export default function PricingPage() {
       {/* Intro Dashboard Card */}
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 md:p-10 shadow-sm animate-fade-in">
         <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#c322f4] via-[#d779f4] to-[#d2a22e]" />
-        
+
         <div className="space-y-4 max-w-2xl">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[#c322f4] animate-pulse" />
@@ -550,7 +550,7 @@ export default function PricingPage() {
               {showTailorPlans ? "💼 Partner Subscription Plans" : "🏷️ Simple & Transparent Pricing"}
             </span>
           </div>
-          
+
           <h1 className="font-serif text-[30px] font-extrabold uppercase leading-[1.2] tracking-wide text-gray-900 sm:text-[38px] lg:text-[44px]">
             {showTailorPlans ? (
               <>
@@ -562,7 +562,7 @@ export default function PricingPage() {
               </>
             )}
           </h1>
-          
+
           <p className="pl-4 border-l-2 border-[#c322f4] text-xs leading-relaxed text-gray-500">
             {showTailorPlans ? (
               <>
@@ -587,27 +587,24 @@ export default function PricingPage() {
             <div className="relative flex items-center bg-[#f1f3f5] p-1.5 rounded-2xl border border-gray-200/50 shadow-inner w-fit">
               {/* Sliding active background indicator */}
               <div
-                className={`absolute top-1.5 bottom-1.5 left-1.5 w-[110px] bg-white rounded-xl shadow-md transition-all duration-300 ease-out border border-gray-200/30 ${
-                  activePlanType === "tailor" ? "translate-x-[114px]" : "translate-x-0"
-                }`}
+                className={`absolute top-1.5 bottom-1.5 left-1.5 w-[110px] bg-white rounded-xl shadow-md transition-all duration-300 ease-out border border-gray-200/30 ${activePlanType === "tailor" ? "translate-x-[114px]" : "translate-x-0"
+                  }`}
               />
-              
+
               <button
                 type="button"
                 onClick={() => setActivePlanType("customer")}
-                className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
-                  activePlanType === "customer" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
-                }`}
+                className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${activePlanType === "customer" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
+                  }`}
               >
                 User
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => setActivePlanType("tailor")}
-                className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
-                  activePlanType === "tailor" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
-                }`}
+                className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${activePlanType === "tailor" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
+                  }`}
               >
                 Tailor
               </button>
@@ -623,27 +620,24 @@ export default function PricingPage() {
           <div className="relative flex items-center bg-[#f1f3f5] p-1.5 rounded-2xl border border-gray-200/50 shadow-inner w-fit">
             {/* Sliding active background indicator */}
             <div
-              className={`absolute top-1.5 bottom-1.5 left-1.5 w-[110px] bg-white rounded-xl shadow-md transition-all duration-300 ease-out border border-gray-200/30 ${
-                billingCycle === "yearly" ? "translate-x-[114px]" : "translate-x-0"
-              }`}
+              className={`absolute top-1.5 bottom-1.5 left-1.5 w-[110px] bg-white rounded-xl shadow-md transition-all duration-300 ease-out border border-gray-200/30 ${billingCycle === "yearly" ? "translate-x-[114px]" : "translate-x-0"
+                }`}
             />
-            
+
             <button
               type="button"
               onClick={() => setBillingCycle("monthly")}
-              className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
-                billingCycle === "monthly" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
-              }`}
+              className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${billingCycle === "monthly" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
+                }`}
             >
               Monthly
             </button>
-            
+
             <button
               type="button"
               onClick={() => setBillingCycle("yearly")}
-              className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
-                billingCycle === "yearly" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
-              }`}
+              className={`relative z-10 w-[110px] py-2.5 text-center text-xs font-extrabold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${billingCycle === "yearly" ? "text-[#c322f4]" : "text-gray-400 hover:text-gray-600"
+                }`}
             >
               Yearly
             </button>
@@ -662,9 +656,9 @@ export default function PricingPage() {
         {plans.map((tier) => {
           const currentPrice = billingCycle === "monthly" ? tier.priceMonthly : tier.priceYearly;
           const billingDetail = billingCycle === "monthly" ? "billed monthly" : "billed yearly";
-          
+
           const isUserPlanActive = currentUser && currentUser.plan === tier.id;
-          
+
           let btnLabel = tier.cta;
           let btnDisabled = false;
 
@@ -676,11 +670,10 @@ export default function PricingPage() {
           return (
             <article
               key={tier.name}
-              className={`relative rounded-3xl border bg-white p-6 md:p-8 shadow-sm transition-all duration-500 ease-out hover:-translate-y-2.5 hover:shadow-2xl hover:border-[#c322f4]/50 flex flex-col justify-between group ${tier.glowColor} ${
-                tier.popular 
-                  ? "border-[#c322f4]/80 ring-2 ring-[#c322f4]/5" 
+              className={`relative rounded-3xl border bg-white p-6 md:p-8 shadow-sm transition-all duration-500 ease-out hover:-translate-y-2.5 hover:shadow-2xl hover:border-[#c322f4]/50 flex flex-col justify-between group ${tier.glowColor} ${tier.popular
+                  ? "border-[#c322f4]/80 ring-2 ring-[#c322f4]/5"
                   : "border-gray-200"
-              }`}
+                }`}
             >
               {tier.popular && (
                 <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#d779f4] to-[#c322f4] px-4 py-1 text-[9px] font-extrabold uppercase tracking-wider text-white shadow-md shadow-[#c322f4]/25">
@@ -694,7 +687,7 @@ export default function PricingPage() {
 
                 <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">{tier.name}</h3>
                 <p className="mt-2 text-xs text-gray-500 min-h-[32px] leading-relaxed">{tier.description}</p>
-                
+
                 {/* Pricing block with subtle transition */}
                 <div className="mt-6 flex flex-col">
                   <div className="flex items-baseline gap-1.5">
@@ -729,13 +722,12 @@ export default function PricingPage() {
                   type="button"
                   disabled={btnDisabled}
                   onClick={() => handleCheckout(tier)}
-                  className={`w-full block rounded-2xl py-3.5 text-center text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${
-                    btnDisabled
+                  className={`w-full block rounded-2xl py-3.5 text-center text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${btnDisabled
                       ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
                       : tier.popular
-                      ? "bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-white shadow-md shadow-[#c322f4]/15 hover:from-[#c322f4] hover:to-[#a81bd4] hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                      : "bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                  }`}
+                        ? "bg-gradient-to-r from-[#d779f4] to-[#c322f4] text-white shadow-md shadow-[#c322f4]/15 hover:from-[#c322f4] hover:to-[#a81bd4] hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                        : "bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    }`}
                 >
                   {btnLabel}
                 </button>
