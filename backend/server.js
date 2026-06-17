@@ -1477,6 +1477,90 @@ app.post("/api/auth/verify-otp", async (request, response) => {
   }
 });
 
+app.post("/api/auth/google-login", async (request, response) => {
+  try {
+    const { email, fullName, image } = request.body;
+
+    if (!email) {
+      return response.status(400).json({
+        message: "Email is required",
+      });
+    }
+
+    const pool = await getSqlPool();
+
+    // Check if the user already exists by email
+    const userResult = await pool
+      .request()
+      .input("email", sql.NVarChar(255), email)
+      .query(`
+        SELECT id, fullName, email, phoneNumber, role, [plan], firstName, lastName, address, image, referralCode, credit, isBanned
+        FROM Users
+        WHERE email = @email
+      `);
+
+    let user = userResult.recordset[0];
+
+    if (user && user.isBanned) {
+      return response.status(403).json({
+        message: "Your account has been deactivated.",
+      });
+    }
+
+    if (!user) {
+      // Create user if they don't exist
+      const referralCode = await generateUniqueReferralCode(pool);
+      const randomPasswordHash = "GOOGLE_AUTH_" + Math.random().toString(36).substring(2, 12);
+      const defaultRole = "user";
+
+      const insertResult = await pool
+        .request()
+        .input("fullName", sql.NVarChar(150), fullName || email.split("@")[0])
+        .input("email", sql.NVarChar(255), email)
+        .input("phoneNumber", sql.NVarChar(20), null) // null allows multiple Google users since index is filtered
+        .input("passwordHash", sql.NVarChar(255), randomPasswordHash)
+        .input("role", sql.NVarChar(50), defaultRole)
+        .input("referralCode", sql.NVarChar(20), referralCode)
+        .input("image", sql.NVarChar(sql.MAX), image || "")
+        .query(`
+          INSERT INTO Users (fullName, email, phoneNumber, passwordHash, role, referralCode, image, credit)
+          OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.phoneNumber, INSERTED.role, INSERTED.[plan], INSERTED.referralCode, INSERTED.credit, INSERTED.image
+          VALUES (@fullName, @email, @phoneNumber, @passwordHash, @role, @referralCode, @image, 0)
+        `);
+
+      user = insertResult.recordset[0];
+    }
+
+    return response.json({
+      message: "Login successful",
+      token: createAuthToken(user),
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        phoneNumber: user.phoneNumber || "",
+        role: user.role,
+        plan: user.plan || "Free",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        address: user.address || "",
+        image: user.image || "",
+        referralCode: user.referralCode,
+        credit: user.credit !== undefined ? Number(user.credit) : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Google login error:", error);
+    return response.status(500).json({
+      message: "Unable to complete Google login",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.originalError?.message || error.message,
+    });
+  }
+});
+
 app.use("/api", authenticateApiRequest);
 
 app.use("/api", async (request, response, next) => {
