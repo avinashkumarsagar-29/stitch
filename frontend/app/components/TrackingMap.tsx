@@ -1,15 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { io } from "socket.io-client";
 
 type TrackingMapProps = {
+  bookingId: number;
+  role: string;
   status: string;
   pickupLocation: string;
   dropoffLocation: string;
   tailorName?: string | null;
 };
 
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 export default function TrackingMap({
+  bookingId,
+  role,
   status,
   pickupLocation,
   dropoffLocation,
@@ -26,6 +43,10 @@ export default function TrackingMap({
   const [courierSpeed, setCourierSpeed] = useState<number>(24); // km/h
   const [courierStatus, setCourierStatus] = useState<string>("Initializing...");
 
+  const [liveCoords, setLiveCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const liveCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [isSimulatingGps, setIsSimulatingGps] = useState(false);
+
   // Generate stable coordinates based on location strings
   const hashString = (str: string) => {
     let hash = 0;
@@ -41,7 +62,7 @@ export default function TrackingMap({
     // Delhi center base
     const baseLat = 28.6139;
     const baseLng = 77.2090;
-    
+
     // Add reproducible pseudo-random offsets
     const latOffset = ((hash % 100) / 1000) - 0.05;
     const lngOffset = (((hash >> 4) % 100) / 1000) - 0.05;
@@ -63,17 +84,201 @@ export default function TrackingMap({
   const customerCoords = getCoordinates(pickupLocation || dropoffLocation || "Stitch Hub");
   const tailorCoords = getCoordinates(pickupLocation || "Stitch Tailor Shop", true);
 
+  // Helper to generate simulated route points for mock GPS driving
+  const getSimulatedRoute = () => {
+    const latDiff = customerCoords.lat - tailorCoords.lat;
+    const lngDiff = customerCoords.lng - tailorCoords.lng;
+    const points = [];
+    const segments = 30;
+
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      let lat = tailorCoords.lat + latDiff * t;
+      let lng = tailorCoords.lng + lngDiff * t;
+
+      if (i > 0 && i < segments) {
+        const sineFactor = Math.sin(t * Math.PI * 2.5);
+        lat += sineFactor * 0.0018;
+        lng += Math.cos(t * Math.PI * 1.5) * 0.0018;
+      }
+      points.push({ lat, lng });
+    }
+    return points;
+  };
+
+  // Socket.IO tracking setup
+  useEffect(() => {
+    if (!bookingId) return;
+
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const socket = io(socketUrl);
+
+    socket.on("connect", () => {
+      console.log(`Socket connected. Joining room: booking-${bookingId}`);
+      socket.emit("join-booking", bookingId);
+    });
+
+    if (role === "tailor") {
+      if (isSimulatingGps) {
+        const route = getSimulatedRoute();
+        let step = 0;
+
+        const intervalId = setInterval(() => {
+          if (step >= route.length) {
+            step = 0; // Loop simulation
+          }
+          const pt = route[step];
+          setLiveCoords(pt);
+          liveCoordsRef.current = pt;
+
+          // Emit location via Socket
+          socket.emit("update-location", {
+            bookingId,
+            lat: pt.lat,
+            lng: pt.lng,
+          });
+
+          // Move own map marker
+          if (tailorMarkerRef.current) {
+            tailorMarkerRef.current.setLatLng([pt.lat, pt.lng]);
+          }
+          if (mapRef.current) {
+            mapRef.current.panTo([pt.lat, pt.lng], { animate: true });
+          }
+
+          // Update HUD distance/ETA
+          const dist = calculateDistance(pt.lat, pt.lng, customerCoords.lat, customerCoords.lng);
+          setDistance(Number(dist.toFixed(2)));
+          const speed = 24;
+          const etaMins = Math.max(1, Math.round((dist / speed) * 60));
+          setEta(etaMins);
+          setCourierSpeed(speed);
+          setCourierStatus("Simulating delivery run (broadcasting live coordinates)");
+
+          step++;
+        }, 3000);
+
+        return () => {
+          clearInterval(intervalId);
+          socket.disconnect();
+        };
+      } else {
+        // Geolocation watchPosition
+        let watchId: number | null = null;
+        let emitInterval: NodeJS.Timeout | null = null;
+        let currentPos = { lat: tailorCoords.lat, lng: tailorCoords.lng };
+
+        if (typeof navigator !== "undefined" && navigator.geolocation) {
+          watchId = navigator.geolocation.watchPosition(
+            (position) => {
+              const newPos = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              };
+              currentPos = newPos;
+              setLiveCoords(newPos);
+              liveCoordsRef.current = newPos;
+
+              if (tailorMarkerRef.current) {
+                tailorMarkerRef.current.setLatLng([newPos.lat, newPos.lng]);
+              }
+              if (mapRef.current) {
+                mapRef.current.panTo([newPos.lat, newPos.lng], { animate: true });
+              }
+
+              // Update HUD distance/ETA
+              const dist = calculateDistance(newPos.lat, newPos.lng, customerCoords.lat, customerCoords.lng);
+              setDistance(Number(dist.toFixed(2)));
+              const speed = 24;
+              const etaMins = Math.max(1, Math.round((dist / speed) * 60));
+              setEta(etaMins);
+              setCourierSpeed(speed);
+              setCourierStatus("GPS tracking active (broadcasting live coordinates)");
+
+              // Emit update immediately
+              socket.emit("update-location", {
+                bookingId,
+                lat: newPos.lat,
+                lng: newPos.lng,
+              });
+            },
+            (error) => {
+              // Handle permission or timeout warnings gracefully without raising a console error
+              console.warn("GPS watchPosition warning:", error.message || error);
+              
+              if (error.code === 1) { // PERMISSION_DENIED
+                setCourierStatus("GPS permission denied. Please allow location access or start Mock Simulation.");
+              } else if (error.code === 3) { // TIMEOUT
+                // Timeouts are common indoors on desktop browsers, simply log and retry
+                console.log("GPS search timed out. Retrying...");
+              } else {
+                setCourierStatus("GPS unavailable. Use Mock Simulation.");
+              }
+            },
+            {
+              enableHighAccuracy: false, // Set to false to support Wi-Fi/IP location indoors and on desktops
+              timeout: 30000,            // 30 seconds timeout
+              maximumAge: 5000,          // Allow cached positions up to 5 seconds old
+            }
+          );
+        }
+
+        // Emit coordinates periodically to ensure live heartbeat
+        emitInterval = setInterval(() => {
+          socket.emit("update-location", {
+            bookingId,
+            lat: currentPos.lat,
+            lng: currentPos.lng,
+          });
+        }, 4000);
+
+        return () => {
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+          if (emitInterval !== null) clearInterval(emitInterval);
+          socket.disconnect();
+        };
+      }
+    } else {
+      // Customer receives coordinates
+      socket.on("location-updated", (data: { lat: number; lng: number }) => {
+        console.log("Customer received live coordinates update:", data);
+        setLiveCoords(data);
+        liveCoordsRef.current = data;
+
+        // Dynamically update marker on map
+        if (tailorMarkerRef.current) {
+          tailorMarkerRef.current.setLatLng([data.lat, data.lng]);
+        }
+        if (mapRef.current) {
+          mapRef.current.panTo([data.lat, data.lng], { animate: true });
+        }
+
+        // Calculate actual distance and ETA
+        const dist = calculateDistance(data.lat, data.lng, customerCoords.lat, customerCoords.lng);
+        setDistance(Number(dist.toFixed(2)));
+        const speed = 24; // km/h average
+        const etaMins = Math.max(1, Math.round((dist / speed) * 60));
+        setEta(etaMins);
+        setCourierSpeed(speed);
+        setCourierStatus("Live coordinates updated in real-time");
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [bookingId, role, isSimulatingGps]);
+
+  // Leaflet initialization
   useEffect(() => {
     let isMounted = true;
     let mapInstance: any = null;
     let L: any = null;
     let animationInterval: any = null;
 
-    // Load Leaflet dynamically
     async function initLeaflet() {
       if (typeof window === "undefined") return;
 
-      // Append CSS link
       if (!document.getElementById("leaflet-css")) {
         const link = document.createElement("link");
         link.id = "leaflet-css";
@@ -82,7 +287,6 @@ export default function TrackingMap({
         document.head.appendChild(link);
       }
 
-      // Wait for window.L or load script
       if (!(window as any).L) {
         await new Promise<void>((resolve) => {
           const script = document.createElement("script");
@@ -96,7 +300,6 @@ export default function TrackingMap({
 
       if (!isMounted || !L) return;
 
-      // Clean up existing map instance if any
       if (mapRef.current) {
         try {
           mapRef.current.remove();
@@ -105,10 +308,11 @@ export default function TrackingMap({
         }
       }
 
-      // Initialize Map
+      const initialTailorCoords = liveCoordsRef.current || tailorCoords;
+
       const mapCenter = [
-        (customerCoords.lat + tailorCoords.lat) / 2,
-        (customerCoords.lng + tailorCoords.lng) / 2,
+        (customerCoords.lat + initialTailorCoords.lat) / 2,
+        (customerCoords.lng + initialTailorCoords.lng) / 2,
       ];
 
       mapInstance = L.map(mapContainerId, {
@@ -118,13 +322,11 @@ export default function TrackingMap({
       });
       mapRef.current = mapInstance;
 
-      // OpenStreetMap Map Tiles
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       }).addTo(mapInstance);
 
-      // Create Custom Icons using SVG
       const tailorIcon = L.divIcon({
         className: "custom-div-icon",
         html: `<div class="relative flex items-center justify-center h-10 w-10">
@@ -145,19 +347,17 @@ export default function TrackingMap({
         iconAnchor: [20, 20],
       });
 
-      // Markers
       customerMarkerRef.current = L.marker([customerCoords.lat, customerCoords.lng], {
         icon: customerIcon,
       })
         .addTo(mapInstance)
         .bindPopup("Your Location");
 
-      tailorMarkerRef.current = L.marker([tailorCoords.lat, tailorCoords.lng], {
+      tailorMarkerRef.current = L.marker([initialTailorCoords.lat, initialTailorCoords.lng], {
         icon: tailorIcon,
       }).addTo(mapInstance);
 
-      // Connect tailor and customer via simulated road route (polylines)
-      // Create a wavy simulated route
+      // Generate visual routing line
       const latDiff = customerCoords.lat - tailorCoords.lat;
       const lngDiff = customerCoords.lng - tailorCoords.lng;
       const routePoints = [];
@@ -165,11 +365,9 @@ export default function TrackingMap({
 
       for (let i = 0; i <= segments; i++) {
         const t = i / segments;
-        // Linear path
         let lat = tailorCoords.lat + latDiff * t;
         let lng = tailorCoords.lng + lngDiff * t;
-        
-        // Add waving offset for actual street curve feeling
+
         if (i > 0 && i < segments) {
           const sineFactor = Math.sin(t * Math.PI * 2.5);
           lat += sineFactor * 0.0018;
@@ -178,7 +376,6 @@ export default function TrackingMap({
         routePoints.push([lat, lng]);
       }
 
-      // Draw route line
       routePolylineRef.current = L.polyline(routePoints, {
         color: "#c322f4",
         weight: 4,
@@ -187,29 +384,23 @@ export default function TrackingMap({
         lineCap: "round",
       }).addTo(mapInstance);
 
-      // Fit map bounds
       mapInstance.fitBounds(routePolylineRef.current.getBounds(), {
         padding: [40, 40],
       });
 
-      // Route animation based on status
       const s = String(status || "").toLowerCase().trim();
-      
+
       if (s === "booked") {
-        // Tailor partner heading towards customer for pickup
         setCourierStatus("Tailor heading to your address for pickup");
         animateCourier(routePoints, false);
       } else if (s === "picked-up") {
-        // Tailor returning to workshop with fabric
         setCourierStatus("Courier transporting fabric to Stitch Workshop");
         animateCourier(routePoints.slice().reverse(), false);
       } else if (s === "out-for-delivery") {
-        // Tailor delivering finished garment to customer
         setCourierStatus("Courier out for delivery of your custom garment");
         animateCourier(routePoints, true);
       } else if (s === "in-stitching") {
         setCourierStatus("Garment in production at Stitch Workshop");
-        // Courier stays at workshop
         tailorMarkerRef.current.setLatLng([tailorCoords.lat, tailorCoords.lng]);
         setEta(0);
         setDistance(0);
@@ -237,15 +428,19 @@ export default function TrackingMap({
 
         animationInterval = setInterval(() => {
           if (!isMounted) return;
+          // If real-time live GPS coords are being received, stop the client-side mock loop
+          if (liveCoordsRef.current !== null) {
+            clearInterval(animationInterval);
+            return;
+          }
+
           if (currentStep >= points.length) {
-            // Loop simulator or hold at destination
             if (isFinalDelivery) {
               setCourierStatus("Delivered successfully");
               setDistance(0);
               setEta(0);
               tailorMarkerRef.current.setLatLng(points[points.length - 1]);
             } else {
-              // Reset to simulate continuous travel
               currentStep = 0;
             }
             return;
@@ -254,14 +449,12 @@ export default function TrackingMap({
           const currentPoint = points[currentStep];
           tailorMarkerRef.current.setLatLng(currentPoint);
 
-          // Pan map to follow courier gently
           if (mapInstance && currentStep % 3 === 0) {
             mapInstance.panTo(currentPoint, { animate: true });
           }
 
-          // Calculate remaining distance
           const remainingSteps = points.length - 1 - currentStep;
-          const totalDistance = 3.2; // km base
+          const totalDistance = 3.2;
           const remDistance = Math.max(0.1, Number(((remainingSteps / points.length) * totalDistance).toFixed(1)));
           const remEta = Math.max(1, Math.round((remDistance / speed) * 60 + 2));
 
@@ -291,7 +484,7 @@ export default function TrackingMap({
           <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Live Delivery Route</h4>
           <p className="text-[10px] text-purple-600 font-semibold uppercase mt-0.5">{courierStatus}</p>
         </div>
-        
+
         {showTransitStats && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-extrabold bg-purple-50 text-[#c322f4] border border-purple-100 animate-pulse">
             ⚡ LIVE TRACKING ACTIVE
@@ -302,6 +495,31 @@ export default function TrackingMap({
       {/* Map Container */}
       <div className="relative flex-1 min-h-[300px] rounded-xl border border-gray-100 shadow-inner overflow-hidden">
         <div id={mapContainerId} className="absolute inset-0 z-10 w-full h-full" />
+
+        {/* Live GPS test simulation controller for tailors */}
+        {role === "tailor" && (
+          <div className="absolute bottom-4 left-4 z-20 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-purple-100 shadow-lg max-w-[220px] text-xs space-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className={`h-2.5 w-2.5 rounded-full ${isSimulatingGps ? "bg-emerald-500 animate-ping" : "bg-gray-400"}`} />
+              <span className="font-extrabold text-gray-800 uppercase tracking-wide">GPS Broadcaster</span>
+            </div>
+            <p className="text-[10px] text-gray-500 leading-snug">
+              {isSimulatingGps 
+                ? "Simulating driving and broadcasting coordinates to client." 
+                : "Awaiting live tracking broadcast or start mock simulation."}
+            </p>
+            <button
+              onClick={() => setIsSimulatingGps(!isSimulatingGps)}
+              className={`w-full py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                isSimulatingGps 
+                  ? "bg-red-500 hover:bg-red-600 text-white shadow-sm" 
+                  : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-[1.02] text-white shadow-md shadow-purple-200"
+              }`}
+            >
+              {isSimulatingGps ? "Stop Mock Simulation" : "Start GPS Simulation"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* HUD metrics dashboard */}

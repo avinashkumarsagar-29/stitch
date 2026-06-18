@@ -61,6 +61,8 @@ export default function ProfileEditor() {
     hip: "",
     shoulder: "",
     inseam: "",
+    height: "",
+    sleeve: "",
   });
   const [isSavingMeasurements, setIsSavingMeasurements] = useState(false);
 
@@ -109,6 +111,8 @@ export default function ProfileEditor() {
             hip: data.measurements.hip !== null ? String(data.measurements.hip) : "",
             shoulder: data.measurements.shoulder !== null ? String(data.measurements.shoulder) : "",
             inseam: data.measurements.inseam !== null ? String(data.measurements.inseam) : "",
+            height: data.measurements.height !== null ? String(data.measurements.height) : "",
+            sleeve: data.measurements.sleeve !== null ? String(data.measurements.sleeve) : "",
           });
         }
       } catch (err) {
@@ -234,6 +238,8 @@ export default function ProfileEditor() {
           hip: measurements.hip,
           shoulder: measurements.shoulder,
           inseam: measurements.inseam,
+          height: measurements.height,
+          sleeve: measurements.sleeve,
         }),
       });
       const data = await response.json();
@@ -426,7 +432,7 @@ export default function ProfileEditor() {
               </p>
             </div>
 
-            <div className="grid gap-5 grid-cols-2 sm:grid-cols-5">
+            <div className="grid gap-5 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
               <ProfileField
                 label="Chest"
                 value={measurements.chest}
@@ -460,10 +466,26 @@ export default function ProfileEditor() {
                 required={false}
               />
               <ProfileField
+                label="Sleeve"
+                value={measurements.sleeve}
+                onChange={(value) => setMeasurements((prev) => ({ ...prev, sleeve: value }))}
+                placeholder="eg. 24"
+                type="number"
+                required={false}
+              />
+              <ProfileField
                 label="Inseam"
                 value={measurements.inseam}
                 onChange={(value) => setMeasurements((prev) => ({ ...prev, inseam: value }))}
                 placeholder="eg. 30"
+                type="number"
+                required={false}
+              />
+              <ProfileField
+                label="Height"
+                value={measurements.height}
+                onChange={(value) => setMeasurements((prev) => ({ ...prev, height: value }))}
+                placeholder="eg. 67"
                 type="number"
                 required={false}
               />

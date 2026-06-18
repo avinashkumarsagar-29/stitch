@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import AuthGuard from "../../../components/AuthGuard";
 import { showToast } from "../../../components/Toast";
 import { authFetch } from "../../../components/profileStorage";
+import BodyScannerModal from "../../../components/BodyScannerModal";
 
 type BookingRecord = {
   id: number;
@@ -77,9 +78,12 @@ export default function BookingDetailsPage() {
     hip: "",
     shoulder: "",
     inseam: "",
+    height: "",
+    sleeve: "",
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   useEffect(() => {
     async function loadBookingDetails() {
@@ -120,6 +124,8 @@ export default function BookingDetailsPage() {
                 hip: measData.measurements.hip !== null ? String(measData.measurements.hip) : "",
                 shoulder: measData.measurements.shoulder !== null ? String(measData.measurements.shoulder) : "",
                 inseam: measData.measurements.inseam !== null ? String(measData.measurements.inseam) : "",
+                height: measData.measurements.height !== null ? String(measData.measurements.height) : "",
+                sleeve: measData.measurements.sleeve !== null ? String(measData.measurements.sleeve) : "",
               });
             }
           } catch (e) {
@@ -191,6 +197,8 @@ export default function BookingDetailsPage() {
             hip: measurements.hip,
             shoulder: measurements.shoulder,
             inseam: measurements.inseam,
+            height: measurements.height,
+            sleeve: measurements.sleeve,
           }),
         });
       }
@@ -296,15 +304,25 @@ export default function BookingDetailsPage() {
 
                 {/* Body Measurements Section */}
                 <div className="rounded-2xl border border-amber-200 bg-amber-50/10 p-6 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">📏</span>
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900">Your Body Measurements</h3>
-                      <p className="text-[10px] text-gray-500">Auto-filled from your profile. Feel free to adjust these for this order (in inches).</p>
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">📏</span>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900">Your Body Measurements</h3>
+                        <p className="text-[10px] text-gray-500">Auto-filled from your profile. Feel free to adjust these for this order (in inches).</p>
+                      </div>
                     </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setIsScannerOpen(true)}
+                      className="inline-flex h-9 items-center justify-center rounded-xl bg-purple-50 hover:bg-purple-100 text-[#c322f4] text-[10px] font-black uppercase tracking-wider px-4 border border-purple-200 transition-all duration-200 shadow-sm cursor-pointer hover:scale-[1.01]"
+                    >
+                      📸 Scan Body with AI
+                    </button>
                   </div>
 
-                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
+                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
                     <MeasurementField
                       label="Chest"
                       value={measurements.chest}
@@ -330,10 +348,22 @@ export default function BookingDetailsPage() {
                       placeholder="eg. 18"
                     />
                     <MeasurementField
+                      label="Sleeve"
+                      value={measurements.sleeve}
+                      onChange={(val) => setMeasurements(prev => ({ ...prev, sleeve: val }))}
+                      placeholder="eg. 24"
+                    />
+                    <MeasurementField
                       label="Inseam"
                       value={measurements.inseam}
                       onChange={(val) => setMeasurements(prev => ({ ...prev, inseam: val }))}
                       placeholder="eg. 30"
+                    />
+                    <MeasurementField
+                      label="Height"
+                      value={measurements.height}
+                      onChange={(val) => setMeasurements(prev => ({ ...prev, height: val }))}
+                      placeholder="eg. 67"
                     />
                   </div>
                 </div>
@@ -414,6 +444,15 @@ export default function BookingDetailsPage() {
           </aside>
         </section>
       </main>
+
+      <BodyScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onAutofill={(scannedMeas) => {
+          setMeasurements(scannedMeas);
+          showToast("AI scan completed and measurements updated!", "success");
+        }}
+      />
     </AuthGuard>
   );
 }

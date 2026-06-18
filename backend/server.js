@@ -303,9 +303,25 @@ async function ensureMeasurementsTable(pool) {
         hip DECIMAL(5,2),
         shoulder DECIMAL(5,2),
         inseam DECIMAL(5,2),
+        height DECIMAL(5,2),
+        sleeve DECIMAL(5,2),
         updatedAt DATETIME2 DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_Measurements_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
       );
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Measurements', 'height') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Measurements ADD height DECIMAL(5,2) NULL;
+    END
+  `);
+
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.Measurements', 'sleeve') IS NULL
+    BEGIN
+      ALTER TABLE dbo.Measurements ADD sleeve DECIMAL(5,2) NULL;
     END
   `);
 }
@@ -2891,6 +2907,8 @@ app.put("/api/users/:userId/measurements", async (request, response) => {
     const hip = request.body.hip !== undefined && request.body.hip !== "" ? Number(request.body.hip) : null;
     const shoulder = request.body.shoulder !== undefined && request.body.shoulder !== "" ? Number(request.body.shoulder) : null;
     const inseam = request.body.inseam !== undefined && request.body.inseam !== "" ? Number(request.body.inseam) : null;
+    const height = request.body.height !== undefined && request.body.height !== "" ? Number(request.body.height) : null;
+    const sleeve = request.body.sleeve !== undefined && request.body.sleeve !== "" ? Number(request.body.sleeve) : null;
 
     if (!userId) {
       return response.status(400).json({ message: "User ID is required" });
@@ -2919,9 +2937,11 @@ app.put("/api/users/:userId/measurements", async (request, response) => {
         .input("hip", sql.Decimal(5, 2), hip)
         .input("shoulder", sql.Decimal(5, 2), shoulder)
         .input("inseam", sql.Decimal(5, 2), inseam)
+        .input("height", sql.Decimal(5, 2), height)
+        .input("sleeve", sql.Decimal(5, 2), sleeve)
         .query(`
           UPDATE Measurements
-          SET chest = @chest, waist = @waist, hip = @hip, shoulder = @shoulder, inseam = @inseam, updatedAt = SYSUTCDATETIME()
+          SET chest = @chest, waist = @waist, hip = @hip, shoulder = @shoulder, inseam = @inseam, height = @height, sleeve = @sleeve, updatedAt = SYSUTCDATETIME()
           WHERE userId = @userId
         `);
     } else {
@@ -2934,15 +2954,17 @@ app.put("/api/users/:userId/measurements", async (request, response) => {
         .input("hip", sql.Decimal(5, 2), hip)
         .input("shoulder", sql.Decimal(5, 2), shoulder)
         .input("inseam", sql.Decimal(5, 2), inseam)
+        .input("height", sql.Decimal(5, 2), height)
+        .input("sleeve", sql.Decimal(5, 2), sleeve)
         .query(`
-          INSERT INTO Measurements (userId, chest, waist, hip, shoulder, inseam)
-          VALUES (@userId, @chest, @waist, @hip, @shoulder, @inseam)
+          INSERT INTO Measurements (userId, chest, waist, hip, shoulder, inseam, height, sleeve)
+          VALUES (@userId, @chest, @waist, @hip, @shoulder, @inseam, @height, @sleeve)
         `);
     }
 
     return response.json({
       message: "Measurements saved successfully",
-      measurements: { chest, waist, hip, shoulder, inseam }
+      measurements: { chest, waist, hip, shoulder, inseam, height, sleeve }
     });
   } catch (error) {
     console.error("Save measurements error:", error);
@@ -5439,6 +5461,39 @@ app.patch("/api/business-orders/:orderId/status", requireAuth, async (request, r
   }
 });
 
-app.listen(port, () => {
+const http = require("http");
+const { Server } = require("socket.io");
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log("Client connected to Socket.IO:", socket.id);
+
+  socket.on("join-booking", (bookingId) => {
+    socket.join(`booking-${bookingId}`);
+    console.log(`Socket ${socket.id} joined room booking-${bookingId}`);
+  });
+
+  socket.on("update-location", (data) => {
+    console.log(`Location update for booking ${data.bookingId}:`, data.lat, data.lng);
+    io.to(`booking-${data.bookingId}`).emit("location-updated", {
+      lat: data.lat,
+      lng: data.lng,
+      timestamp: Date.now()
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected from Socket.IO:", socket.id);
+  });
+});
+
+server.listen(port, () => {
   console.log(`Stitch backend running at http://localhost:${port}`);
 });

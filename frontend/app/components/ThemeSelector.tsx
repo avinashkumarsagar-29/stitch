@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Theme = "light" | "dark" | "classic";
+type Theme = "light" | "classic";
 
 export default function ThemeSelector() {
   const [theme, setTheme] = useState<Theme>("light");
@@ -11,7 +11,7 @@ export default function ThemeSelector() {
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem("stitch-theme") as Theme;
-    if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "classic") {
+    if (savedTheme === "light" || savedTheme === "classic") {
       setTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
@@ -30,8 +30,6 @@ export default function ThemeSelector() {
   function handleCycle() {
     let nextTheme: Theme = "light";
     if (theme === "light") {
-      nextTheme = "dark";
-    } else if (theme === "dark") {
       nextTheme = "classic";
     } else if (theme === "classic") {
       nextTheme = "light";
@@ -54,8 +52,8 @@ export default function ThemeSelector() {
     );
   }
 
-  const emoji = theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "📜";
-  const label = theme === "light" ? "Light" : theme === "dark" ? "Dark" : "Classic";
+  const emoji = theme === "light" ? "☀️" : "📜";
+  const label = theme === "light" ? "Light" : "Classic";
 
   return (
     <button

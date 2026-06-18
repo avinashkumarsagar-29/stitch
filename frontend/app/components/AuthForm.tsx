@@ -33,8 +33,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [role, setRole] = useState("user");
 
   useEffect(() => {
-    if (isRegister) return;
-
     const id = "google-gsi-script";
     let script = document.getElementById(id) as HTMLScriptElement | null;
     
@@ -75,7 +73,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         });
       }
     }
-  }, [isRegister]);
+  }, []);
 
   async function handleGoogleCredentialResponse(response: any) {
     if (!response.credential) {
@@ -353,7 +351,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
             {isRegister ? (
               <>
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block mb-2">
+                  <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
                     Full name
                   </label>
                   <div className="relative">
@@ -375,13 +373,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       placeholder="Enter your full name"
                       required
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-250/50 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block mb-2">
+                  <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
                     Email address
                   </label>
                   <div className="relative">
@@ -403,13 +401,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       placeholder="you@example.com"
                       required
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-255/50 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block mb-2">
+                  <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
                     Phone number
                   </label>
                   <div className="relative">
@@ -432,13 +430,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       placeholder="+91 98765 43210"
                       required
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-250/50 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block mb-2">
+                  <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
                     Password
                   </label>
                   <div className="relative">
@@ -461,7 +459,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       required
                       minLength={6}
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-12 rounded-xl border border-gray-250/50 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      className="block w-full h-12 pl-10 pr-12 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
                     />
                     <button
                       type="button"
@@ -497,7 +495,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 </div>
 
                 <div>
-                  <span className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-1.5">
+                  <span className="block text-[10px] font-extrabold text-gray-700 uppercase tracking-widest mb-1.5">
                     Join as a
                   </span>
                   <div className="grid grid-cols-2 gap-2.5">
@@ -539,7 +537,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
             ) : (
               <>
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block mb-2">
+                  <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
                     Phone number
                   </label>
                   <div className="relative">
@@ -570,7 +568,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
                 {isOtpSent && (
                   <div className="animate-fade-in">
-                    <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest block mb-2">
+                    <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
                       Verification OTP
                     </label>
                     <div className="relative">
@@ -595,7 +593,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                         required
                         maxLength={6}
                         suppressHydrationWarning
-                        className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-250/50 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 tracking-widest text-center font-mono text-lg"
+                        className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 tracking-widest text-center font-mono text-lg"
                       />
                     </div>
                     {devOtp && (
@@ -664,9 +662,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
             </button>
           )}
 
-          {!isRegister && (
-            <>
-              <div className="relative flex py-5 items-center">
+          <>
+            <div className="relative flex py-5 items-center">
                 <div className="flex-grow border-t border-gray-150/60"></div>
                 <span className="flex-shrink mx-4 text-gray-400 text-[10px] font-extrabold uppercase tracking-widest">or</span>
                 <div className="flex-grow border-t border-gray-150/60"></div>
@@ -699,7 +696,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 Continue with Google
               </button>
             </>
-          )}
 
           <div className="mt-8 pt-6 border-t border-gray-100 text-center text-xs text-gray-500">
             {isRegister ? "Already have an account?" : "New to Stitch?"}{" "}

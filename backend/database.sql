@@ -214,6 +214,8 @@ BEGIN
     hip DECIMAL(5,2),
     shoulder DECIMAL(5,2),
     inseam DECIMAL(5,2),
+    height DECIMAL(5,2),
+    sleeve DECIMAL(5,2),
     updatedAt DATETIME2 DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_Measurements_Users FOREIGN KEY (userId) REFERENCES dbo.Users(id)
   );

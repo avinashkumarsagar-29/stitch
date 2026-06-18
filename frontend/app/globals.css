@@ -12,17 +12,6 @@
   --text-muted: #9ca3af;
 }
 
-.dark {
-  --background: #0a1128;
-  --foreground: #e2eafc;
-  --card: #141f36;
-  --card-hover: #1f2d4d;
-  --card-border: #243557;
-  --text-primary: #e2eafc;
-  --text-secondary: #8da9c4;
-  --text-muted: #607b96;
-}
-
 .classic {
   --background: #fcf9f2;
   --foreground: #473a2b;

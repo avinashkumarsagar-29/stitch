@@ -1021,6 +1021,8 @@ function TrackContent() {
             {/* Right side: Real-time tracking Map */}
             <div className="lg:col-span-7 flex flex-col h-[450px] lg:h-auto">
               <TrackingMap
+                bookingId={activeBooking.id}
+                role={currentUser?.role || "user"}
                 status={activeBooking.status}
                 pickupLocation={activeBooking.pickupLocation}
                 dropoffLocation={activeBooking.dropoffLocation}
