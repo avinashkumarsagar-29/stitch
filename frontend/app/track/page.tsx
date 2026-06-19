@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "../components/profileStorage";
+import { API_URL } from "@/app/config";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -89,7 +90,7 @@ function PriceQuoteForm({ bookingId, onQuoteSubmitted }: { bookingId: number; on
 
     setIsSubmitting(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/price`, {
         method: "PATCH",
         headers: {
@@ -178,7 +179,7 @@ function TrackContent() {
     async function fetchBooking(id: string, typeVal: string) {
       setIsLoading(true);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         if (typeVal === "business") {
           const bizResponse = await authFetch(`${apiUrl}/api/business-orders/${id}`);
           const bizData = await bizResponse.json();
@@ -258,7 +259,7 @@ function TrackContent() {
       }
       setIsListLoading(true);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         
         // Fetch Standard Bookings
         const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
@@ -340,7 +341,7 @@ function TrackContent() {
     if (!activeBooking) return;
     setIsSimulating(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const isBusiness = !!(activeBooking as any).isBusiness;
       const endpoint = isBusiness
         ? `${apiUrl}/api/business-orders/${activeBooking.id}/status`
@@ -379,7 +380,7 @@ function TrackContent() {
   async function handleCardStatusUpdate(bookingId: number, status: string, isBusiness: boolean) {
     setIsSimulating(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const endpoint = isBusiness
         ? `${apiUrl}/api/business-orders/${bookingId}/status`
         : `${apiUrl}/api/bookings/${bookingId}/status`;
@@ -451,7 +452,7 @@ function TrackContent() {
     }
     setIsSubmittingReview(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/reviews`, {
         method: "POST",
         headers: {
@@ -1167,7 +1168,7 @@ function TailorOrderCard({
               return;
             }
             try {
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+              const apiUrl = API_URL;
               const response = await authFetch(`${apiUrl}/api/bookings/${booking.id}/price`, {
                 method: "PATCH",
                 headers: {

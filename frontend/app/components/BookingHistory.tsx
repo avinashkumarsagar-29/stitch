@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { showToast } from "./Toast";
 import { getCurrentUser, authFetch, getCurrentUserRole } from "./profileStorage";
+import { API_URL } from "@/app/config";
 
 type BookingRecord = {
   id: number;
@@ -27,8 +28,7 @@ export default function BookingHistory() {
   useEffect(() => {
     async function fetchBookings() {
       try {
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const userRole = getCurrentUserRole();
         if (userRole === "admin") {
           setBookings([]);

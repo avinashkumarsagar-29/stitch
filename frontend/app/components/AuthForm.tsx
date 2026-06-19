@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { showToast } from "./Toast";
 import { safeSetLocalStorage, authFetch } from "./profileStorage";
+import { API_URL } from "@/app/config";
 
 function decodeJwt(token: string) {
   try {
@@ -89,7 +90,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const res = await authFetch(`${apiUrl}/api/auth/google-login`, {
         method: "POST",
         headers: {
@@ -176,7 +177,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   async function registerUser(form: HTMLFormElement) {
     const formData = new FormData(form);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const apiUrl = API_URL;
     const payload = {
       fullName: String(formData.get("fullName") || ""),
       email: String(formData.get("email") || ""),
@@ -210,7 +211,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
   }
 
   async function requestOtp() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const apiUrl = API_URL;
 
     try {
       const response = await authFetch(`${apiUrl}/api/auth/request-otp`, {
@@ -239,7 +240,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
   }
 
   async function verifyOtp() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const apiUrl = API_URL;
 
     try {
       const response = await authFetch(`${apiUrl}/api/auth/verify-otp`, {

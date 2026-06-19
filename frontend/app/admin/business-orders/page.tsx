@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
+import { API_URL } from "@/app/config";
 
 type BusinessOrder = {
   id: number;
@@ -80,7 +81,7 @@ export default function AdminBusinessOrdersPage() {
   // Load Tailors (fetch all applications and filter by approved)
   const loadApprovedTailors = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/join`);
       const data = await response.json();
       if (response.ok && data.applications) {
@@ -105,7 +106,7 @@ export default function AdminBusinessOrdersPage() {
     setIsLoading(true);
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const params = new URLSearchParams();
       if (statusFilter) params.append("status", statusFilter);
       if (searchQuery) params.append("search", searchQuery);
@@ -147,7 +148,7 @@ export default function AdminBusinessOrdersPage() {
     if (!selectedOrder) return;
     setActionPending(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/business-orders/${selectedOrder.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

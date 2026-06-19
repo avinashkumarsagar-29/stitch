@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "./profileStorage";
+import { API_URL } from "@/app/config";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -213,7 +214,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
     setIsSubmitting(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
 
       let pickupLat = pickupCoords?.lat;
       let pickupLon = pickupCoords?.lon;

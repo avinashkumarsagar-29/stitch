@@ -13,6 +13,7 @@ import {
   authFetch,
   getCurrentUserRole,
 } from "./profileStorage";
+import { API_URL } from "@/app/config";
 import Loader from "./Loader";
 import JoinDrawer from "./JoinDrawer";
 import { showToast } from "./Toast";
@@ -151,7 +152,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
     async function checkNotifications() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const currentUser = getCurrentUser();
         const currentUserEmail = currentUser?.email || "";
         const currentUserPhone = currentUser?.phoneNumber || "";

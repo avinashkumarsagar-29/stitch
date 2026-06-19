@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "./profileStorage";
+import { API_URL } from "@/app/config";
 
 import { useEffect, useState } from "react";
 import { showToast } from "./Toast";
@@ -55,8 +56,7 @@ export default function UserOrderStatus() {
   useEffect(() => {
     async function fetchLatestBooking() {
       try {
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const savedUser = localStorage.getItem("stitch-user");
         const user: StoredUser | null = savedUser ? JSON.parse(savedUser) : null;
         const response = await authFetch(`${apiUrl}/api/bookings`);

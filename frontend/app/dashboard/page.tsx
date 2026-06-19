@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
 import { showToast } from "../components/Toast";
 import { getProfileForCurrentUser, getCurrentUser, emptyProfile, authFetch } from "../components/profileStorage";
+import { API_URL } from "@/app/config";
 
 type BookingRecord = {
   id: number;
@@ -86,7 +87,7 @@ function DashboardContent() {
       return;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const apiUrl = API_URL;
 
     async function fetchBookings() {
       if (!currentUser) return;
@@ -191,7 +192,7 @@ function DashboardContent() {
 
     setIsSubmittingQuote((prev) => ({ ...prev, [bookingId]: true }));
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/price`, {
         method: "PATCH",
         headers: {

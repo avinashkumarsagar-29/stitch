@@ -15,6 +15,7 @@ import {
   clearUserDataOnLogout,
   getCurrentUserRole,
 } from "./profileStorage";
+import { API_URL } from "@/app/config";
 import { showToast } from "./Toast";
 
 function playNotificationSound() {
@@ -168,7 +169,7 @@ export default function Sidebar({
 
     async function checkNotifications() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const currentUser = getCurrentUser();
         const currentUserEmail = currentUser?.email || "";
         const currentUserPhone = currentUser?.phoneNumber || "";

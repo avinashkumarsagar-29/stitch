@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
+import { API_URL } from "@/app/config";
 
 type BookingRecord = {
   id: number;
@@ -89,7 +90,7 @@ export default function AdminBookingsPage() {
     setIsLoading(true);
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const params = new URLSearchParams();
       if (statusFilter) params.append("status", statusFilter);
       if (searchQuery) params.append("search", searchQuery);
@@ -118,7 +119,7 @@ export default function AdminBookingsPage() {
     setIsDetailsLoading(true);
     setSelectedBookingId(bookingId);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/bookings/${bookingId}`);
       const data = await response.json();
 
@@ -146,7 +147,7 @@ export default function AdminBookingsPage() {
     if (!selectedBooking) return;
     setActionPending(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/bookings/${selectedBooking.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

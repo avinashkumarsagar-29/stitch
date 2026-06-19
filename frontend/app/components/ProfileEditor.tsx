@@ -13,6 +13,7 @@ import {
   authFetch,
   getCurrentUserRole,
 } from "./profileStorage";
+import { API_URL } from "@/app/config";
 import { showToast } from "./Toast";
 import UserOrderStatus from "./UserOrderStatus";
 
@@ -79,7 +80,7 @@ export default function ProfileEditor() {
       return;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const apiUrl = API_URL;
     const userId = user.id;
     const currentUserObj = user;
 
@@ -175,7 +176,7 @@ export default function ProfileEditor() {
 
     setIsSaving(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/users/${user.id}/profile`, {
         method: "PUT",
         headers: {
@@ -226,7 +227,7 @@ export default function ProfileEditor() {
 
     setIsSavingMeasurements(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/users/${user.id}/measurements`, {
         method: "PUT",
         headers: {

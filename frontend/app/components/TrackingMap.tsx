@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import { API_URL } from "@/app/config";
 
 type TrackingMapProps = {
   bookingId: number;
@@ -110,7 +111,7 @@ export default function TrackingMap({
   useEffect(() => {
     if (!bookingId) return;
 
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const socketUrl = API_URL;
     const socket = io(socketUrl);
 
     socket.on("connect", () => {

@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import AuthGuard from "../components/AuthGuard";
 import { showToast } from "../components/Toast";
 import { getCurrentUser, authFetch } from "../components/profileStorage";
+import { API_URL } from "@/app/config";
 
 type PendingBooking = {
   bookingId: number;
@@ -100,7 +101,7 @@ export default function PaymentPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const urlParams = new URLSearchParams(window.location.search);
         const urlBookingId = urlParams.get("bookingId");
 
@@ -184,7 +185,7 @@ export default function PaymentPage() {
     setIsProcessing(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/payments/create-order`, {
         method: "POST",
         headers: {
@@ -242,7 +243,7 @@ export default function PaymentPage() {
       handler: async function (response: any) {
         try {
           setIsProcessing(true);
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+          const apiUrl = API_URL;
           const verifyRes = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
             method: "POST",
             headers: {
@@ -298,7 +299,7 @@ export default function PaymentPage() {
       setShowMockModal(false);
       setIsProcessing(true);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
         method: "POST",
         headers: {
@@ -342,7 +343,7 @@ export default function PaymentPage() {
     if (!currentUser) return;
     try {
       setIsProcessing(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       
       const verifyRes = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
         method: "POST",
@@ -378,7 +379,7 @@ export default function PaymentPage() {
     if (!pendingBooking) return;
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/bookings/${pendingBooking.bookingId}/details`, {
         method: "POST",
         headers: {

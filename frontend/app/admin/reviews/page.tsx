@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
+import { API_URL } from "@/app/config";
 
 type ReviewRecord = {
   id: number;
@@ -56,7 +57,7 @@ export default function AdminReviewsPage() {
     setIsLoading(true);
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const params = new URLSearchParams();
       if (ratingFilter) params.append("rating", ratingFilter);
       if (searchQuery) params.append("search", searchQuery);
@@ -89,7 +90,7 @@ export default function AdminReviewsPage() {
 
     setActionPendingId(reviewId);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/reviews/${reviewId}`, {
         method: "DELETE",
       });

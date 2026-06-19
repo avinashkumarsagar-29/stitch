@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
+import { API_URL } from "@/app/config";
 
 type PaymentRecord = {
   id: number;
@@ -67,7 +68,7 @@ export default function AdminPaymentsPage() {
     setIsLoading(true);
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const params = new URLSearchParams();
       if (statusFilter) params.append("status", statusFilter);
       if (searchQuery) params.append("search", searchQuery);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useSyncExternalStore } from "react";
 import { showToast } from "../components/Toast";
 import { safeSetLocalStorage, authFetch, getCurrentUserRole } from "../components/profileStorage";
+import { API_URL } from "@/app/config";
 
 const customerPlans = [
   {
@@ -251,7 +252,7 @@ export default function PricingPage() {
     if (price === 0) {
       try {
         setIsProcessing(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const response = await authFetch(`${apiUrl}/api/payments/activate-free-plan`, {
           method: "POST",
           headers: {
@@ -289,7 +290,7 @@ export default function PricingPage() {
     // 2. Paid plan checkout (Razorpay)
     try {
       setIsProcessing(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/payments/create-order`, {
         method: "POST",
         headers: {
@@ -365,7 +366,7 @@ export default function PricingPage() {
       handler: async function (response: any) {
         try {
           setIsProcessing(true);
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+          const apiUrl = API_URL;
           const verifyRes = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
             method: "POST",
             headers: {
@@ -428,7 +429,7 @@ export default function PricingPage() {
     try {
       setShowMockModal(false);
       setIsProcessing(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
         method: "POST",
         headers: {

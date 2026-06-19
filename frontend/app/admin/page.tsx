@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../components/profileStorage";
+import { API_URL } from "../config";
 
 type ActivityItem = {
   id: string;
@@ -89,7 +90,7 @@ export default function AdminLandingPage() {
 
     async function loadSummary() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const response = await authFetch(`${apiUrl}/api/admin/summary`);
         const data = await response.json();
 

@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 import AuthGuard from "../../../components/AuthGuard";
 import { showToast } from "../../../components/Toast";
 import { authFetch } from "../../../components/profileStorage";
+import { API_URL } from "@/app/config";
+
 import BodyScannerModal from "../../../components/BodyScannerModal";
 
 type BookingRecord = {
@@ -88,8 +90,7 @@ export default function BookingDetailsPage() {
   useEffect(() => {
     async function loadBookingDetails() {
       try {
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = API_URL;
         const [bookingResponse, tailorResponse] = await Promise.all([
           authFetch(`${apiUrl}/api/bookings/${bookingId}`),
           authFetch(`${apiUrl}/api/tailors/${tailorId}`),
@@ -180,7 +181,7 @@ export default function BookingDetailsPage() {
 
     setIsSaving(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
 
       // Save/update body measurements in the database if user is logged in
       const savedUser = localStorage.getItem("stitch-user");

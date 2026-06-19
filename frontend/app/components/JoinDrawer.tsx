@@ -12,6 +12,7 @@ import {
   getProfileForCurrentUser,
   authFetch,
 } from "./profileStorage";
+import { API_URL } from "@/app/config";
 
 interface JoinDrawerProps {
   isOpen: boolean;
@@ -166,7 +167,7 @@ export default function JoinDrawer({ isOpen, onClose }: JoinDrawerProps) {
     setIsSubmitting(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
 
       let imageData = null;
       const image = formData.image;

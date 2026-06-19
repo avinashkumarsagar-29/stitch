@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
 import { showToast } from "../components/Toast";
 import { getProfileForCurrentUser, getCurrentUser, getProfileStorageKey, emptyProfile, authFetch } from "../components/profileStorage";
+import { API_URL } from "@/app/config";
 
 type BookingRecord = {
   id: number;
@@ -116,7 +117,7 @@ function NotificationsContent() {
       return;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const apiUrl = API_URL;
 
     async function fetchTailorApp() {
       if (currentUser?.role !== "tailor") return;
@@ -294,7 +295,7 @@ function NotificationsContent() {
 
     setIsSubmitting(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/tailor`, {
         method: "POST",
         headers: {
@@ -655,7 +656,7 @@ function NotificationsContent() {
                     }
                     setIsSubmitting(true);
                     try {
-                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+                      const apiUrl = API_URL;
                       const response = await authFetch(`${apiUrl}/api/bookings/${b.id}/price`, {
                         method: "PATCH",
                         headers: {
@@ -790,7 +791,7 @@ function NotificationsContent() {
                     }
                     setIsSubmitting(true);
                     try {
-                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+                      const apiUrl = API_URL;
                       
                       // Submit the price quote for the business order
                       const response = await authFetch(`${apiUrl}/api/business-orders/${bo.id}/price`, {

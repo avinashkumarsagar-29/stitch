@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUser, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
+import { API_URL } from "@/app/config";
 
 type AdminAccount = {
   id: number;
@@ -60,7 +61,7 @@ export default function AdminSettingsPage() {
   const loadSettings = async () => {
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/settings`);
       const data = await response.json();
 
@@ -93,7 +94,7 @@ export default function AdminSettingsPage() {
     setIsSaving(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -121,7 +122,7 @@ export default function AdminSettingsPage() {
 
     setIsSaving(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/admins`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,7 +147,7 @@ export default function AdminSettingsPage() {
   const removeAdmin = async (admin: AdminAccount) => {
     setIsSaving(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/admins/${admin.id}`, {
         method: "DELETE",
       });

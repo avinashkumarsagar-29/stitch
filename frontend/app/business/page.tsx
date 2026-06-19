@@ -4,6 +4,7 @@ import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { showToast } from "../components/Toast";
 import { authFetch, getCurrentUser, getCurrentUserRole } from "../components/profileStorage";
+import { API_URL } from "@/app/config";
 
 interface BusinessOrder {
   id: number;
@@ -175,7 +176,7 @@ export default function BusinessPage() {
     if (!isLoggedIn) return;
     try {
       setIsLoadingOrders(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/business-orders`);
       const data = await response.json();
       if (response.ok && data.businessOrders) {
@@ -286,7 +287,7 @@ export default function BusinessPage() {
     // Search available tailors at the location
     try {
       setIsSearchingTailors(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const tailorResponse = await authFetch(
         `${apiUrl}/api/tailors?location=${encodeURIComponent(location)}`
       );
@@ -319,7 +320,7 @@ export default function BusinessPage() {
   const submitInquiry = async (tailorId: number | null) => {
     try {
       setIsSubmitting(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/business-orders`, {
         method: "POST",
         headers: {
@@ -374,7 +375,7 @@ export default function BusinessPage() {
 
     try {
       setIsQuoting((prev) => ({ ...prev, [orderId]: true }));
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/business-orders/${orderId}/price`, {
         method: "PATCH",
         headers: {
@@ -422,7 +423,7 @@ export default function BusinessPage() {
   const handleUpdateStatus = async (orderId: number, status: "booked" | "cancelled" | "delivered") => {
     try {
       setIsUpdatingStatus((prev) => ({ ...prev, [orderId]: true }));
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/business-orders/${orderId}/status`, {
         method: "PATCH",
         headers: {

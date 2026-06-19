@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
+import { API_URL } from "@/app/config";
 
 type ReferralRecord = {
   id: number;
@@ -79,7 +80,7 @@ export default function ReferralsAdminPage() {
     setIsLoading(true);
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/referrals`);
       const data = await response.json();
 
@@ -114,7 +115,7 @@ export default function ReferralsAdminPage() {
 
     setIsActionSubmitting(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/referrals/${actioningRef.id}/${actionType}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -147,7 +148,7 @@ export default function ReferralsAdminPage() {
 
     setIsCreditSaving(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/users/${userId}/credit`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

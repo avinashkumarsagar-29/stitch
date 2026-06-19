@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
+import { API_URL } from "@/app/config";
 
 type JoinApplication = {
   id: number;
@@ -50,7 +51,7 @@ export default function AdminApplicationsPage() {
     setIsLoading(true);
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/join`);
       const data = await response.json();
 
@@ -88,7 +89,7 @@ export default function AdminApplicationsPage() {
   const handleApprove = async (appId: number) => {
     setActionPending(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/join/${appId}/approve`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -129,7 +130,7 @@ export default function AdminApplicationsPage() {
 
     setActionPending(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/join/${appId}/reject`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
+import { API_URL } from "@/app/config";
 
 type UserRecord = {
   id: number;
@@ -108,7 +109,7 @@ export default function UserManagementPage() {
     setIsLoading(true);
     setError("");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const params = new URLSearchParams();
       if (roleFilter) params.append("role", roleFilter);
       if (planFilter) params.append("plan", planFilter);
@@ -134,7 +135,7 @@ export default function UserManagementPage() {
   // Update user role
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/users/${userId}/role`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -157,7 +158,7 @@ export default function UserManagementPage() {
   // Toggle user ban status
   const handleBanToggle = async (userId: number, currentBanStatus: boolean) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       const response = await authFetch(`${apiUrl}/api/admin/users/${userId}/ban`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -185,7 +186,7 @@ export default function UserManagementPage() {
     setIsDetailsLoading(true);
     setSelectedUserId(userId);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const apiUrl = API_URL;
       
       const [profileRes, measurementsRes, bookingsRes] = await Promise.all([
         authFetch(`${apiUrl}/api/users/${userId}/profile`),
