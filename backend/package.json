@@ -12,8 +12,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "msnodesqlv8": "^5.2.0",
-    "mssql": "^12.5.4",
+    "mongoose": "^9.7.1",
     "nodemailer": "^8.0.10",
     "socket.io": "^4.8.3"
   }

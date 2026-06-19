@@ -4,7 +4,7 @@ Stitch is a tailoring and design application split into separate frontend and ba
 
 ```text
 frontend/  Next.js user interface
-backend/   Node.js Express API with SQL Server
+backend/   Node.js Express API with MongoDB
 ```
 
 ## Tech Stack
@@ -21,9 +21,7 @@ Backend:
 
 - Node.js
 - Express
-- SQL Server
-- mssql
-- msnodesqlv8 for Windows Authentication
+- MongoDB with Mongoose
 - bcryptjs
 - Twilio SMS API for OTP delivery
 
@@ -32,7 +30,7 @@ Backend:
 - Responsive Stitch home page
 - User role-based access (User vs Tailor)
 - Register and login pages with role selection
-- SQL Server powered auth API
+- MongoDB powered auth API
 - Password hashing with bcryptjs
 - Logout and protected page behavior
 - Profile page with editable details and image upload
@@ -102,22 +100,23 @@ frontend/app/components/Toast.tsx             Toastr-compatible messages
 frontend/.env.example                         Frontend API URL example
 
 backend/server.js                             Express server
-backend/db.js                                 SQL Server connection helper
-backend/database.sql                          SQL Server database/table script
-backend/.env.example                          Backend SQL config example
+backend/db.js                                 MongoDB connection compatibility helper
+backend/db.mongo.js                           MongoDB connection helper
+backend/models/                               Mongoose models
+backend/.env.example                          Backend environment config example
 ```
 
-## SQL Server Setup
+## MongoDB Setup
 
-Run this script in SQL Server:
+Set `MONGODB_URI` in `backend/.env`. Collections are managed through the Mongoose models in:
 
 ```text
-backend/database.sql
+backend/models/
 ```
 
 Create `backend/.env` from `backend/.env.example`.
 
-For your SSMS connection `SAGAR\SQLEXPRESS` with Integrated Security, use:
+Configure MongoDB Atlas and the backend API:
 
 ```text
 PORT=4000
@@ -125,11 +124,8 @@ FRONTEND_URL=http://localhost:3000
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+15551234567
-SQL_SERVER=localhost
-SQL_AUTH_TYPE=windows
-SQL_SERVER=SAGAR\SQLEXPRESS
-SQL_DATABASE=stitch
-SQL_CONNECTION_STRING=Driver={ODBC Driver 17 for SQL Server};Server=SAGAR\SQLEXPRESS;Database=stitch;Trusted_Connection=Yes;Encrypt=Yes;TrustServerCertificate=Yes;Application Name=Stitch Backend
+MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/stitch
+JWT_SECRET=change-me
 ```
 
 Create `frontend/.env.local` from `frontend/.env.example`:
@@ -204,9 +200,9 @@ npm run start
 - Without Twilio settings, the backend logs the OTP and returns `devOtp` for local development.
 - User role is stored in `stitch-role` localStorage (user or tailor).
 - User data is stored in `stitch-user` localStorage.
-- SQL Server stores registered users in the `Users` table with role column.
-- SQL Server stores pickup/drop-off requests in the `Bookings` table.
-- SQL Server stores join applications in the `JoinApplications` table.
+- MongoDB stores registered users in the `users` collection with a role field.
+- MongoDB stores pickup/drop-off requests in the `bookings` collection.
+- MongoDB stores join applications in the `joinapplications` collection.
 - Booking search shows available tailor cards from matching join applications.
 - Passwords are stored as bcrypt hashes, not plain text.
 - Profile information is still stored in browser localStorage.

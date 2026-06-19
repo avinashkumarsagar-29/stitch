@@ -537,9 +537,18 @@ export default function Sidebar({
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center transition-all duration-300 hover:border-purple-300 hover:bg-purple-50/10">
-                <p className="text-xs text-gray-400 font-medium">Join our tech-atelier</p>
-                <div className="mt-3">
+              <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center transition-all duration-300 hover:border-purple-300 hover:bg-purple-50/10 flex flex-col items-center">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-50 shadow-inner mb-3 transition-transform duration-500 hover:scale-105">
+                  <Image
+                    src={placeholderProfileImage}
+                    alt="Guest Avatar"
+                    fill
+                    sizes="48px"
+                    unoptimized
+                    className="object-cover rounded-full"
+                  />
+                </div>
+                <div className="w-full">
                   <Link
                     href="/login"
                     onClick={handleLinkClick}
