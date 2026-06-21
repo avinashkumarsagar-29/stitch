@@ -19,6 +19,7 @@ const JoinApplication = require("./models/JoinApplication");
 const BusinessOrder = require("./models/BusinessOrder");
 const Payment = require("./models/Payment");
 const AppSettings = require("./models/AppSettings");
+const Razorpay = require("razorpay");
 
 
 // Initialize MongoDB Connection
@@ -110,6 +111,54 @@ async function logPayment(userId, amount, planPurchased, razorpayOrderId, razorp
   } catch (error) {
     console.error("logPayment error:", error);
   }
+}
+
+async function confirmBookingAndProcessReferrals(bookingId) {
+  const mongoBooking = await Booking.findById(bookingId);
+  if (!mongoBooking) return null;
+
+  const oldStatus = mongoBooking.status;
+  if (oldStatus === "booked") {
+    return mongoBooking;
+  }
+
+  mongoBooking.status = "booked";
+  await mongoBooking.save();
+
+  if (oldStatus === "pending-payment") {
+    const userId = mongoBooking.userId;
+    const creditApplied = Number(mongoBooking.creditApplied || 0);
+
+    if (creditApplied > 0) {
+      const userDoc = await User.findById(userId);
+      if (userDoc) {
+        userDoc.credit = Math.max(0, (userDoc.credit || 0) - creditApplied);
+        await userDoc.save();
+      }
+    }
+
+    const referral = await Referral.findOne({ referredUserId: userId });
+    if (referral && !referral.rewardGranted) {
+      const confirmedCount = await Booking.countDocuments({
+        userId,
+        _id: { $ne: bookingId },
+        status: { $in: ['booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered'] }
+      });
+
+      if (confirmedCount === 0) {
+        referral.rewardGranted = true;
+        await referral.save();
+
+        const referrerDoc = await User.findById(referral.referrerUserId);
+        if (referrerDoc) {
+          referrerDoc.credit = (referrerDoc.credit || 0) + 50.00;
+          await referrerDoc.save();
+        }
+      }
+    }
+  }
+
+  return mongoBooking;
 }
 
 async function generateUniqueReferralCode() {
@@ -3182,9 +3231,9 @@ app.post("/api/payments/create-order", requireAuth, async (request, response) =>
     const userId = Number(request.body.userId);
     const billingCycle = String(request.body.billingCycle || "monthly").trim();
 
-    if (!planId || !Number.isFinite(price) || price <= 0 || !userId) {
+    if (!planId || !userId) {
       return response.status(400).json({
-        message: "Plan ID, price, and User ID are required",
+        message: "Plan ID and User ID are required",
       });
     }
 
@@ -3244,20 +3293,36 @@ app.post("/api/payments/create-order", requireAuth, async (request, response) =>
       });
     }
 
-    if (finalPrice === 0) {
+    // Determine amount in paise
+    let amount = request.body.amount;
+    if (amount === undefined || amount === null) {
+      amount = Math.round(finalPrice * 100);
+    }
+
+    // Free plan bypass
+    if (amount === 0) {
       const freeOrderId = "order_free_" + Math.random().toString(36).substring(2, 11);
       await logPayment(userId, 0, planId, freeOrderId, null, 'pending');
       return response.json({
         id: freeOrderId,
+        order_id: freeOrderId,
         amount: 0,
         currency: "INR",
         isMock: true,
         isFree: true,
         key: "rzp_test_mockkey",
+        key_id: "rzp_test_mockkey",
         planId,
         billingCycle,
         referralDiscount: referralDiscountApplied,
         creditApplied,
+      });
+    }
+
+    // Validate amount >= 100 paise before calling Razorpay; return 400 if not
+    if (amount < 100) {
+      return response.status(400).json({
+        message: "Amount must be at least 100 paise (1 INR)",
       });
     }
 
@@ -3269,13 +3334,15 @@ app.post("/api/payments/create-order", requireAuth, async (request, response) =>
     if (!isRazorpayConfigured) {
       // Return a Mock Order for developer testing
       const mockOrderId = "order_mock_" + Math.random().toString(36).substring(2, 11);
-      await logPayment(userId, finalPrice, planId, mockOrderId, null, 'pending');
+      await logPayment(userId, amount / 100, planId, mockOrderId, null, 'pending');
       return response.json({
         id: mockOrderId,
-        amount: Math.round(finalPrice * 100),
+        order_id: mockOrderId,
+        amount,
         currency: "INR",
         isMock: true,
         key: "rzp_test_mockkey",
+        key_id: "rzp_test_mockkey",
         planId,
         billingCycle,
         referralDiscount: referralDiscountApplied,
@@ -3283,42 +3350,40 @@ app.post("/api/payments/create-order", requireAuth, async (request, response) =>
       });
     }
 
-    const authHeader = "Basic " + Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const orderRes = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": authHeader
-      },
-      body: JSON.stringify({
-        amount: Math.round(finalPrice * 100),
+    try {
+      const instance = new Razorpay({
+        key_id: keyId,
+        key_secret: keySecret,
+      });
+
+      const orderData = await instance.orders.create({
+        amount: Math.round(amount),
         currency: "INR",
-        receipt: "receipt_order_" + Date.now()
-      })
-    });
+        receipt: "receipt_order_" + Date.now(),
+      });
 
-    const orderData = await orderRes.json();
+      await logPayment(userId, amount / 100, planId, orderData.id, null, 'pending');
 
-    if (!orderRes.ok) {
-      return response.status(orderRes.status).json({
-        message: orderData.error?.description || "Failed to create Razorpay order",
-        detail: orderData.error,
+      return response.json({
+        id: orderData.id,
+        order_id: orderData.id,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        key_id: keyId,
+        isMock: false,
+        key: keyId,
+        planId,
+        billingCycle,
+        referralDiscount: referralDiscountApplied,
+        creditApplied,
+      });
+    } catch (sdkError) {
+      console.error("Razorpay SDK Order Creation Error:", sdkError);
+      return response.status(500).json({
+        message: sdkError.message || "Failed to create Razorpay order",
+        detail: sdkError,
       });
     }
-
-    await logPayment(userId, finalPrice, planId, orderData.id, null, 'pending');
-
-    return response.json({
-      id: orderData.id,
-      amount: orderData.amount,
-      currency: orderData.currency,
-      isMock: false,
-      key: keyId,
-      planId,
-      billingCycle,
-      referralDiscount: referralDiscountApplied,
-      creditApplied,
-    });
   } catch (error) {
     console.error("Create order error:", error);
     return response.status(500).json({
@@ -3328,7 +3393,7 @@ app.post("/api/payments/create-order", requireAuth, async (request, response) =>
   }
 });
 
-app.post("/api/payments/verify-payment", requireAuth, async (request, response) => {
+async function verifyPaymentHandler(request, response) {
   try {
     const {
       razorpay_order_id,
@@ -3339,58 +3404,88 @@ app.post("/api/payments/verify-payment", requireAuth, async (request, response) 
       isMock,
     } = request.body;
 
-    if (!planId || !userId) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return response.status(400).json({
-        message: "Plan ID and User ID are required",
+        message: "Missing required fields: razorpay_order_id, razorpay_payment_id, and razorpay_signature are required",
       });
     }
 
-    if (!canAccessUser(request, userId)) {
+    // 1. Fetch related payment information
+    const payment = await Payment.findOne({ razorpayOrderId: razorpay_order_id });
+    const finalPlanId = planId || payment?.planPurchased;
+    const finalUserId = userId || payment?.userId || getAuthenticatedUserId(request);
+
+    if (!finalUserId) {
+      return response.status(400).json({
+        message: "User ID is required",
+      });
+    }
+
+    if (!canAccessUser(request, finalUserId)) {
       return response.status(403).json({
         message: "You can only verify payments for your own account",
       });
     }
 
-    if (isMock) {
+    if (isMock || String(razorpay_order_id).startsWith("order_mock_") || String(razorpay_order_id).startsWith("order_free_")) {
       const keyId = process.env.RAZORPAY_KEY_ID;
+      // Allow mock if no keys are configured, or if it is a free order
       if (keyId && keyId.trim() && !String(razorpay_order_id).startsWith("order_free_")) {
         return response.status(400).json({
           message: "Mock payments are disabled because real Razorpay keys are configured",
         });
       }
 
-      if (!planId.startsWith("booking_")) {
-        // Update plan in Users
-        await User.findByIdAndUpdate(userId, { plan: planId });
+      // Mark the payment as verified in Payment model
+      if (payment) {
+        payment.razorpayPaymentId = razorpay_payment_id;
+        payment.status = "verified";
+        await payment.save();
+      } else {
+        let amountVal = 0;
+        if (finalPlanId === "Pro") amountVal = 799.00;
+        else if (finalPlanId === "Plus") amountVal = 299.00;
+        else if (finalPlanId === "Alterations") amountVal = 0.00;
+        else if (finalPlanId === "Custom") amountVal = 199.00;
+        else if (finalPlanId === "Bespoke") amountVal = 299.00;
+        
+        if (finalPlanId && finalPlanId.startsWith("booking_")) {
+          const bookingId = Number(finalPlanId.replace("booking_", ""));
+          const b = await Booking.findById(bookingId);
+          if (b) {
+            amountVal = Number(b.approxPrice || 0);
+          }
+        }
+        await logPayment(finalUserId, amountVal, finalPlanId || "unknown", razorpay_order_id, razorpay_payment_id, "verified");
+      }
 
-        // Sync user subscription details to JoinApplications if they are a Tailor
-        const user = await User.findById(userId);
-
+      // Mark booking as paid if booking plan
+      if (finalPlanId && finalPlanId.startsWith("booking_")) {
+        const bookingId = Number(finalPlanId.replace("booking_", ""));
+        const updatedBooking = await confirmBookingAndProcessReferrals(bookingId);
+        if (!updatedBooking) {
+          return response.status(404).json({ message: "Booking not found" });
+        }
+      } else if (finalPlanId) {
+        // subscription updates
+        await User.findByIdAndUpdate(finalUserId, { plan: finalPlanId });
+        const user = await User.findById(finalUserId);
         if (user && user.role === "tailor") {
           await JoinApplication.updateMany(
             { $or: [{ email: user.email }, { phoneNumber: user.phoneNumber }] },
-            { plan: planId }
+            { plan: finalPlanId }
           );
         }
       }
 
-      let amountVal = 0;
-      if (planId === "Pro") amountVal = 799.00;
-      else if (planId === "Plus") amountVal = 299.00;
-      else if (planId === "Alterations") amountVal = 0.00;
-      else if (planId === "Custom") amountVal = 199.00;
-      else if (planId === "Bespoke") amountVal = 299.00;
-
-      await logPayment(userId, amountVal, planId, razorpay_order_id, razorpay_payment_id || "mock_payment", "verified");
-
       return response.json({
         success: true,
-        message: planId.startsWith("booking_") ? "Mock payment verified and booking confirmed" : "Mock payment verified and subscription activated",
-        plan: planId,
+        message: finalPlanId && finalPlanId.startsWith("booking_") ? "Mock payment verified and booking confirmed" : "Mock payment verified and subscription activated",
+        plan: finalPlanId,
       });
     }
 
-    // Real signature verification using crypto
+    // 2. Real signature verification
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keySecret) {
       return response.status(500).json({
@@ -3398,51 +3493,76 @@ app.post("/api/payments/verify-payment", requireAuth, async (request, response) 
       });
     }
 
-    let amountVal = 0;
-    if (planId === "Pro") amountVal = 799.00;
-    else if (planId === "Plus") amountVal = 299.00;
-    else if (planId === "Alterations") amountVal = 0.00;
-    else if (planId === "Custom") amountVal = 199.00;
-    else if (planId === "Bespoke") amountVal = 299.00;
-
-    const crypto = require("crypto");
     const hmac = crypto.createHmac("sha256", keySecret);
     hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
     const generated_signature = hmac.digest("hex");
 
-    if (generated_signature !== razorpay_signature) {
-      await logPayment(userId, amountVal, planId, razorpay_order_id, razorpay_payment_id, "failed");
+    const signatureBuffer = Buffer.from(razorpay_signature);
+    const generatedBuffer = Buffer.from(generated_signature);
+
+    if (signatureBuffer.length !== generatedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, generatedBuffer)) {
+      if (payment) {
+        payment.razorpayPaymentId = razorpay_payment_id;
+        payment.status = "failed";
+        await payment.save();
+      }
       return response.status(400).json({
         message: "Invalid payment signature. Payment verification failed.",
       });
     }
 
-    await logPayment(userId, amountVal, planId, razorpay_order_id, razorpay_payment_id, "verified");
+    // Update payment in db
+    if (payment) {
+      payment.razorpayPaymentId = razorpay_payment_id;
+      payment.status = "verified";
+      await payment.save();
+    } else {
+      let amountVal = 0;
+      if (finalPlanId === "Pro") amountVal = 799.00;
+      else if (finalPlanId === "Plus") amountVal = 299.00;
+      else if (finalPlanId === "Alterations") amountVal = 0.00;
+      else if (finalPlanId === "Custom") amountVal = 199.00;
+      else if (finalPlanId === "Bespoke") amountVal = 299.00;
 
-    if (!planId.startsWith("booking_")) {
-      // Signature matches, update plan in Users
-      await User.findByIdAndUpdate(userId, { plan: planId });
+      if (finalPlanId && finalPlanId.startsWith("booking_")) {
+        const bookingId = Number(finalPlanId.replace("booking_", ""));
+        const b = await Booking.findById(bookingId);
+        if (b) {
+          amountVal = Number(b.approxPrice || 0);
+        }
+      }
+      await logPayment(finalUserId, amountVal, finalPlanId || "unknown", razorpay_order_id, razorpay_payment_id, "verified");
+    }
 
-      // Sync to JoinApplications if tailor
-      const user = await User.findById(userId);
-
+    // Mark booking as paid if booking plan
+    if (finalPlanId && finalPlanId.startsWith("booking_")) {
+      const bookingId = Number(finalPlanId.replace("booking_", ""));
+      const updatedBooking = await confirmBookingAndProcessReferrals(bookingId);
+      if (!updatedBooking) {
+        return response.status(404).json({ message: "Booking not found to mark as paid" });
+      }
+    } else if (finalPlanId) {
+      // subscription updates
+      await User.findByIdAndUpdate(finalUserId, { plan: finalPlanId });
+      const user = await User.findById(finalUserId);
       if (user && user.role === "tailor") {
         await JoinApplication.updateMany(
           { $or: [{ email: user.email }, { phoneNumber: user.phoneNumber }] },
-          { plan: planId }
+          { plan: finalPlanId }
         );
       }
     }
 
     return response.json({
       success: true,
-      message: planId.startsWith("booking_") ? "Payment verified and booking confirmed successfully" : "Payment verified and subscription activated successfully",
-      plan: planId,
+      message: finalPlanId && finalPlanId.startsWith("booking_") ? "Payment verified and booking confirmed successfully" : "Payment verified and subscription activated successfully",
+      plan: finalPlanId,
     });
   } catch (error) {
     console.error("Verify payment error:", error);
     try {
-      await logPayment(request.body.userId || 0, 0, request.body.planId || "unknown", request.body.razorpay_order_id || "unknown", request.body.razorpay_payment_id || "unknown", "failed");
+      const finalUserId = request.body.userId || getAuthenticatedUserId(request) || 0;
+      await logPayment(finalUserId, 0, request.body.planId || "unknown", request.body.razorpay_order_id || "unknown", request.body.razorpay_payment_id || "unknown", "failed");
     } catch (e) {
       console.error("Failed to log failed payment error:", e);
     }
@@ -3451,7 +3571,10 @@ app.post("/api/payments/verify-payment", requireAuth, async (request, response) 
       detail: error.message,
     });
   }
-});
+}
+
+app.post("/api/payments/verify", requireAuth, verifyPaymentHandler);
+app.post("/api/payments/verify-payment", requireAuth, verifyPaymentHandler);
 
 app.post("/api/payments/activate-free-plan", requireAuth, async (request, response) => {
   try {
@@ -3586,47 +3709,23 @@ app.patch("/api/bookings/:bookingId/status", requireAuth, async (request, respon
       });
     }
 
-    const oldStatus = mongoBooking.status;
-
-    mongoBooking.status = status;
-    await mongoBooking.save();
-
-    if (status === "booked" && oldStatus === "pending-payment") {
-      const userId = mongoBooking.userId;
-      const creditApplied = Number(mongoBooking.creditApplied || 0);
-
-      if (creditApplied > 0) {
-        const userDoc = await User.findById(userId);
-        if (userDoc) {
-          userDoc.credit = Math.max(0, (userDoc.credit || 0) - creditApplied);
-          await userDoc.save();
-        }
-      }
-
-      const referral = await Referral.findOne({ referredUserId: userId });
-      if (referral && !referral.rewardGranted) {
-        const confirmedCount = await Booking.countDocuments({
-          userId,
-          _id: { $ne: bookingId },
-          status: { $in: ['booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered'] }
+    let finalBooking = mongoBooking;
+    if (status === "booked") {
+      const updated = await confirmBookingAndProcessReferrals(bookingId);
+      if (!updated) {
+        return response.status(404).json({
+          message: "Booking not found",
         });
-
-        if (confirmedCount === 0) {
-          referral.rewardGranted = true;
-          await referral.save();
-
-          const referrerDoc = await User.findById(referral.referrerUserId);
-          if (referrerDoc) {
-            referrerDoc.credit = (referrerDoc.credit || 0) + 50.00;
-            await referrerDoc.save();
-          }
-        }
       }
+      finalBooking = updated;
+    } else {
+      mongoBooking.status = status;
+      await mongoBooking.save();
     }
 
     return response.json({
       message: "Booking status updated successfully",
-      booking: mongoBooking.toObject(),
+      booking: finalBooking.toObject(),
     });
   } catch (error) {
     console.error("Booking status update error:", error);

@@ -357,7 +357,7 @@ export default function PricingPage() {
     }
 
     const options = {
-      key: order.key,
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || order.key_id || order.key,
       amount: order.amount,
       currency: order.currency,
       name: "Stitch Tailoring",
@@ -367,7 +367,7 @@ export default function PricingPage() {
         try {
           setIsProcessing(true);
           const apiUrl = API_URL;
-          const verifyRes = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
+          const verifyRes = await authFetch(`${apiUrl}/api/payments/verify`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -412,6 +412,12 @@ export default function PricingPage() {
       theme: {
         color: "#c322f4",
       },
+      modal: {
+        ondismiss: function () {
+          showToast("Payment window closed. You can retry payment anytime.", "success");
+          setIsProcessing(false);
+        },
+      },
     };
 
     const rzp = new (window as any).Razorpay(options);
@@ -430,7 +436,7 @@ export default function PricingPage() {
       setShowMockModal(false);
       setIsProcessing(true);
       const apiUrl = API_URL;
-      const response = await authFetch(`${apiUrl}/api/payments/verify-payment`, {
+      const response = await authFetch(`${apiUrl}/api/payments/verify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

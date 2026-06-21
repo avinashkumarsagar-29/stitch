@@ -11,8 +11,9 @@ async function connectMongo() {
   const options = {
     maxPoolSize: 10,
     minPoolSize: 0,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
+    serverSelectionTimeoutMS: 10000, // Wait up to 10s for server selection
+    socketTimeoutMS: 90000,          // Wait up to 90s for socket inactivity
+    connectTimeoutMS: 30000,         // Wait up to 30s to establish initial connection
   };
 
   let retries = 5;

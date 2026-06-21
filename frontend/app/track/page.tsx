@@ -726,6 +726,26 @@ function TrackContent() {
             </div>
           )}
 
+          {activeBooking.status === "pending-payment" && !isTailor && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm animate-fade-in">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                  <span className="animate-pulse h-2 w-2 rounded-full bg-amber-600" />
+                  Price Quote Received!
+                </h4>
+                <p className="text-xs text-amber-700">
+                  Your tailor partner has quoted a price of <strong>₹{activeBooking.approxPrice}</strong> for your custom stitching booking. Confirm now to proceed with payment.
+                </p>
+              </div>
+              <button
+                onClick={() => router.push(`/payment?bookingId=${activeBooking.id}`)}
+                className="h-11 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-xs font-bold text-white shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer shrink-0"
+              >
+                Pay Now
+              </button>
+            </div>
+          )}
+
           {/* Order Completion Review prompt */}
           {activeBooking.status === "delivered" && !isTailor && !(activeBooking as any).isBusiness && (
             !activeBooking.reviewId ? (

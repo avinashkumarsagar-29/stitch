@@ -20,6 +20,7 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"
         />
+        <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
       </head>
       <body className="min-h-full flex flex-col">
         <LayoutWrapper>{children}</LayoutWrapper>
