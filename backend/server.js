@@ -20,7 +20,12 @@ const BusinessOrder = require("./models/BusinessOrder");
 const Payment = require("./models/Payment");
 const AppSettings = require("./models/AppSettings");
 const Razorpay = require("razorpay");
-const { uploadProfile, uploadCloth } = require("./cloudinary");
+const {
+  uploadProfile,
+  uploadCloth,
+  uploadProfileImage,
+  uploadClothImage,
+} = require("./cloudinary");
 
 
 // Initialize MongoDB Connection
@@ -66,7 +71,7 @@ app.get("/health/db", async (_request, response) => {
     const mongoose = require("mongoose");
     const state = mongoose.connection.readyState;
     const states = ["disconnected", "connected", "connecting", "disconnecting"];
-    
+
     if (state === 1) {
       return response.json({
         status: "ok",
@@ -1482,8 +1487,8 @@ app.patch("/api/admin/users/:userId/role", requireAdmin, async (request, respons
     }
 
     if (newRole === "admin" && request.user?.email !== process.env.SUPER_ADMIN_EMAIL) {
-      return response.status(403).json({ 
-        message: "Forbidden: Only super admin can assign admin role" 
+      return response.status(403).json({
+        message: "Forbidden: Only super admin can assign admin role"
       });
     }
 
@@ -1698,9 +1703,9 @@ app.get("/api/admin/bookings", requireAdmin, async (request, response) => {
       if (search) {
         const s = search.toLowerCase();
         const match = (bookingObj.customerName && bookingObj.customerName.toLowerCase().includes(s)) ||
-                      (bookingObj.tailorName && bookingObj.tailorName.toLowerCase().includes(s)) ||
-                      (bookingObj.trackingCode && bookingObj.trackingCode.toLowerCase().includes(s)) ||
-                      (bookingObj.clothCategory && bookingObj.clothCategory.toLowerCase().includes(s));
+          (bookingObj.tailorName && bookingObj.tailorName.toLowerCase().includes(s)) ||
+          (bookingObj.trackingCode && bookingObj.trackingCode.toLowerCase().includes(s)) ||
+          (bookingObj.clothCategory && bookingObj.clothCategory.toLowerCase().includes(s));
         if (match) {
           bookings.push(bookingObj);
         }
@@ -1958,10 +1963,10 @@ app.get("/api/admin/payments", requireAdmin, async (request, response) => {
       if (search) {
         const s = search.toLowerCase();
         const match = (paymentObj.customerName && paymentObj.customerName.toLowerCase().includes(s)) ||
-                      (paymentObj.customerEmail && paymentObj.customerEmail.toLowerCase().includes(s)) ||
-                      (paymentObj.planPurchased && paymentObj.planPurchased.toLowerCase().includes(s)) ||
-                      (paymentObj.razorpayOrderId && paymentObj.razorpayOrderId.toLowerCase().includes(s)) ||
-                      (paymentObj.razorpayPaymentId && paymentObj.razorpayPaymentId.toLowerCase().includes(s));
+          (paymentObj.customerEmail && paymentObj.customerEmail.toLowerCase().includes(s)) ||
+          (paymentObj.planPurchased && paymentObj.planPurchased.toLowerCase().includes(s)) ||
+          (paymentObj.razorpayOrderId && paymentObj.razorpayOrderId.toLowerCase().includes(s)) ||
+          (paymentObj.razorpayPaymentId && paymentObj.razorpayPaymentId.toLowerCase().includes(s));
         if (match) {
           payments.push(paymentObj);
         }
@@ -2059,8 +2064,8 @@ app.get("/api/admin/reviews", requireAdmin, async (request, response) => {
       if (search) {
         const s = search.toLowerCase();
         const match = (reviewObj.customerName && reviewObj.customerName.toLowerCase().includes(s)) ||
-                      (reviewObj.tailorName && reviewObj.tailorName.toLowerCase().includes(s)) ||
-                      (reviewObj.comment && reviewObj.comment.toLowerCase().includes(s));
+          (reviewObj.tailorName && reviewObj.tailorName.toLowerCase().includes(s)) ||
+          (reviewObj.comment && reviewObj.comment.toLowerCase().includes(s));
         if (match) {
           reviews.push(reviewObj);
         }
@@ -2395,7 +2400,9 @@ app.put("/api/users/:userId/profile", uploadProfile.single("image"), async (requ
     const email = String(request.body.email || "").trim().toLowerCase();
     const phone = normalizePhoneNumber(request.body.phone);
     const address = String(request.body.address || "").trim();
-    const image = request.file ? request.file.path : (request.body.image || null);
+    const image = request.file
+      ? await uploadProfileImage(request.file.buffer)
+      : (request.body.image || null);
 
     if (!userId) {
       return response.status(400).json({ message: "User ID is required" });
@@ -2859,7 +2866,9 @@ app.post("/api/bookings/:bookingId/details", requireAuth, uploadCloth.single("cl
     const clothCategory = String(request.body.clothCategory || "").trim();
     const material = String(request.body.material || "").trim();
     const approxPrice = request.body.approxPrice !== undefined && request.body.approxPrice !== null ? Number(request.body.approxPrice) : null;
-    const clothImage = request.file ? request.file.path : (request.body.clothImage || null);
+    const clothImage = request.file
+      ? await uploadClothImage(request.file.buffer)
+      : (request.body.clothImage || null);
 
     if (!bookingId || !tailorApplicationId) {
       return response.status(400).json({
@@ -3090,7 +3099,9 @@ app.post("/api/join", uploadProfile.single("image"), async (request, response) =
     const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
     const experience = String(request.body.experience || "").trim();
     const location = String(request.body.location || "").trim();
-    const image = request.file ? request.file.path : (request.body.image || null);
+    const image = request.file
+      ? await uploadProfileImage(request.file.buffer)
+      : (request.body.image || null);
     const plan = String(request.body.plan || "Free").trim();
 
     if (!firstName || !lastName || !email || !phoneNumber || !experience || !location) {
@@ -3265,7 +3276,7 @@ app.get("/api/tailors", async (request, response) => {
     for (const ja of applications) {
       const reviews = await Review.find({ tailorApplicationId: ja._id });
       const avgRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
-      
+
       enrichedTailors.push({
         id: ja._id,
         firstName: ja.firstName,
@@ -3667,7 +3678,7 @@ async function verifyPaymentHandler(request, response) {
         else if (finalPlanId === "Alterations") amountVal = 0.00;
         else if (finalPlanId === "Custom") amountVal = 199.00;
         else if (finalPlanId === "Bespoke") amountVal = 299.00;
-        
+
         if (finalPlanId && finalPlanId.startsWith("booking_")) {
           const bookingId = Number(finalPlanId.replace("booking_", ""));
           const b = await Booking.findById(bookingId);
