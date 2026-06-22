@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
+import { useEffect, useState, useSyncExternalStore, Suspense, useCallback } from "react";
 import { showToast } from "../components/Toast";
 import { getProfileForCurrentUser, getCurrentUser, emptyProfile, authFetch } from "../components/profileStorage";
 import { API_URL } from "@/app/config";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type BookingRecord = {
   id: number;
@@ -81,43 +82,42 @@ function DashboardContent() {
     setProfile(getProfileForCurrentUser());
   }, []);
 
+  const fetchBookings = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const apiUrl = API_URL;
+      const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser.role}`);
+      const data = await response.json();
+      if (response.ok && data.bookings) {
+        // Filter bookings assigned to this tailor
+        const tailorEmail = currentUser.email?.toLowerCase().trim() || "";
+        const tailorPhone = currentUser.phoneNumber?.trim() || "";
+        const tailorId = currentUser.id;
+
+        const myBookings = data.bookings.filter((b: BookingRecord) =>
+          (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === tailorEmail) ||
+          (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === tailorPhone) ||
+          (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(tailorId))
+        );
+        setBookings(myBookings);
+      }
+    } catch (error) {
+      console.error("Fetch dashboard bookings error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     if (!currentUser || currentUser.role !== "tailor") {
       setIsLoading(false);
       return;
     }
 
-    const apiUrl = API_URL;
-
-    async function fetchBookings() {
-      if (!currentUser) return;
-      try {
-        const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser.role}`);
-        const data = await response.json();
-        if (response.ok && data.bookings) {
-          // Filter bookings assigned to this tailor
-          const tailorEmail = currentUser.email?.toLowerCase().trim() || "";
-          const tailorPhone = currentUser.phoneNumber?.trim() || "";
-          const tailorId = currentUser.id;
-
-          const myBookings = data.bookings.filter((b: BookingRecord) =>
-            (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === tailorEmail) ||
-            (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === tailorPhone) ||
-            (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(tailorId))
-          );
-          setBookings(myBookings);
-        }
-      } catch (error) {
-        console.error("Fetch dashboard bookings error:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     fetchBookings();
-    const interval = setInterval(fetchBookings, 10000);
-    return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, fetchBookings]);
+
+  useAutoRefresh("bookings", fetchBookings);
 
   if (!currentUser || currentUser.role !== "tailor") {
     return (

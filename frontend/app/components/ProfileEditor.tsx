@@ -47,6 +47,7 @@ export default function ProfileEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   function handleCopyReferral() {
     if (!profile.referralCode) return;
@@ -159,6 +160,8 @@ export default function ProfileEditor() {
       return;
     }
 
+    setSelectedFile(file);
+
     const reader = new FileReader();
     reader.onload = () => {
       updateProfile("image", String(reader.result));
@@ -177,20 +180,23 @@ export default function ProfileEditor() {
     setIsSaving(true);
     try {
       const apiUrl = API_URL;
+      const formData = new FormData();
+      formData.append("fullName", profile.fullName || "");
+      formData.append("firstName", profile.firstName || "");
+      formData.append("lastName", profile.lastName || "");
+      formData.append("email", profile.email || "");
+      formData.append("phone", profile.phone || "");
+      formData.append("address", profile.address || "");
+      
+      if (selectedFile) {
+        formData.append("image", selectedFile);
+      } else if (profile.image) {
+        formData.append("image", profile.image);
+      }
+
       const response = await authFetch(`${apiUrl}/api/users/${user.id}/profile`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName: profile.fullName,
-          firstName: profile.firstName,
-          lastName: profile.lastName,
-          email: profile.email,
-          phone: profile.phone,
-          address: profile.address,
-          image: profile.image || null,
-        }),
+        body: formData,
       });
       const data = await response.json();
 
@@ -208,6 +214,7 @@ export default function ProfileEditor() {
       window.dispatchEvent(new Event("stitch-auth-change"));
 
       setProfile(data.profile);
+      setSelectedFile(null); // Reset after successful upload
       showToast("Profile updated successfully", "success");
     } catch (err) {
       console.error("Save profile error:", err);
@@ -351,7 +358,7 @@ export default function ProfileEditor() {
             Update Your Account Information
           </h2>
           <p className="mt-3.5 max-w-[620px] text-xs leading-relaxed text-gray-500">
-            Upload your <span className="text-[#c322f4] font-semibold">profile image</span> and populate your basic <span className="text-[#d2a22e] font-semibold">contact & address details</span> below.
+            Upload your <span className="text-[#c322f4] font-semibold">profile image</span> and populate your basic <span className="text-[#d2a22e] font-semibold">contact details</span> below.
           </p>
 
           <div className="mt-10 grid gap-5 sm:grid-cols-2">
@@ -394,20 +401,7 @@ export default function ProfileEditor() {
                 </svg>
               }
             />
-            <div className="sm:col-span-2">
-              <ProfileField
-                label="Full Address"
-                value={profile.address}
-                onChange={(value) => updateProfile("address", value)}
-                placeholder="Enter address details"
-                icon={
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <circle cx="12" cy="11" r="3" />
-                  </svg>
-                }
-              />
-            </div>
+
           </div>
 
           <button

@@ -74,6 +74,7 @@ export default function BookingDetailsPage() {
     approxPrice: "",
     clothImage: "",
   });
+  const [selectedClothFile, setSelectedClothFile] = useState<File | null>(null);
   const [measurements, setMeasurements] = useState({
     chest: "",
     waist: "",
@@ -164,6 +165,8 @@ export default function BookingDetailsPage() {
       return;
     }
 
+    setSelectedClothFile(file);
+
     const reader = new FileReader();
     reader.onload = () => {
       updateDetails("clothImage", String(reader.result));
@@ -205,18 +208,20 @@ export default function BookingDetailsPage() {
       }
 
       // Save details to backend (approxPrice is null because tailor sets it!)
+      const formData = new FormData();
+      formData.append("tailorApplicationId", String(tailorId));
+      formData.append("clothCategory", details.clothCategory);
+      formData.append("material", details.material);
+
+      if (selectedClothFile) {
+        formData.append("clothImage", selectedClothFile);
+      } else if (details.clothImage) {
+        formData.append("clothImage", details.clothImage);
+      }
+
       const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/details`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tailorApplicationId: Number(tailorId),
-          clothCategory: details.clothCategory,
-          material: details.material,
-          approxPrice: null,
-          clothImage: details.clothImage || null,
-        }),
+        body: formData,
       });
 
       const data = await response.json();

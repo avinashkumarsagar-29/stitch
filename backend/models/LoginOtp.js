@@ -3,7 +3,7 @@ const { getNextSequenceValue } = require("./Counter");
 
 const loginOtpSchema = new mongoose.Schema({
   _id: { type: Number },
-  phoneNumber: { type: String, required: true },
+  email: { type: String, required: true },
   otpCode: { type: String, required: true },
   expiresAt: { type: Date, required: true },
   usedAt: { type: Date, default: null },
@@ -39,8 +39,9 @@ loginOtpSchema.set("toObject", {
 });
 
 // Indexes for query optimization
-loginOtpSchema.index({ phoneNumber: 1 });
+loginOtpSchema.index({ email: 1 });
 loginOtpSchema.index({ createdAt: -1 });
+loginOtpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 loginOtpSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {

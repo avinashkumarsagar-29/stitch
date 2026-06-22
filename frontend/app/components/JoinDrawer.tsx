@@ -169,33 +169,21 @@ export default function JoinDrawer({ isOpen, onClose }: JoinDrawerProps) {
     try {
       const apiUrl = API_URL;
 
-      let imageData = null;
-      const image = formData.image;
-      if (image) {
-        imageData = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            resolve(reader.result as string);
-          };
-          reader.readAsDataURL(image);
-        });
+      const formPayload = new FormData();
+      formPayload.append("firstName", formData.firstName);
+      formPayload.append("lastName", formData.lastName);
+      formPayload.append("email", formData.email);
+      formPayload.append("phoneNumber", formData.phoneNumber);
+      formPayload.append("experience", formData.experience);
+      formPayload.append("location", formData.location);
+      formPayload.append("plan", formData.plan);
+      if (formData.image) {
+        formPayload.append("image", formData.image);
       }
 
       const response = await authFetch(`${apiUrl}/api/join`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber,
-          experience: formData.experience,
-          location: formData.location,
-          image: imageData,
-          plan: formData.plan,
-        }),
+        body: formPayload,
       });
 
       const data = await response.json();

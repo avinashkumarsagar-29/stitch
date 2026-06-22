@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../components/profileStorage";
 import { API_URL } from "../config";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type ActivityItem = {
   id: string;
@@ -82,32 +83,36 @@ export default function AdminLandingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const loadSummary = useCallback(async () => {
+    try {
+      const apiUrl = API_URL;
+      const response = await authFetch(`${apiUrl}/api/admin/summary`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to load admin summary");
+      }
+
+      setSummary(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Unable to load admin summary");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (getCurrentUserRole() !== "admin") {
       router.replace("/login");
       return;
     }
 
-    async function loadSummary() {
-      try {
-        const apiUrl = API_URL;
-        const response = await authFetch(`${apiUrl}/api/admin/summary`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || "Unable to load admin summary");
-        }
-
-        setSummary(data);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Unable to load admin summary");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     loadSummary();
-  }, [router]);
+  }, [router, loadSummary]);
+
+  useAutoRefresh("bookings", loadSummary);
+  useAutoRefresh("users", loadSummary);
+  useAutoRefresh("applications", loadSummary);
 
   const bookingStatusCards = useMemo(
     () => [

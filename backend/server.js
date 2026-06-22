@@ -20,6 +20,7 @@ const BusinessOrder = require("./models/BusinessOrder");
 const Payment = require("./models/Payment");
 const AppSettings = require("./models/AppSettings");
 const Razorpay = require("razorpay");
+const { uploadProfile, uploadCloth } = require("./cloudinary");
 
 
 // Initialize MongoDB Connection
@@ -299,11 +300,20 @@ function requireAuth(request, response, next) {
 }
 
 function requireAdmin(request, response, next) {
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+
   if (request.user?.role !== "admin") {
     return response.status(403).json({
       message: "Forbidden: Admin access required",
     });
   }
+
+  if (superAdminEmail && request.user?.email !== superAdminEmail) {
+    return response.status(403).json({
+      message: "Forbidden: You do not have super admin privileges",
+    });
+  }
+
   next();
 }
 
@@ -431,6 +441,91 @@ async function sendOtpSms(phoneNumber, otpCode) {
   }
 
   return { sent: true };
+}
+
+async function sendOtpEmail(userEmail, userName, otpCode) {
+  const host = process.env.SMTP_HOST;
+  const port = process.env.SMTP_PORT;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || "no-reply@stitch.com";
+
+  const isMailConfigured = host && port && user && pass;
+
+  const subject = "Your Stitch Login OTP";
+  const htmlContent = `
+    <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Hi ${userName},</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        Please use the following One-Time Password (OTP) to complete your login. This OTP is valid for 5 minutes. Do not share it with anyone.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Your Secure OTP</p>
+        <p style="margin: 12px 0 0 0; font-size: 38px; font-weight: 900; color: #c322f4; letter-spacing: 6px; font-family: monospace;">${otpCode}</p>
+      </div>
+
+      <p style="font-size: 12px; line-height: 1.6; color: #9ca3af; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
+        If you did not request this, please ignore this email.
+      </p>
+
+      <div style="margin-top: 24px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">&copy; ${new Date().getFullYear()} Stitch Inc. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">You are receiving this because you requested a login OTP on Stitch.</p>
+      </div>
+    </div>
+  `;
+
+  if (!isMailConfigured) {
+    const logFilePath = path.join(__dirname, "mock_emails.log");
+    const logEntry = `
+========================================
+TIMESTAMP: ${new Date().toISOString()}
+TO: ${userEmail}
+FROM: ${from}
+SUBJECT: ${subject}
+BODY:
+${htmlContent}
+========================================
+\n`;
+    try {
+      fs.appendFileSync(logFilePath, logEntry, "utf8");
+      console.log(`Mock OTP email logged successfully to ${logFilePath}`);
+    } catch (err) {
+      console.error("Failed to write mock OTP email to log file:", err);
+    }
+    return { sent: false, mock: true };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port: Number(port),
+      secure: port === "465",
+      auth: {
+        user,
+        pass,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from,
+      to: userEmail,
+      subject,
+      html: htmlContent,
+    });
+
+    console.log("OTP Email sent successfully:", info.messageId);
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending OTP email via SMTP:", error);
+    throw error;
+  }
 }
 
 async function sendBookingEmail(userEmail, booking) {
@@ -738,6 +833,7 @@ app.post("/api/auth/register", async (request, response) => {
       credit: 0
     });
     await mongoUser.save();
+    io.emit("data:updated", { type: "users" });
 
     if (referrerUserId) {
       const referral = new Referral({
@@ -776,11 +872,11 @@ app.post("/api/auth/register", async (request, response) => {
 
 app.post("/api/auth/request-otp", async (request, response) => {
   try {
-    const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
+    const email = String(request.body.email || "").trim().toLowerCase();
 
-    if (!phoneNumber) {
+    if (!email) {
       return response.status(400).json({
-        message: "Phone number is required",
+        message: "Email is required",
       });
     }
 
@@ -788,7 +884,7 @@ app.post("/api/auth/request-otp", async (request, response) => {
     if (process.env.NODE_ENV === "production") {
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
       const requestCount = await LoginOtp.countDocuments({
-        phoneNumber,
+        email,
         createdAt: { $gt: tenMinutesAgo }
       });
 
@@ -799,11 +895,11 @@ app.post("/api/auth/request-otp", async (request, response) => {
       }
     }
 
-    const user = await User.findOne({ phoneNumber });
+    const user = await User.findOne({ email });
 
     if (!user) {
       return response.status(404).json({
-        message: "Phone number is not registered",
+        message: "Email is not registered",
       });
     }
 
@@ -815,19 +911,19 @@ app.post("/api/auth/request-otp", async (request, response) => {
 
     const otpCode = generateOtp();
     const loginOtp = new LoginOtp({
-      phoneNumber,
+      email,
       otpCode,
       expiresAt: new Date(Date.now() + otpExpiryMinutes * 60 * 1000)
     });
     await loginOtp.save();
 
-    const smsResult = await sendOtpSms(phoneNumber, otpCode);
+    const emailResult = await sendOtpEmail(user.email, user.fullName, otpCode);
 
     return response.json({
-      message: smsResult.sent
+      message: emailResult.sent
         ? "OTP sent successfully"
-        : "OTP generated successfully. Configure SMS settings to send it to the phone.",
-      devOtp: smsResult.sent ? undefined : otpCode,
+        : "OTP generated successfully. Configure email settings to send it.",
+      devOtp: emailResult.sent ? undefined : otpCode,
     });
   } catch (error) {
     console.error("OTP request error:", error);
@@ -843,18 +939,18 @@ app.post("/api/auth/request-otp", async (request, response) => {
 
 app.post("/api/auth/verify-otp", async (request, response) => {
   try {
-    const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
+    const email = String(request.body.email || "").trim().toLowerCase();
     const otpCode = String(request.body.otp || "").trim();
 
-    if (!phoneNumber || !otpCode) {
+    if (!email || !otpCode) {
       return response.status(400).json({
-        message: "Phone number and OTP are required",
+        message: "Email and OTP are required",
       });
     }
 
-    // Retrieve the latest active (unused & unexpired) OTP record for this phone number
+    // Retrieve the latest active (unused & unexpired) OTP record for this email
     const activeOtp = await LoginOtp.findOne({
-      phoneNumber,
+      email,
       usedAt: null,
       expiresAt: { $gt: new Date() }
     }).sort({ createdAt: -1 });
@@ -894,9 +990,15 @@ app.post("/api/auth/verify-otp", async (request, response) => {
     activeOtp.usedAt = new Date();
     await activeOtp.save();
 
-    const user = await User.findOne({ phoneNumber });
+    const user = await User.findOne({ email });
 
-    if (user && user.isBanned) {
+    if (!user) {
+      return response.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (user.isBanned) {
       return response.status(403).json({
         message: "Your account has been deactivated.",
       });
@@ -1254,6 +1356,12 @@ app.post("/api/admin/admins", requireAdmin, async (request, response) => {
       });
     }
 
+    if (request.user?.email !== process.env.SUPER_ADMIN_EMAIL) {
+      return response.status(403).json({
+        message: "Forbidden: Only super admin can add admins",
+      });
+    }
+
     const admin = await User.findOneAndUpdate(
       { phoneNumber },
       { role: 'admin' },
@@ -1298,6 +1406,12 @@ app.delete("/api/admin/admins/:userId", requireAdmin, async (request, response) 
     if (adminCount <= 1) {
       return response.status(400).json({
         message: "At least one admin account is required",
+      });
+    }
+
+    if (request.user?.email !== process.env.SUPER_ADMIN_EMAIL) {
+      return response.status(403).json({
+        message: "Forbidden: Only super admin can remove admins",
       });
     }
 
@@ -1367,6 +1481,12 @@ app.patch("/api/admin/users/:userId/role", requireAdmin, async (request, respons
       return response.status(400).json({ message: "Invalid role value. Must be 'user', 'tailor', or 'admin'" });
     }
 
+    if (newRole === "admin" && request.user?.email !== process.env.SUPER_ADMIN_EMAIL) {
+      return response.status(403).json({ 
+        message: "Forbidden: Only super admin can assign admin role" 
+      });
+    }
+
     await User.findByIdAndUpdate(userId, { role: newRole });
 
     return response.json({ message: `User role successfully updated to ${newRole}` });
@@ -1385,6 +1505,7 @@ app.patch("/api/admin/users/:userId/ban", requireAdmin, async (request, response
     const isBanned = !!request.body.isBanned;
 
     await User.findByIdAndUpdate(userId, { isBanned });
+    io.emit("data:updated", { type: "users" });
 
     return response.json({ message: isBanned ? "User account deactivated" : "User account activated" });
   } catch (error) {
@@ -1476,6 +1597,7 @@ app.patch("/api/admin/join/:applicationId/approve", requireAdmin, async (request
     appRecord.status = "approved";
     appRecord.rejectionReason = null;
     await appRecord.save();
+    io.emit("data:updated", { type: "applications" });
 
     const email = appRecord.email ? appRecord.email.toLowerCase().trim() : "";
     const phoneNumber = appRecord.phoneNumber ? appRecord.phoneNumber.trim() : "";
@@ -1534,6 +1656,7 @@ app.patch("/api/admin/join/:applicationId/reject", requireAdmin, async (request,
     appRecord.status = "rejected";
     appRecord.rejectionReason = reason;
     await appRecord.save();
+    io.emit("data:updated", { type: "applications" });
 
     return response.json({ message: "Application rejected successfully" });
   } catch (error) {
@@ -1658,6 +1781,7 @@ app.patch("/api/admin/bookings/:bookingId/status", requireAdmin, async (request,
     }
 
     await b.save();
+    io.emit("data:updated", { type: "bookings" });
 
     return response.json({ message: "Booking updated successfully" });
   } catch (error) {
@@ -2262,7 +2386,7 @@ app.put("/api/users/:userId/measurements", async (request, response) => {
   }
 });
 
-app.put("/api/users/:userId/profile", async (request, response) => {
+app.put("/api/users/:userId/profile", uploadProfile.single("image"), async (request, response) => {
   try {
     const userId = Number(request.params.userId);
     let fullName = String(request.body.fullName || "").trim();
@@ -2271,7 +2395,7 @@ app.put("/api/users/:userId/profile", async (request, response) => {
     const email = String(request.body.email || "").trim().toLowerCase();
     const phone = normalizePhoneNumber(request.body.phone);
     const address = String(request.body.address || "").trim();
-    const image = request.body.image || null;
+    const image = request.file ? request.file.path : (request.body.image || null);
 
     if (!userId) {
       return response.status(400).json({ message: "User ID is required" });
@@ -2432,6 +2556,7 @@ app.post("/api/bookings", requireAuth, async (request, response) => {
       trackingCode: null
     });
     await mongoBooking.save();
+    io.emit("data:updated", { type: "bookings" });
 
     return response.status(201).json({
       message: "Booking saved successfully",
@@ -2727,14 +2852,14 @@ app.get("/api/bookings/:bookingId", requireAuth, async (request, response) => {
 });
 
 
-app.post("/api/bookings/:bookingId/details", requireAuth, async (request, response) => {
+app.post("/api/bookings/:bookingId/details", requireAuth, uploadCloth.single("clothImage"), async (request, response) => {
   try {
     const bookingId = Number(request.params.bookingId);
     const tailorApplicationId = Number(request.body.tailorApplicationId);
     const clothCategory = String(request.body.clothCategory || "").trim();
     const material = String(request.body.material || "").trim();
     const approxPrice = request.body.approxPrice !== undefined && request.body.approxPrice !== null ? Number(request.body.approxPrice) : null;
-    const clothImage = request.body.clothImage || null;
+    const clothImage = request.file ? request.file.path : (request.body.clothImage || null);
 
     if (!bookingId || !tailorApplicationId) {
       return response.status(400).json({
@@ -2957,7 +3082,7 @@ app.post("/api/bookings/:bookingId/tailor", requireAuth, async (request, respons
   }
 });
 
-app.post("/api/join", async (request, response) => {
+app.post("/api/join", uploadProfile.single("image"), async (request, response) => {
   try {
     const firstName = String(request.body.firstName || "").trim();
     const lastName = String(request.body.lastName || "").trim();
@@ -2965,7 +3090,7 @@ app.post("/api/join", async (request, response) => {
     const phoneNumber = normalizePhoneNumber(request.body.phoneNumber);
     const experience = String(request.body.experience || "").trim();
     const location = String(request.body.location || "").trim();
-    const image = request.body.image || null;
+    const image = request.file ? request.file.path : (request.body.image || null);
     const plan = String(request.body.plan || "Free").trim();
 
     if (!firstName || !lastName || !email || !phoneNumber || !experience || !location) {
@@ -2986,6 +3111,7 @@ app.post("/api/join", async (request, response) => {
       status: "pending"
     });
     await application.save();
+    io.emit("data:updated", { type: "applications" });
 
     // Auto-update User profile if a matching user is registered (by email or phone)
     let updatedUserObj = null;

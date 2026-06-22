@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
 import { API_URL } from "@/app/config";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type UserRecord = {
   id: number;
@@ -105,7 +106,7 @@ export default function UserManagementPage() {
   }, [router]);
 
   // Load users directory
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
@@ -126,11 +127,13 @@ export default function UserManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [roleFilter, planFilter, searchQuery]);
 
   useEffect(() => {
     loadUsers();
-  }, [roleFilter, planFilter, searchQuery]);
+  }, [loadUsers]);
+
+  useAutoRefresh("users", loadUsers);
 
   // Update user role
   const handleRoleChange = async (userId: number, newRole: string) => {

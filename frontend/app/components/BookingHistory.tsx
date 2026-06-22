@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { showToast } from "./Toast";
 import { getCurrentUser, authFetch, getCurrentUserRole } from "./profileStorage";
 import { API_URL } from "@/app/config";
@@ -25,49 +26,51 @@ export default function BookingHistory() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchBookings() {
-      try {
-        const apiUrl = API_URL;
-        const userRole = getCurrentUserRole();
-        if (userRole === "admin") {
-          setBookings([]);
-          return;
-        }
-
-        const response = await authFetch(`${apiUrl}/api/bookings?role=${userRole}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          showToast(data.message || "Unable to fetch bookings", "error");
-          return;
-        }
-
-        const user = getCurrentUser();
-        const allBookings: BookingRecord[] = data.bookings || [];
-        if (user) {
-          const userRole = getCurrentUserRole();
-          if (userRole === "tailor") {
-            setBookings(allBookings.filter((b) =>
-              (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === user.email?.toLowerCase().trim()) ||
-              (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === user.phoneNumber?.trim()) ||
-              (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(user.id))
-            ));
-          } else {
-            setBookings(allBookings.filter((b) => Number(b.userId) === Number(user.id)));
-          }
-        } else {
-          setBookings([]);
-        }
-      } catch {
-        showToast("Unable to connect to backend server", "error");
-      } finally {
-        setIsLoading(false);
+  const fetchBookings = useCallback(async () => {
+    try {
+      const apiUrl = API_URL;
+      const userRole = getCurrentUserRole();
+      if (userRole === "admin") {
+        setBookings([]);
+        return;
       }
-    }
 
-    fetchBookings();
+      const response = await authFetch(`${apiUrl}/api/bookings?role=${userRole}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.message || "Unable to fetch bookings", "error");
+        return;
+      }
+
+      const user = getCurrentUser();
+      const allBookings: BookingRecord[] = data.bookings || [];
+      if (user) {
+        const userRole = getCurrentUserRole();
+        if (userRole === "tailor") {
+          setBookings(allBookings.filter((b) =>
+            (b.tailorEmail && b.tailorEmail.toLowerCase().trim() === user.email?.toLowerCase().trim()) ||
+            (b.tailorPhoneNumber && b.tailorPhoneNumber.trim() === user.phoneNumber?.trim()) ||
+            (b.tailorApplicationId && Number(b.tailorApplicationId) === Number(user.id))
+          ));
+        } else {
+          setBookings(allBookings.filter((b) => Number(b.userId) === Number(user.id)));
+        }
+      } else {
+        setBookings([]);
+      }
+    } catch {
+      showToast("Unable to connect to backend server", "error");
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  useAutoRefresh("bookings", fetchBookings);
 
   const currentRole = getCurrentUserRole();
   if (currentRole === "admin" || currentRole === "tailor") {

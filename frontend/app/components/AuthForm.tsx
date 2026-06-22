@@ -146,12 +146,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
       (window as any).google.accounts.id.prompt();
     }
   }
-  const [phoneNumber, setPhoneNumber] = useState(() => {
+  const [email, setEmail] = useState(() => {
     if (typeof window === "undefined" || isRegister) {
       return "";
     }
 
-    return localStorage.getItem("stitch-last-phone") || "";
+    return localStorage.getItem("stitch-last-email") || "";
   });
   const [otp, setOtp] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
@@ -202,7 +202,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
-      localStorage.setItem("stitch-last-phone", payload.phoneNumber);
+      localStorage.setItem("stitch-last-email", payload.email);
       showToast(data.message, "success");
       router.push("/login");
     } catch {
@@ -219,7 +219,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ phoneNumber }),
+        body: JSON.stringify({ email }),
       });
       const data = await response.json();
 
@@ -248,7 +248,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ phoneNumber, otp }),
+        body: JSON.stringify({ email, otp }),
       });
       const data = await response.json();
 
@@ -312,7 +312,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
           <p className="mt-2 text-xs leading-relaxed text-gray-500">
             {isRegister
               ? "Join India's leading sewing & custom tailoring platform."
-              : "Sign in with your phone number and verify using OTP."}
+              : "Sign in with your email address and verify using OTP."}
           </p>
 
           {/* Stepper only for sign in */}
@@ -327,7 +327,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   1
                 </span>
                 <span className={!isOtpSent ? "text-gray-800 font-extrabold" : "text-gray-400"}>
-                  Phone
+                  Email
                 </span>
               </div>
 
@@ -426,8 +426,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
                     <input
                       name="phoneNumber"
                       type="tel"
-                      value={phoneNumber}
-                      onChange={(event) => setPhoneNumber(event.target.value)}
                       placeholder="+91 98765 43210"
                       required
                       suppressHydrationWarning
@@ -539,7 +537,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
               <>
                 <div>
                   <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
-                    Phone number
+                    Email address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
@@ -550,16 +548,17 @@ export default function AuthForm({ mode }: AuthFormProps) {
                         stroke="currentColor"
                         strokeWidth="2"
                       >
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                       </svg>
                     </div>
                     <input
-                      name="phoneNumber"
-                      type="tel"
-                      value={phoneNumber}
+                      name="email"
+                      type="email"
+                      value={email}
                       disabled={isOtpSent}
-                      onChange={(event) => setPhoneNumber(event.target.value)}
-                      placeholder="+91 98765 43210"
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="you@example.com"
                       required
                       suppressHydrationWarning
                       className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 disabled:opacity-60"
@@ -659,7 +658,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
               suppressHydrationWarning
               className="mt-4 w-full text-[10px] font-extrabold text-gray-400 hover:text-gray-700 transition-colors uppercase tracking-widest text-center cursor-pointer"
             >
-              ← Change phone number
+              ← Change email address
             </button>
           )}
 

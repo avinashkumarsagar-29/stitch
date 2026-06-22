@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
 import { API_URL } from "@/app/config";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type JoinApplication = {
   id: number;
@@ -47,7 +48,7 @@ export default function AdminApplicationsPage() {
   }, [router]);
 
   // Load Tailor Applications
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
@@ -65,11 +66,13 @@ export default function AdminApplicationsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadApplications();
-  }, []);
+  }, [loadApplications]);
+
+  useAutoRefresh("applications", loadApplications);
 
   // Filter application list
   const filteredApps = applications.filter((app) => {

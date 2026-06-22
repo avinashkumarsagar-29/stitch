@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../../components/profileStorage";
 import { showToast } from "../../components/Toast";
 import { API_URL } from "@/app/config";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type BookingRecord = {
   id: number;
@@ -86,7 +87,7 @@ export default function AdminBookingsPage() {
   }, [router]);
 
   // Load Bookings
-  const loadBookings = async () => {
+  const loadBookings = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
@@ -108,11 +109,13 @@ export default function AdminBookingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, searchQuery]);
 
   useEffect(() => {
     loadBookings();
-  }, [statusFilter, searchQuery]);
+  }, [loadBookings]);
+
+  useAutoRefresh("bookings", loadBookings);
 
   // Fetch Booking Details & Measurements
   const fetchBookingDetails = async (bookingId: number) => {

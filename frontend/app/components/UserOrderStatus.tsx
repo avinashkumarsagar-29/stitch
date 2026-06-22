@@ -3,7 +3,8 @@
 import { authFetch } from "./profileStorage";
 import { API_URL } from "@/app/config";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { showToast } from "./Toast";
 
 type BookingRecord = {
@@ -53,34 +54,36 @@ export default function UserOrderStatus() {
   const [booking, setBooking] = useState<BookingRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchLatestBooking() {
-      try {
-        const apiUrl = API_URL;
-        const savedUser = localStorage.getItem("stitch-user");
-        const user: StoredUser | null = savedUser ? JSON.parse(savedUser) : null;
-        const response = await authFetch(`${apiUrl}/api/bookings`);
-        const data = await response.json();
+  const fetchLatestBooking = useCallback(async () => {
+    try {
+      const apiUrl = API_URL;
+      const savedUser = localStorage.getItem("stitch-user");
+      const user: StoredUser | null = savedUser ? JSON.parse(savedUser) : null;
+      const response = await authFetch(`${apiUrl}/api/bookings`);
+      const data = await response.json();
 
-        if (!response.ok) {
-          showToast(data.message || "Unable to load order status", "error");
-          return;
-        }
-
-        const bookings: BookingRecord[] = data.bookings || [];
-        const userBooking =
-          bookings.find((item) => Number(item.userId) === Number(user?.id)) || bookings[0] || null;
-
-        setBooking(userBooking);
-      } catch {
-        showToast("Unable to connect to backend server", "error");
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        showToast(data.message || "Unable to load order status", "error");
+        return;
       }
-    }
 
-    fetchLatestBooking();
+      const bookings: BookingRecord[] = data.bookings || [];
+      const userBooking =
+        bookings.find((item) => Number(item.userId) === Number(user?.id)) || bookings[0] || null;
+
+      setBooking(userBooking);
+    } catch {
+      showToast("Unable to connect to backend server", "error");
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLatestBooking();
+  }, [fetchLatestBooking]);
+
+  useAutoRefresh("bookings", fetchLatestBooking);
 
   const statusText = booking?.status?.toLowerCase() || "pending";
   const activeStep = statusText === "delivered" ? 3 : statusText === "out-for-delivery" ? 2 : 1;
