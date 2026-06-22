@@ -46,6 +46,12 @@ userSchema.set("toObject", {
   }
 });
 
+// Indexes for query optimization
+userSchema.index({ role: 1 });
+userSchema.index({ plan: 1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ referralCode: 1 });
+
 userSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {
     this._id = await getNextSequenceValue("userId");

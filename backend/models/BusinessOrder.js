@@ -62,6 +62,8 @@ businessOrderSchema.set("toObject", {
 // Indexes for foreign keys
 businessOrderSchema.index({ userId: 1 });
 businessOrderSchema.index({ tailorApplicationId: 1 });
+businessOrderSchema.index({ status: 1 });
+businessOrderSchema.index({ createdAt: -1 });
 
 businessOrderSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {

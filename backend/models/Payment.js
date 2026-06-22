@@ -49,6 +49,9 @@ paymentSchema.set("toObject", {
 
 // Indexes for foreign keys
 paymentSchema.index({ userId: 1 });
+paymentSchema.index({ razorpayOrderId: 1 }, { sparse: true });
+paymentSchema.index({ status: 1 });
+paymentSchema.index({ createdAt: -1 });
 
 paymentSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {

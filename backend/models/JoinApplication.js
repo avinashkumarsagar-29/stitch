@@ -43,6 +43,12 @@ joinApplicationSchema.set("toObject", {
   }
 });
 
+// Indexes for query optimization
+joinApplicationSchema.index({ email: 1 });
+joinApplicationSchema.index({ phoneNumber: 1 });
+joinApplicationSchema.index({ status: 1 });
+joinApplicationSchema.index({ createdAt: -1 });
+
 joinApplicationSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {
     this._id = await getNextSequenceValue("joinApplicationId");

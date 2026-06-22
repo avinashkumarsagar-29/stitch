@@ -41,6 +41,9 @@ measurementSchema.set("toObject", {
   }
 });
 
+// Indexes for query optimization
+measurementSchema.index({ userId: 1 });
+
 measurementSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {
     this._id = await getNextSequenceValue("measurementId");

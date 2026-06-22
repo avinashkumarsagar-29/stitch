@@ -50,6 +50,13 @@ bookingSchema.set("toObject", {
   }
 });
 
+// Indexes for query optimization
+bookingSchema.index({ userId: 1 });
+bookingSchema.index({ tailorApplicationId: 1 });
+bookingSchema.index({ status: 1 });
+bookingSchema.index({ createdAt: -1 });
+bookingSchema.index({ trackingCode: 1 });
+
 bookingSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {
     this._id = await getNextSequenceValue("bookingId");

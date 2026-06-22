@@ -38,6 +38,10 @@ loginOtpSchema.set("toObject", {
   }
 });
 
+// Indexes for query optimization
+loginOtpSchema.index({ phoneNumber: 1 });
+loginOtpSchema.index({ createdAt: -1 });
+
 loginOtpSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {
     this._id = await getNextSequenceValue("loginOtpId");

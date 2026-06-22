@@ -52,6 +52,7 @@ reviewSchema.set("toObject", {
 reviewSchema.index({ bookingId: 1 });
 reviewSchema.index({ userId: 1 });
 reviewSchema.index({ tailorApplicationId: 1 });
+reviewSchema.index({ createdAt: -1 });
 
 reviewSchema.pre("save", async function () {
   if (this.isNew && typeof this._id !== "number") {

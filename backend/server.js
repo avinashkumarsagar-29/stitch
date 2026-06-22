@@ -1033,50 +1033,101 @@ app.use("/api", async (request, response, next) => {
 
 app.get("/api/admin/summary", requireAdmin, async (_request, response) => {
   try {
-    const total = await User.countDocuments();
-    const users = await User.countDocuments({ role: "user" });
-    const tailors = await User.countDocuments({ role: "tailor" });
-    const admins = await User.countDocuments({ role: "admin" });
+    const [
+      total,
+      users,
+      tailors,
+      admins,
+      totalBookings,
+      pendingBookings,
+      bookedBookings,
+      deliveredBookings,
+      cancelledBookings,
+      totalApps,
+      pendingApps,
+      approvedApps,
+      rejectedApps,
+      recentUsers,
+      recentBookingsRaw,
+      recentApplications,
+      revenueAggregation
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ role: "user" }),
+      User.countDocuments({ role: "tailor" }),
+      User.countDocuments({ role: "admin" }),
+      Booking.countDocuments(),
+      Booking.countDocuments({ status: { $in: ['pending', 'pending-price', 'pending-payment'] } }),
+      Booking.countDocuments({ status: { $in: ['booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery'] } }),
+      Booking.countDocuments({ status: 'delivered' }),
+      Booking.countDocuments({ status: 'cancelled' }),
+      JoinApplication.countDocuments(),
+      JoinApplication.countDocuments({ status: "pending" }),
+      JoinApplication.countDocuments({ status: "approved" }),
+      JoinApplication.countDocuments({ status: "rejected" }),
+      User.find().sort({ createdAt: -1 }).limit(5),
+      Booking.find().sort({ createdAt: -1 }).limit(5),
+      JoinApplication.find().sort({ createdAt: -1 }).limit(5),
+      Booking.aggregate([
+        {
+          $match: {
+            status: { $in: ['booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered'] }
+          }
+        },
+        {
+          $project: {
+            val: {
+              $subtract: [
+                {
+                  $add: [
+                    { $ifNull: ["$approxPrice", 0] },
+                    { $round: [{ $multiply: [{ $ifNull: ["$approxPrice", 0] }, 0.18] }, 0] },
+                    49
+                  ]
+                },
+                {
+                  $add: [
+                    { $ifNull: ["$referralDiscount", 0] },
+                    { $ifNull: ["$creditApplied", 0] }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalCollected: {
+              $sum: {
+                $cond: {
+                  if: { $lt: ["$val", 0] },
+                  then: 0,
+                  else: "$val"
+                }
+              }
+            }
+          }
+        }
+      ])
+    ]);
 
-    const totalBookings = await Booking.countDocuments();
-    const pendingBookings = await Booking.countDocuments({ status: { $in: ['pending', 'pending-price', 'pending-payment'] } });
-    const bookedBookings = await Booking.countDocuments({ status: { $in: ['booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery'] } });
-    const deliveredBookings = await Booking.countDocuments({ status: 'delivered' });
-    const cancelledBookings = await Booking.countDocuments({ status: 'cancelled' });
+    const totalCollected = revenueAggregation[0]?.totalCollected || 0;
 
-    const activeBookingsForRevenue = await Booking.find({
-      status: { $in: ['booked', 'picked-up', 'in-stitching', 'ready', 'out-for-delivery', 'delivered'] }
-    });
-    let totalCollected = 0;
-    for (const b of activeBookingsForRevenue) {
-      const price = Number(b.approxPrice || 0);
-      const tax = Math.round(price * 0.18);
-      const refDisc = Number(b.referralDiscount || 0);
-      const credApp = Number(b.creditApplied || 0);
-      const val = price + tax + 49 - refDisc - credApp;
-      totalCollected += val < 0 ? 0 : val;
-    }
+    const userIds = [...new Set(recentBookingsRaw.map(b => b.userId).filter(id => id !== null && id !== undefined))];
+    const bookingUsers = await User.find({ _id: { $in: userIds } });
+    const userMap = new Map(bookingUsers.map(u => [u._id, u]));
 
-    const totalApps = await JoinApplication.countDocuments();
-    const pendingApps = await JoinApplication.countDocuments({ status: "pending" });
-    const approvedApps = await JoinApplication.countDocuments({ status: "approved" });
-    const rejectedApps = await JoinApplication.countDocuments({ status: "rejected" });
-
-    const recentUsers = await User.find().sort({ createdAt: -1 }).limit(5);
-    const recentBookingsRaw = await Booking.find().sort({ createdAt: -1 }).limit(5);
-    const recentBookings = [];
-    for (const b of recentBookingsRaw) {
-      const u = await User.findById(b.userId);
-      recentBookings.push({
+    const recentBookings = recentBookingsRaw.map(b => {
+      const u = b.userId ? userMap.get(b.userId) : null;
+      return {
         id: b._id,
         status: b.status,
         approxPrice: b.approxPrice,
         createdAt: b.createdAt,
         fullName: u ? u.fullName : null
-      });
-    }
-
-    const recentApplications = await JoinApplication.find().sort({ createdAt: -1 }).limit(5);
+      };
+    });
 
     const recentActivity = [
       ...recentBookings.map((booking) => ({
@@ -1506,9 +1557,13 @@ app.get("/api/admin/bookings", requireAdmin, async (request, response) => {
 
     const bookingsRaw = await Booking.find(filter).sort({ createdAt: -1 });
 
+    const userIds = [...new Set(bookingsRaw.map(b => b.userId).filter(id => id !== null && id !== undefined))];
+    const users = await User.find({ _id: { $in: userIds } });
+    const userMap = new Map(users.map(u => [u._id, u]));
+
     const bookings = [];
     for (const b of bookingsRaw) {
-      const u = b.userId ? await User.findById(b.userId) : null;
+      const u = b.userId ? userMap.get(b.userId) : null;
       const bookingObj = {
         ...b.toObject(),
         id: b._id,
@@ -1636,9 +1691,13 @@ app.get("/api/admin/business-orders", requireAdmin, async (request, response) =>
 
     const ordersRaw = await BusinessOrder.find(filter).sort({ createdAt: -1 });
 
+    const userIds = [...new Set(ordersRaw.map(bo => bo.userId).filter(id => id !== null && id !== undefined))];
+    const users = await User.find({ _id: { $in: userIds } });
+    const userMap = new Map(users.map(u => [u._id, u]));
+
     const businessOrders = [];
     for (const bo of ordersRaw) {
-      const u = bo.userId ? await User.findById(bo.userId) : null;
+      const u = bo.userId ? userMap.get(bo.userId) : null;
       businessOrders.push({
         ...bo.toObject(),
         id: bo._id,
@@ -1757,9 +1816,13 @@ app.get("/api/admin/payments", requireAdmin, async (request, response) => {
 
     const paymentsRaw = await Payment.find(filter).sort({ createdAt: -1 });
 
+    const userIds = [...new Set(paymentsRaw.map(p => p.userId).filter(id => id !== null && id !== undefined))];
+    const users = await User.find({ _id: { $in: userIds } });
+    const userMap = new Map(users.map(u => [u._id, u]));
+
     const payments = [];
     for (const p of paymentsRaw) {
-      const u = p.userId ? await User.findById(p.userId) : null;
+      const u = p.userId ? userMap.get(p.userId) : null;
       const paymentObj = {
         ...p.toObject(),
         id: p._id,
@@ -1835,10 +1898,30 @@ app.get("/api/admin/reviews", requireAdmin, async (request, response) => {
 
     const reviewsRaw = await Review.find(filter).sort({ createdAt: -1 });
 
+    const userIds = [...new Set(reviewsRaw.map(r => r.userId).filter(id => id !== null && id !== undefined))];
+    const tailorIds = [...new Set(reviewsRaw.map(r => r.tailorApplicationId).filter(id => id !== null && id !== undefined))];
+
+    const [users, joinApps, averagesAggregation] = await Promise.all([
+      User.find({ _id: { $in: userIds } }),
+      JoinApplication.find({ _id: { $in: tailorIds } }),
+      Review.aggregate([
+        {
+          $group: {
+            _id: "$tailorApplicationId",
+            averageRating: { $avg: "$rating" },
+            reviewCount: { $sum: 1 }
+          }
+        }
+      ])
+    ]);
+
+    const userMap = new Map(users.map(u => [u._id, u]));
+    const joinAppMap = new Map(joinApps.map(ja => [ja._id, ja]));
+
     const reviews = [];
     for (const r of reviewsRaw) {
-      const u = await User.findById(r.userId);
-      const ja = await JoinApplication.findById(r.tailorApplicationId);
+      const u = r.userId ? userMap.get(r.userId) : null;
+      const ja = r.tailorApplicationId ? joinAppMap.get(r.tailorApplicationId) : null;
 
       const reviewObj = {
         ...r.toObject(),
@@ -1863,18 +1946,18 @@ app.get("/api/admin/reviews", requireAdmin, async (request, response) => {
     }
 
     const tailors = await JoinApplication.find();
+    const averagesMap = new Map(averagesAggregation.map(item => [item._id, item]));
+
     const averages = [];
     for (const ja of tailors) {
-      const tailorReviews = await Review.find({ tailorApplicationId: ja._id });
-      if (tailorReviews.length > 0) {
-        const sum = tailorReviews.reduce((acc, curr) => acc + curr.rating, 0);
-        const averageRating = sum / tailorReviews.length;
+      const avgInfo = averagesMap.get(ja._id);
+      if (avgInfo) {
         averages.push({
           tailorId: ja._id,
           tailorName: `${ja.firstName} ${ja.lastName}`.trim(),
           tailorEmail: ja.email,
-          averageRating: Number(averageRating.toFixed(2)),
-          reviewCount: tailorReviews.length
+          averageRating: Number(avgInfo.averageRating.toFixed(2)),
+          reviewCount: avgInfo.reviewCount
         });
       }
     }
@@ -1919,11 +2002,17 @@ app.delete("/api/admin/reviews/:reviewId", requireAdmin, async (request, respons
 
 app.get("/api/admin/referrals", requireAdmin, async (request, response) => {
   try {
-    const referralsRaw = await Referral.find().sort({ createdAt: -1 });
+    const [referralsRaw, users] = await Promise.all([
+      Referral.find().sort({ createdAt: -1 }),
+      User.find().sort({ credit: -1, fullName: 1 })
+    ]);
+
+    const userMap = new Map(users.map(u => [u._id, u]));
+
     const referrals = [];
     for (const r of referralsRaw) {
-      const u1 = await User.findById(r.referrerUserId);
-      const u2 = await User.findById(r.referredUserId);
+      const u1 = r.referrerUserId ? userMap.get(r.referrerUserId) : null;
+      const u2 = r.referredUserId ? userMap.get(r.referredUserId) : null;
       referrals.push({
         ...r.toObject(),
         id: r._id,
@@ -1935,8 +2024,6 @@ app.get("/api/admin/referrals", requireAdmin, async (request, response) => {
         referredCredit: u2 ? Number(u2.credit || 0) : 0
       });
     }
-
-    const users = await User.find().sort({ credit: -1, fullName: 1 });
 
     return response.json({
       referrals,
@@ -3379,6 +3466,12 @@ app.post("/api/payments/create-order", requireAuth, async (request, response) =>
       });
     } catch (sdkError) {
       console.error("Razorpay SDK Order Creation Error:", sdkError);
+      if (sdkError.statusCode === 401 || (sdkError.error && sdkError.error.description && sdkError.error.description.includes("Authentication"))) {
+        return response.status(401).json({
+          message: "Razorpay authentication failed. Please verify your RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the backend .env file, or comment them out to run in Sandbox/Mock mode.",
+          detail: sdkError,
+        });
+      }
       return response.status(500).json({
         message: sdkError.message || "Failed to create Razorpay order",
         detail: sdkError,
