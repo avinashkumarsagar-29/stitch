@@ -32,6 +32,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const isRegister = mode === "register";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [role, setRole] = useState("user");
+  const [googlePendingData, setGooglePendingData] = useState<{
+    email: string;
+    fullName: string;
+    image: string;
+  } | null>(null);
+  const [googlePhone, setGooglePhone] = useState("");
+  const [googleRole, setGoogleRole] = useState("user");
 
   useEffect(() => {
     const id = "google-gsi-script";
@@ -109,6 +116,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
+      if (data.isNewUser) {
+        if (isRegister) {
+          setGooglePendingData(data.googleData);
+        } else {
+          showToast("Account not found. Please register first.", "error");
+        }
+        return;
+      }
+
       localStorage.setItem("stitch-auth", "true");
       localStorage.setItem("stitch-token", data.token);
       safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
@@ -144,6 +160,58 @@ export default function AuthForm({ mode }: AuthFormProps) {
       nativeBtn.click();
     } else {
       (window as any).google.accounts.id.prompt();
+    }
+  }
+
+  async function handleGoogleRegisterComplete() {
+    if (!googlePendingData) return;
+    if (!googlePhone.trim()) {
+      showToast("Phone number is required", "error");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const apiUrl = API_URL;
+      const res = await authFetch(`${apiUrl}/api/auth/google-register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: googlePendingData.email,
+          fullName: googlePendingData.fullName,
+          image: googlePendingData.image,
+          phoneNumber: googlePhone,
+          role: googleRole,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.message || "Google registration failed", "error");
+        return;
+      }
+
+      localStorage.setItem("stitch-auth", "true");
+      localStorage.setItem("stitch-token", data.token);
+      safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
+      localStorage.setItem("stitch-role", data.user.role || "user");
+
+      showToast("Registration successful", "success");
+      window.dispatchEvent(new Event("stitch-auth-change"));
+
+      const roleRedirects: Record<string, string> = {
+        admin: "/admin",
+        tailor: "/join",
+        user: "/Home",
+      };
+      router.push(roleRedirects[data.user.role] || "/Home");
+    } catch (err) {
+      console.error(err);
+      showToast("Unable to connect to registration server", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   }
   const [email, setEmail] = useState(() => {
@@ -276,8 +344,123 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <div className="w-full max-w-[440px] flex flex-col items-center justify-center">
-      {/* Top Segmented Tabs */}
-      <div className="bg-white border border-gray-200/60 rounded-full p-1.5 flex gap-1 w-full max-w-[390px] shadow-lg mb-6">
+      {googlePendingData ? (
+        <div className="bg-white border border-gray-100 rounded-[28px] p-8 md:p-10 shadow-[0_10px_35px_rgba(0,0,0,0.06)] w-full text-center">
+          {googlePendingData.image && (
+            <img
+              src={googlePendingData.image}
+              alt="Google Profile"
+              className="w-20 h-20 rounded-full mx-auto border-4 border-[#c322f4]/20 shadow-md object-cover animate-fade-in"
+              referrerPolicy="no-referrer"
+            />
+          )}
+          <h2 className="mt-4 font-serif text-[24px] font-extrabold leading-tight tracking-tight text-gray-900">
+            Welcome, {googlePendingData.fullName}!
+          </h2>
+          <p className="mt-1.5 text-xs text-gray-500">
+            Please complete your registration details to continue.
+          </p>
+
+          <div className="mt-6 space-y-4 text-left">
+            <div>
+              <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
+                Phone number
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                </div>
+                <input
+                  type="tel"
+                  value={googlePhone}
+                  onChange={(e) => setGooglePhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  required
+                  className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                />
+              </div>
+            </div>
+
+            <div>
+              <span className="block text-[10px] font-extrabold text-gray-700 uppercase tracking-widest mb-1.5">
+                Join as a
+              </span>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setGoogleRole("user")}
+                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${
+                    googleRole === "user"
+                      ? "border-[#c322f4] bg-[#c322f4]/5 text-[#c322f4] shadow-[0_0_12px_rgba(195,34,244,0.12)]"
+                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="text-lg mb-0.5">👔</span>
+                  <span className="text-[11px] font-bold block">Customer</span>
+                  <span className="text-[8px] text-gray-400 font-normal mt-0.5 leading-tight">
+                    Book services
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGoogleRole("tailor")}
+                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 text-center transition-all duration-300 cursor-pointer ${
+                    googleRole === "tailor"
+                      ? "border-[#c322f4] bg-[#c322f4]/5 text-[#c322f4] shadow-[0_0_12px_rgba(195,34,244,0.12)]"
+                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="text-lg mb-0.5">🧵</span>
+                  <span className="text-[11px] font-bold block">Partner Tailor</span>
+                  <span className="text-[8px] text-gray-400 font-normal mt-0.5 leading-tight">
+                    Provide tailoring
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleRegisterComplete}
+            disabled={isSubmitting}
+            className="w-full h-12 mt-8 rounded-xl bg-[#c322f4] text-sm font-bold text-white shadow-[0_4px_14px_rgba(195,34,244,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-75 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2"
+          >
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              "Complete Registration"
+            )}
+          </button>
+
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setGooglePendingData(null)}
+              className="text-xs font-extrabold text-[#c322f4] hover:text-[#a81bd4] transition-colors"
+            >
+              Use a different account
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Top Segmented Tabs */}
+          <div className="bg-white border border-gray-200/60 rounded-full p-1.5 flex gap-1 w-full max-w-[390px] shadow-lg mb-6">
         <Link
           href="/login"
           className={`flex-1 text-center py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
@@ -708,6 +891,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
           </div>
         </form>
       </div>
+      </>
+      )}
       {/* Hidden native Google Sign-in button for programmatic click triggering */}
       <div id="google-signin-btn-hidden" style={{ display: "none" }} />
     </div>

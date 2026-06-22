@@ -1059,26 +1059,14 @@ app.post("/api/auth/google-login", async (request, response) => {
     }
 
     if (!user) {
-      // Create user if they don't exist
-      const referralCode = await generateUniqueReferralCode();
-      const randomPasswordHash = "GOOGLE_AUTH_" + Math.random().toString(36).substring(2, 12);
-      const defaultRole = "user";
-
-      // Save to MongoDB (letting the save hook auto-generate the sequential Number ID)
-      const mongoUser = new User({
-        fullName: fullName || email.split("@")[0],
-        email,
-        phoneNumber: null,
-        passwordHash: randomPasswordHash,
-        role: defaultRole,
-        plan: "Free",
-        referralCode,
-        image: image || null,
-        credit: 0,
+      return response.json({
+        isNewUser: true,
+        googleData: {
+          email,
+          fullName: fullName || email.split("@")[0],
+          image: image || null,
+        },
       });
-      await mongoUser.save();
-
-      user = mongoUser;
     }
 
     return response.json({
@@ -1103,6 +1091,89 @@ app.post("/api/auth/google-login", async (request, response) => {
     console.error("Google login error:", error);
     return response.status(500).json({
       message: "Unable to complete Google login",
+      detail:
+        process.env.NODE_ENV === "production"
+          ? undefined
+          : error.message,
+    });
+  }
+});
+
+app.post("/api/auth/google-register", async (request, response) => {
+  try {
+    const { email, fullName, image, phoneNumber, role } = request.body;
+
+    if (!email) {
+      return response.status(400).json({
+        message: "Email is required",
+      });
+    }
+
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!phoneNumber || !normalizedPhone) {
+      return response.status(400).json({
+        message: "Phone number is required",
+      });
+    }
+
+    const userRole = String(role || "user").toLowerCase();
+    if (!["user", "tailor"].includes(userRole)) {
+      return response.status(400).json({
+        message: "Role must be 'user' or 'tailor'",
+      });
+    }
+
+    // Check duplicate in MongoDB
+    const existingUser = await User.findOne({
+      $or: [{ email: email.toLowerCase() }, { phoneNumber: normalizedPhone }]
+    });
+
+    if (existingUser) {
+      return response.status(409).json({
+        message: "Email or phone number is already registered",
+      });
+    }
+
+    const referralCode = await generateUniqueReferralCode();
+    const randomPasswordHash = "GOOGLE_AUTH_" + Math.random().toString(36).substring(2, 12);
+
+    const mongoUser = new User({
+      fullName: fullName || email.split("@")[0],
+      email: email.toLowerCase(),
+      phoneNumber: normalizedPhone,
+      passwordHash: randomPasswordHash,
+      role: userRole,
+      plan: "Free",
+      referralCode,
+      image: image || null,
+      credit: 0,
+    });
+
+    await mongoUser.save();
+    io.emit("data:updated", { type: "users" });
+
+    return response.status(201).json({
+      message: "Registration successful",
+      token: createAuthToken(mongoUser),
+      user: {
+        id: mongoUser.id,
+        fullName: mongoUser.fullName,
+        email: mongoUser.email,
+        phoneNumber: mongoUser.phoneNumber || "",
+        role: mongoUser.role,
+        plan: mongoUser.plan || "Free",
+        firstName: mongoUser.firstName || "",
+        lastName: mongoUser.lastName || "",
+        address: mongoUser.address || "",
+        image: mongoUser.image || "",
+        referralCode: mongoUser.referralCode,
+        credit: mongoUser.credit !== undefined ? Number(mongoUser.credit) : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Google register error:", error);
+    return response.status(500).json({
+      message: "Unable to complete Google registration",
       detail:
         process.env.NODE_ENV === "production"
           ? undefined
