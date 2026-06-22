@@ -39,6 +39,44 @@ export default function AuthForm({ mode }: AuthFormProps) {
   } | null>(null);
   const [googlePhone, setGooglePhone] = useState("");
   const [googleRole, setGoogleRole] = useState("user");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  function validateEmail(emailStr: string): string {
+    if (!emailStr.trim()) return "Email address is required";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailStr.trim())) return "Please enter a valid email address";
+    return "";
+  }
+
+  function validatePhoneNumber(phoneStr: string): string {
+    if (!phoneStr.trim()) return "Phone number is required";
+    const digits = phoneStr.replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 15) return "Phone number must be between 10 and 15 digits";
+    return "";
+  }
+
+  function validateFullName(nameStr: string): string {
+    const trimmed = nameStr.trim();
+    if (!trimmed) return "Full name is required";
+    if (trimmed.length < 3) return "Full name must be at least 3 characters";
+    if (!/^[a-zA-Z\s]+$/.test(trimmed)) return "Full name can only contain letters and spaces";
+    return "";
+  }
+
+  function validatePassword(passStr: string): string {
+    if (!passStr) return "Password is required";
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{6,}$/;
+    if (!passRegex.test(passStr)) {
+      return "Password must be at least 6 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character.";
+    }
+    return "";
+  }
+
+  function validateOtp(otpStr: string): string {
+    if (!otpStr.trim()) return "Verification OTP is required";
+    if (!/^\d{6}$/.test(otpStr.trim())) return "OTP must be exactly 6 digits";
+    return "";
+  }
 
   useEffect(() => {
     const id = "google-gsi-script";
@@ -165,8 +203,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   async function handleGoogleRegisterComplete() {
     if (!googlePendingData) return;
-    if (!googlePhone.trim()) {
-      showToast("Phone number is required", "error");
+    setErrors({});
+
+    const phoneErr = validatePhoneNumber(googlePhone);
+    if (phoneErr) {
+      setErrors({ googlePhone: phoneErr });
+      showToast("Please enter a valid phone number.", "error");
       return;
     }
 
@@ -228,8 +270,42 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
+    setErrors({});
 
+    if (isRegister) {
+      const formData = new FormData(event.currentTarget);
+      const nameErr = validateFullName(String(formData.get("fullName") || ""));
+      const emailErr = validateEmail(String(formData.get("email") || ""));
+      const phoneErr = validatePhoneNumber(String(formData.get("phoneNumber") || ""));
+      const passErr = validatePassword(String(formData.get("password") || ""));
+
+      if (nameErr || emailErr || phoneErr || passErr) {
+        setErrors({
+          fullName: nameErr,
+          email: emailErr,
+          phoneNumber: phoneErr,
+          password: passErr,
+        });
+        showToast("Please fix the validation errors before registering.", "error");
+        return;
+      }
+    } else if (isOtpSent) {
+      const otpErr = validateOtp(otp);
+      if (otpErr) {
+        setErrors({ otp: otpErr });
+        showToast("Please enter a valid 6-digit OTP.", "error");
+        return;
+      }
+    } else {
+      const emailErr = validateEmail(email);
+      if (emailErr) {
+        setErrors({ email: emailErr });
+        showToast("Please enter a valid email address.", "error");
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
     try {
       if (isRegister) {
         await registerUser(event.currentTarget);
@@ -381,12 +457,24 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 <input
                   type="tel"
                   value={googlePhone}
-                  onChange={(e) => setGooglePhone(e.target.value)}
+                  onChange={(e) => {
+                    setGooglePhone(e.target.value);
+                    setErrors(prev => ({ ...prev, googlePhone: validatePhoneNumber(e.target.value) }));
+                  }}
                   placeholder="+91 98765 43210"
                   required
-                  className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                  className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
+                    errors.googlePhone
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                      : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                  }`}
                 />
               </div>
+              {errors.googlePhone && (
+                <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                  <span>⚠️</span> {errors.googlePhone}
+                </p>
+              )}
             </div>
 
             <div>
@@ -557,9 +645,21 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       placeholder="Enter your full name"
                       required
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      onChange={(e) => {
+                        setErrors(prev => ({ ...prev, fullName: validateFullName(e.target.value) }));
+                      }}
+                      className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
+                        errors.fullName
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                      }`}
                     />
                   </div>
+                  {errors.fullName && (
+                    <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                      <span>⚠️</span> {errors.fullName}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -585,9 +685,21 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       placeholder="you@example.com"
                       required
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      onChange={(e) => {
+                        setErrors(prev => ({ ...prev, email: validateEmail(e.target.value) }));
+                      }}
+                      className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
+                        errors.email
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                      }`}
                     />
                   </div>
+                  {errors.email && (
+                    <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                      <span>⚠️</span> {errors.email}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -612,9 +724,21 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       placeholder="+91 98765 43210"
                       required
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      onChange={(e) => {
+                        setErrors(prev => ({ ...prev, phoneNumber: validatePhoneNumber(e.target.value) }));
+                      }}
+                      className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
+                        errors.phoneNumber
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                      }`}
                     />
                   </div>
+                  {errors.phoneNumber && (
+                    <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                      <span>⚠️</span> {errors.phoneNumber}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -637,11 +761,18 @@ export default function AuthForm({ mode }: AuthFormProps) {
                     <input
                       name="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Create password (min 6 chars)"
+                      placeholder="Create strong password (min 6 chars)"
                       required
                       minLength={6}
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-12 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10"
+                      onChange={(e) => {
+                        setErrors(prev => ({ ...prev, password: validatePassword(e.target.value) }));
+                      }}
+                      className={`block w-full h-12 pl-10 pr-12 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
+                        errors.password
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                      }`}
                     />
                     <button
                       type="button"
@@ -674,6 +805,11 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       )}
                     </button>
                   </div>
+                  {errors.password && (
+                    <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                      <span>⚠️</span> {errors.password}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -740,13 +876,25 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       type="email"
                       value={email}
                       disabled={isOtpSent}
-                      onChange={(event) => setEmail(event.target.value)}
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        setErrors(prev => ({ ...prev, email: validateEmail(event.target.value) }));
+                      }}
                       placeholder="you@example.com"
                       required
                       suppressHydrationWarning
-                      className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 disabled:opacity-60"
+                      className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 disabled:opacity-60 ${
+                        errors.email
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                      }`}
                     />
                   </div>
+                  {errors.email && (
+                    <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                      <span>⚠️</span> {errors.email}
+                    </p>
+                  )}
                 </div>
 
                 {isOtpSent && (
@@ -771,14 +919,26 @@ export default function AuthForm({ mode }: AuthFormProps) {
                         name="otp"
                         type="text"
                         value={otp}
-                        onChange={(event) => setOtp(event.target.value)}
+                        onChange={(event) => {
+                          setOtp(event.target.value);
+                          setErrors(prev => ({ ...prev, otp: validateOtp(event.target.value) }));
+                        }}
                         placeholder="Enter 6-digit OTP"
                         required
                         maxLength={6}
                         suppressHydrationWarning
-                        className="block w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:border-[#c322f4] focus:bg-white focus:ring-4 focus:ring-[#c322f4]/10 tracking-widest text-center font-mono text-lg"
+                        className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 tracking-widest text-center font-mono text-lg ${
+                          errors.otp
+                            ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                            : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                        }`}
                       />
                     </div>
+                    {errors.otp && (
+                      <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                        <span>⚠️</span> {errors.otp}
+                      </p>
+                    )}
                     {devOtp && (
                       <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2 text-[10px] font-semibold text-purple-700 border border-purple-100">
                         <span>💡</span>

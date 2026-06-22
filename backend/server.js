@@ -185,6 +185,26 @@ function normalizePhoneNumber(phoneNumber) {
   return String(phoneNumber || "").replace(/[^\d+]/g, "").trim();
 }
 
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(String(email || "").trim().toLowerCase());
+}
+
+function isValidPhoneNumber(phoneNumber) {
+  const digits = String(phoneNumber || "").replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15;
+}
+
+function isValidFullName(fullName) {
+  const name = String(fullName || "").trim();
+  return name.length >= 3 && /^[a-zA-Z\s]+$/.test(name);
+}
+
+function isValidPassword(password) {
+  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{6,}$/;
+  return passRegex.test(password);
+}
+
 function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -777,21 +797,33 @@ app.post("/api/auth/register", async (request, response) => {
       });
     }
 
+    if (!isValidFullName(fullName)) {
+      return response.status(400).json({
+        message: "Please enter a valid full name (minimum 3 characters, alphabets and spaces only)",
+      });
+    }
+
+    if (!isValidEmail(email)) {
+      return response.status(400).json({
+        message: "Please enter a valid email address",
+      });
+    }
+
+    if (!isValidPhoneNumber(phoneNumber)) {
+      return response.status(400).json({
+        message: "Please enter a valid phone number (10 to 15 digits)",
+      });
+    }
+
     if (!["user", "tailor"].includes(role)) {
       return response.status(400).json({
         message: "Role must be 'user' or 'tailor'",
       });
     }
 
-    if (password.length < 6) {
+    if (!isValidPassword(password)) {
       return response.status(400).json({
-        message: "Password must be at least 6 characters",
-      });
-    }
-
-    if (phoneNumber.length < 10) {
-      return response.status(400).json({
-        message: "Please enter a valid phone number",
+        message: "Password must be at least 6 characters, and contain at least one uppercase letter, one lowercase letter, one digit, and one special character (e.g. @, $, !, %, *, ?).",
       });
     }
 
@@ -882,6 +914,12 @@ app.post("/api/auth/request-otp", async (request, response) => {
     if (!email) {
       return response.status(400).json({
         message: "Email is required",
+      });
+    }
+
+    if (!isValidEmail(email)) {
+      return response.status(400).json({
+        message: "Please enter a valid email address",
       });
     }
 
@@ -1109,10 +1147,28 @@ app.post("/api/auth/google-register", async (request, response) => {
       });
     }
 
+    if (!isValidEmail(email)) {
+      return response.status(400).json({
+        message: "Please enter a valid email address",
+      });
+    }
+
+    if (fullName && !isValidFullName(fullName)) {
+      return response.status(400).json({
+        message: "Please enter a valid full name (minimum 3 characters, alphabets and spaces only)",
+      });
+    }
+
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
     if (!phoneNumber || !normalizedPhone) {
       return response.status(400).json({
         message: "Phone number is required",
+      });
+    }
+
+    if (!isValidPhoneNumber(phoneNumber)) {
+      return response.status(400).json({
+        message: "Please enter a valid phone number (10 to 15 digits)",
       });
     }
 
