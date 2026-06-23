@@ -109,15 +109,32 @@ export function getAuthToken() {
   return localStorage.getItem("stitch-token") || "";
 }
 
-export function authHeaders(headers?: HeadersInit) {
-  const nextHeaders = new Headers(headers);
-  const token = getAuthToken();
+export function authHeaders(headers?: HeadersInit): Record<string, string> {
+  const obj: Record<string, string> = {};
 
-  if (token && !nextHeaders.has("Authorization")) {
-    nextHeaders.set("Authorization", `Bearer ${token}`);
+  if (headers) {
+    if (headers instanceof Headers) {
+      headers.forEach((value, key) => {
+        obj[key] = value;
+      });
+    } else if (Array.isArray(headers)) {
+      headers.forEach(([key, value]) => {
+        obj[key] = value;
+      });
+    } else {
+      Object.assign(obj, headers);
+    }
   }
 
-  return nextHeaders;
+  const token = getAuthToken();
+  const hasAuth = Object.keys(obj).some(
+    (k) => k.toLowerCase() === "authorization"
+  );
+  if (token && !hasAuth) {
+    obj["Authorization"] = `Bearer ${token}`;
+  }
+
+  return obj;
 }
 
 export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
