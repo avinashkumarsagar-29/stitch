@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="8" fill="#0c1b24"/>
+  <!-- Elegant bold S path -->
+  <path d="M16.5 10 C14.2 10 13.2 11.2 13.2 12.8 C13.2 15.5 18.8 14.8 18.8 17.8 C18.8 19.8 17 21 14.5 21 C12.2 21 11.2 19.8 11 18.5" 
+        fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Golden needle/thread line -->
+  <path d="M22.5 6 L22.5 17" fill="none" stroke="#d2a22e" stroke-width="2" stroke-linecap="round"/>
+  <!-- Needle eye loop -->
+  <path d="M20 6 C20 4.5 25 4.5 25 6 L25 11 C25 12.5 20 12.5 20 11 Z" fill="none" stroke="#ffffff" stroke-width="1.8"/>
+</svg>

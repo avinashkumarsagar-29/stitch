@@ -16,6 +16,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#c322f4" />
         <link
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"

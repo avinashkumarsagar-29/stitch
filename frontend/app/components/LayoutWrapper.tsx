@@ -132,6 +132,12 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setSidebarOpen(false);
     }
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => console.log("Service Worker registered successfully:", reg.scope))
+        .catch((err) => console.error("Service Worker registration failed:", err));
+    }
   }, []);
 
   const isLoggedIn = useSyncExternalStore(subscribe, getSnapshot, () => false);

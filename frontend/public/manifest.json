@@ -1,0 +1,17 @@
+{
+  "name": "Stitch | Tailoring & Design",
+  "short_name": "Stitch",
+  "description": "Book tailoring pickup and drop-off services with Stitch.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#c322f4",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
