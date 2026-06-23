@@ -79,6 +79,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
   }
 
   useEffect(() => {
+    (window as any)._googleCredentialHandler = handleGoogleCredentialResponse;
+    return () => {
+      (window as any)._googleCredentialHandler = null;
+    };
+  }, [handleGoogleCredentialResponse]);
+
+  useEffect(() => {
     const id = "google-gsi-script";
     let script = document.getElementById(id) as HTMLScriptElement | null;
     
@@ -104,10 +111,17 @@ export default function AuthForm({ mode }: AuthFormProps) {
       
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "972584105213-9l34v6g7uapshmprc69jepq3h6a6q8j3.apps.googleusercontent.com";
       
-      (window as any).google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredentialResponse,
-      });
+      if (!(window as any).googleAccountsInitialized) {
+        (window as any).google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response: any) => {
+            if (typeof (window as any)._googleCredentialHandler === "function") {
+              (window as any)._googleCredentialHandler(response);
+            }
+          },
+        });
+        (window as any).googleAccountsInitialized = true;
+      }
 
       const container = document.getElementById("google-signin-btn-hidden");
       if (container) {
