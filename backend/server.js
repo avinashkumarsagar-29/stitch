@@ -94,6 +94,19 @@ io.on("connection", (socket) => {
     });
   });
 
+  socket.on("tailor:online", ({ tailorId, bookingId }) => {
+    socket.join(`booking-${bookingId}`);
+    io.to(`booking-${bookingId}`).emit("tailor:status", { online: true, tailorId });
+  });
+
+  socket.on("tailor:offline", ({ tailorId, bookingId }) => {
+    io.to(`booking-${bookingId}`).emit("tailor:status", { online: false, tailorId });
+  });
+
+  socket.on("ping:tailor", ({ bookingId }) => {
+    socket.to(`booking-${bookingId}`).emit("pong:tailor", { alive: true, ts: Date.now() });
+  });
+
   socket.on("disconnect", () => {
     console.log("Client disconnected from Socket.IO:", socket.id);
   });

@@ -666,6 +666,12 @@ module.exports = (io) => {
       await b.save();
       io.emit("data:updated", { type: "bookings" });
 
+      const newStatus = status;
+      io.to(`booking-${bookingId}`).emit("booking:status-changed", {
+        bookingId,
+        status: newStatus
+      });
+
       return response.json({ message: "Booking updated successfully" });
     } catch (error) {
       console.error("Admin override booking status error:", error);
@@ -908,9 +914,10 @@ module.exports = (io) => {
       const userIds = [...new Set(reviewsRaw.map(r => r.userId).filter(id => id !== null && id !== undefined))];
       const tailorIds = [...new Set(reviewsRaw.map(r => r.tailorApplicationId).filter(id => id !== null && id !== undefined))];
 
-      const [users, joinApps, averagesAggregation] = await Promise.all([
+      const [users, joinApps, userTailors, averagesAggregation] = await Promise.all([
         User.find({ _id: { $in: userIds } }),
         JoinApplication.find({ _id: { $in: tailorIds } }),
+        User.find({ _id: { $in: tailorIds }, role: "tailor" }),
         Review.aggregate([
           {
             $group: {
@@ -924,19 +931,21 @@ module.exports = (io) => {
 
       const userMap = new Map(users.map(u => [u._id, u]));
       const joinAppMap = new Map(joinApps.map(ja => [ja._id, ja]));
+      const userTailorMap = new Map(userTailors.map(ut => [ut._id, ut]));
 
       const reviews = [];
       for (const r of reviewsRaw) {
         const u = r.userId ? userMap.get(r.userId) : null;
         const ja = r.tailorApplicationId ? joinAppMap.get(r.tailorApplicationId) : null;
+        const ut = (!ja && r.tailorApplicationId) ? userTailorMap.get(r.tailorApplicationId) : null;
 
         const reviewObj = {
           ...r.toObject(),
           id: r._id,
           customerName: u ? u.fullName : null,
           customerEmail: u ? u.email : null,
-          tailorName: ja ? `${ja.firstName} ${ja.lastName}`.trim() : null,
-          tailorEmail: ja ? ja.email : null
+          tailorName: ja ? `${ja.firstName} ${ja.lastName}`.trim() : (ut ? ut.fullName : null),
+          tailorEmail: ja ? ja.email : (ut ? ut.email : null)
         };
 
         if (search) {
@@ -957,14 +966,36 @@ module.exports = (io) => {
 
       const averages = [];
       for (const ja of tailors) {
-        const avgInfo = averagesMap.get(ja._id);
-        if (avgInfo) {
+        // Find matching User ID to check if reviews were aggregated under User ID
+        const userTailor = await User.findOne({
+          $or: [
+            { email: ja.email ? ja.email.toLowerCase().trim() : undefined },
+            { phoneNumber: ja.phoneNumber ? ja.phoneNumber.trim() : undefined }
+          ].filter(Boolean)
+        });
+
+        // Sum averages from both JoinApplication ID and User ID
+        const avgInfoJa = averagesMap.get(ja._id);
+        const avgInfoUt = userTailor ? averagesMap.get(userTailor._id) : null;
+
+        let totalReviews = 0;
+        let sumRating = 0;
+        if (avgInfoJa) {
+          totalReviews += avgInfoJa.reviewCount;
+          sumRating += avgInfoJa.averageRating * avgInfoJa.reviewCount;
+        }
+        if (avgInfoUt) {
+          totalReviews += avgInfoUt.reviewCount;
+          sumRating += avgInfoUt.averageRating * avgInfoUt.reviewCount;
+        }
+
+        if (totalReviews > 0) {
           averages.push({
             tailorId: ja._id,
             tailorName: `${ja.firstName} ${ja.lastName}`.trim(),
             tailorEmail: ja.email,
-            averageRating: Number(avgInfo.averageRating.toFixed(2)),
-            reviewCount: avgInfo.reviewCount
+            averageRating: Number((sumRating / totalReviews).toFixed(2)),
+            reviewCount: totalReviews
           });
         }
       }

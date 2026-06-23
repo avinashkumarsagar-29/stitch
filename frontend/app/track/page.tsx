@@ -6,9 +6,10 @@ import { API_URL } from "@/app/config";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, Suspense } from "react";
+import { useEffect, useState, useSyncExternalStore, Suspense, useCallback } from "react";
 import { showToast } from "../components/Toast";
 import TrackingMap from "../components/TrackingMap";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type BookingRecord = {
   id: number;
@@ -174,158 +175,168 @@ function TrackContent() {
     setSearchId(bookingIdParam);
   }, [bookingIdParam]);
 
-  // Load selected booking details if ID in URL
-  useEffect(() => {
-    async function fetchBooking(id: string, typeVal: string) {
-      setIsLoading(true);
-      try {
-        const apiUrl = API_URL;
-        if (typeVal === "business") {
-          const bizResponse = await authFetch(`${apiUrl}/api/business-orders/${id}`);
-          const bizData = await bizResponse.json();
-          if (bizResponse.ok && bizData.businessOrder) {
-            const bo = bizData.businessOrder;
-            setActiveBooking({
-              ...bo,
-              isBusiness: true,
-              pickupLocation: bo.location || "",
-              dropoffLocation: bo.location || "",
-              bookingDate: bo.createdAt,
-              bookingTime: "12:00:00",
-              clothCategory: `${bo.quantity}x ${bo.businessType}`,
-              material: bo.companyName,
-            } as any);
-            setRatingVal(0);
-            setHoverRating(0);
-            setCommentVal("");
-            setIsLoading(false);
-            return;
-          }
+  // Memoized function to load selected booking details
+  const fetchBooking = useCallback(async (id: string, typeVal: string) => {
+    setIsLoading(true);
+    try {
+      const apiUrl = API_URL;
+      if (typeVal === "business") {
+        const bizResponse = await authFetch(`${apiUrl}/api/business-orders/${id}`);
+        const bizData = await bizResponse.json();
+        if (bizResponse.ok && bizData.businessOrder) {
+          const bo = bizData.businessOrder;
+          setActiveBooking({
+            ...bo,
+            isBusiness: true,
+            pickupLocation: bo.location || "",
+            dropoffLocation: bo.location || "",
+            bookingDate: bo.createdAt,
+            bookingTime: "12:00:00",
+            clothCategory: `${bo.quantity}x ${bo.businessType}`,
+            material: bo.companyName,
+          } as any);
+          setRatingVal(0);
+          setHoverRating(0);
+          setCommentVal("");
+          setIsLoading(false);
+          return;
         }
+      }
 
-        const response = await authFetch(`${apiUrl}/api/bookings/${id}?role=${currentUser?.role || 'user'}`);
-        const data = await response.json();
+      const response = await authFetch(`${apiUrl}/api/bookings/${id}?role=${currentUser?.role || 'user'}`);
+      const data = await response.json();
 
-        if (response.ok && data.booking) {
-          setActiveBooking({ ...data.booking, isBusiness: false });
+      if (response.ok && data.booking) {
+        setActiveBooking({ ...data.booking, isBusiness: false });
+        setRatingVal(0);
+        setHoverRating(0);
+        setCommentVal("");
+      } else {
+        // Fallback to try business order lookup if standard booking fails
+        const bizResponse = await authFetch(`${apiUrl}/api/business-orders/${id}`);
+        const bizData = await bizResponse.json();
+        if (bizResponse.ok && bizData.businessOrder) {
+          const bo = bizData.businessOrder;
+          setActiveBooking({
+            ...bo,
+            isBusiness: true,
+            pickupLocation: bo.location || "",
+            dropoffLocation: bo.location || "",
+            bookingDate: bo.createdAt,
+            bookingTime: "12:00:00",
+            clothCategory: `${bo.quantity}x ${bo.businessType}`,
+            material: bo.companyName,
+          } as any);
           setRatingVal(0);
           setHoverRating(0);
           setCommentVal("");
         } else {
-          // Fallback to try business order lookup if standard booking fails
-          const bizResponse = await authFetch(`${apiUrl}/api/business-orders/${id}`);
-          const bizData = await bizResponse.json();
-          if (bizResponse.ok && bizData.businessOrder) {
-            const bo = bizData.businessOrder;
-            setActiveBooking({
-              ...bo,
-              isBusiness: true,
-              pickupLocation: bo.location || "",
-              dropoffLocation: bo.location || "",
-              bookingDate: bo.createdAt,
-              bookingTime: "12:00:00",
-              clothCategory: `${bo.quantity}x ${bo.businessType}`,
-              material: bo.companyName,
-            } as any);
-            setRatingVal(0);
-            setHoverRating(0);
-            setCommentVal("");
-          } else {
-            showToast(data.message || "Booking or Business order ID not found", "error");
-            setActiveBooking(null);
-          }
+          showToast(data.message || "Booking or Business order ID not found", "error");
+          setActiveBooking(null);
         }
-      } catch (error) {
-        console.error("Fetch booking error:", error);
-        showToast("Unable to connect to backend server", "error");
-      } finally {
-        setIsLoading(false);
       }
+    } catch (error) {
+      console.error("Fetch booking error:", error);
+      showToast("Unable to connect to backend server", "error");
+    } finally {
+      setIsLoading(false);
     }
+  }, [currentUser]);
 
+  // Memoized function to load user's bookings & business orders
+  const fetchUserBookings = useCallback(async () => {
+    if (!currentUser) {
+      setUserBookings([]);
+      return;
+    }
+    setIsListLoading(true);
+    try {
+      const apiUrl = API_URL;
+      
+      // Fetch Standard Bookings
+      const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
+      const data = await response.json();
+      let bookingsList: any[] = [];
+      if (response.ok && data.bookings) {
+        bookingsList = data.bookings.map((b: any) => ({ ...b, isBusiness: false }));
+      }
+
+      // Fetch Business Orders
+      let businessList: any[] = [];
+      try {
+        const bizResponse = await authFetch(`${apiUrl}/api/business-orders`);
+        const bizData = await bizResponse.json();
+        if (bizResponse.ok && bizData.businessOrders) {
+          businessList = bizData.businessOrders.map((bo: any) => ({
+            ...bo,
+            isBusiness: true,
+            pickupLocation: bo.location || "",
+            dropoffLocation: bo.location || "",
+            bookingDate: bo.createdAt,
+            bookingTime: "12:00:00",
+            clothCategory: `${bo.quantity}x ${bo.businessType}`,
+            material: bo.companyName,
+          }));
+        }
+      } catch (bizErr) {
+        console.error("Error fetching business orders for tracking:", bizErr);
+      }
+
+      const isTailor = currentUser.role === "tailor";
+      
+      const filteredBookings = bookingsList.filter((b: any) => {
+        if (isTailor) {
+          return (
+            (b.tailorEmail === currentUser.email ||
+             b.tailorPhoneNumber === currentUser.phoneNumber) &&
+            b.status !== "delivered"
+          );
+        } else {
+          return Number(b.userId) === Number(currentUser.id);
+        }
+      });
+
+      const filteredBusiness = businessList.filter((bo: any) => {
+        if (isTailor) {
+          return (
+            (bo.tailorEmail === currentUser.email ||
+             bo.tailorPhoneNumber === currentUser.phoneNumber) &&
+            bo.status !== "delivered"
+          );
+        } else {
+          return Number(bo.userId) === Number(currentUser.id);
+        }
+      });
+
+      setUserBookings([...filteredBookings, ...filteredBusiness]);
+    } catch (error) {
+      console.error("Fetch user bookings error:", error);
+    } finally {
+      setIsListLoading(false);
+    }
+  }, [currentUser]);
+
+  // Load selected booking details if ID in URL
+  useEffect(() => {
     if (bookingIdParam) {
       fetchBooking(bookingIdParam, typeParam);
     } else {
       setActiveBooking(null);
     }
-  }, [bookingIdParam, typeParam, currentUser]);
+  }, [bookingIdParam, typeParam, fetchBooking]);
 
   // Load user's bookings & business orders if logged in
   useEffect(() => {
-    async function fetchUserBookings() {
-      if (!currentUser) {
-        setUserBookings([]);
-        return;
-      }
-      setIsListLoading(true);
-      try {
-        const apiUrl = API_URL;
-        
-        // Fetch Standard Bookings
-        const response = await authFetch(`${apiUrl}/api/bookings?role=${currentUser?.role || 'user'}`);
-        const data = await response.json();
-        let bookingsList: any[] = [];
-        if (response.ok && data.bookings) {
-          bookingsList = data.bookings.map((b: any) => ({ ...b, isBusiness: false }));
-        }
-
-        // Fetch Business Orders
-        let businessList: any[] = [];
-        try {
-          const bizResponse = await authFetch(`${apiUrl}/api/business-orders`);
-          const bizData = await bizResponse.json();
-          if (bizResponse.ok && bizData.businessOrders) {
-            businessList = bizData.businessOrders.map((bo: any) => ({
-              ...bo,
-              isBusiness: true,
-              pickupLocation: bo.location || "",
-              dropoffLocation: bo.location || "",
-              bookingDate: bo.createdAt,
-              bookingTime: "12:00:00",
-              clothCategory: `${bo.quantity}x ${bo.businessType}`,
-              material: bo.companyName,
-            }));
-          }
-        } catch (bizErr) {
-          console.error("Error fetching business orders for tracking:", bizErr);
-        }
-
-        const isTailor = currentUser.role === "tailor";
-        
-        const filteredBookings = bookingsList.filter((b: any) => {
-          if (isTailor) {
-            return (
-              (b.tailorEmail === currentUser.email ||
-               b.tailorPhoneNumber === currentUser.phoneNumber) &&
-              b.status !== "delivered"
-            );
-          } else {
-            return Number(b.userId) === Number(currentUser.id);
-          }
-        });
-
-        const filteredBusiness = businessList.filter((bo: any) => {
-          if (isTailor) {
-            return (
-              (bo.tailorEmail === currentUser.email ||
-               bo.tailorPhoneNumber === currentUser.phoneNumber) &&
-              bo.status !== "delivered"
-            );
-          } else {
-            return Number(bo.userId) === Number(currentUser.id);
-          }
-        });
-
-        setUserBookings([...filteredBookings, ...filteredBusiness]);
-      } catch (error) {
-        console.error("Fetch user bookings error:", error);
-      } finally {
-        setIsListLoading(false);
-      }
-    }
-
     fetchUserBookings();
-  }, [currentUser]);
+  }, [fetchUserBookings]);
+
+  // Auto-refresh when backend data changes via Socket.IO
+  useAutoRefresh("bookings", () => {
+    if (bookingIdParam) {
+      fetchBooking(bookingIdParam, typeParam);
+    }
+    fetchUserBookings();
+  });
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();

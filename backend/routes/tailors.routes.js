@@ -192,7 +192,20 @@ module.exports = (io) => {
 
       const enrichedTailors = [];
       for (const ja of applications) {
-        const reviews = await Review.find({ tailorApplicationId: ja._id });
+        // Find matching User record for the tailor application
+        const userTailor = await User.findOne({
+          $or: [
+            { email: ja.email ? ja.email.toLowerCase().trim() : undefined },
+            { phoneNumber: ja.phoneNumber ? ja.phoneNumber.trim() : undefined }
+          ].filter(Boolean)
+        });
+
+        const searchIds = [ja._id];
+        if (userTailor) {
+          searchIds.push(userTailor._id);
+        }
+
+        const reviews = await Review.find({ tailorApplicationId: { $in: searchIds } });
         const avgRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
 
         enrichedTailors.push({
@@ -339,7 +352,32 @@ module.exports = (io) => {
         });
       }
 
-      const reviews = await Review.find({ tailorApplicationId: tailorId });
+      let searchIds = [tailorId];
+      if (tailor.email || tailor.phoneNumber) {
+        const userTailor = await User.findOne({
+          $or: [
+            { email: tailor.email ? tailor.email.toLowerCase().trim() : undefined },
+            { phoneNumber: tailor.phoneNumber ? tailor.phoneNumber.trim() : undefined }
+          ].filter(Boolean)
+        });
+        if (userTailor) {
+          searchIds.push(userTailor._id);
+        }
+      }
+
+      const matchingApp = await JoinApplication.findOne({
+        $or: [
+          { email: tailor.email ? tailor.email.toLowerCase().trim() : undefined },
+          { phoneNumber: tailor.phoneNumber ? tailor.phoneNumber.trim() : undefined }
+        ].filter(Boolean)
+      });
+      if (matchingApp) {
+        searchIds.push(matchingApp._id);
+      }
+
+      searchIds = [...new Set(searchIds)];
+
+      const reviews = await Review.find({ tailorApplicationId: { $in: searchIds } });
       const avgRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
       const reviewCount = reviews.length;
 

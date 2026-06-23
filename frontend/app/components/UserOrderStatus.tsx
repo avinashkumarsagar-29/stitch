@@ -6,6 +6,7 @@ import { API_URL } from "@/app/config";
 import { useEffect, useState, useCallback } from "react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { showToast } from "./Toast";
+import { getSocket } from "@/lib/socket";
 
 type BookingRecord = {
   id: number;
@@ -81,6 +82,31 @@ export default function UserOrderStatus() {
 
   useEffect(() => {
     fetchLatestBooking();
+  }, [fetchLatestBooking]);
+
+  useEffect(() => {
+    const socket = getSocket();
+
+    socket.on("booking:status-changed", (data: { bookingId: number; status: string }) => {
+      // Re-fetch latest booking data
+      fetchLatestBooking();
+      // Show toast with human-readable status
+      const statusLabels: Record<string, string> = {
+        "booked": "✅ Booking Confirmed!",
+        "picked-up": "🛵 Tailor picked up your cloth!",
+        "in-stitching": "🧵 Stitching in progress...",
+        "ready": "✅ Your garment is ready!",
+        "out-for-delivery": "🚀 Out for delivery!",
+        "delivered": "🎉 Delivered successfully!",
+        "cancelled": "❌ Booking cancelled",
+      };
+      const label = statusLabels[data.status] || `Status updated: ${data.status}`;
+      showToast(label, data.status === "cancelled" ? "error" : "success");
+    });
+
+    return () => {
+      socket.off("booking:status-changed");
+    };
   }, [fetchLatestBooking]);
 
   useAutoRefresh("bookings", fetchLatestBooking);

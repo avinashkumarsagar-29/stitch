@@ -662,6 +662,15 @@ module.exports = (io) => {
         await mongoBooking.save();
       }
 
+      // Targeted emit to booking room (for TrackingMap live update)
+      io.to(`booking-${bookingId}`).emit("booking:status-changed", {
+        bookingId,
+        status: finalBooking.status || status,
+      });
+
+      // Broadcast to all clients (for UserOrderStatus + BookingHistory auto-refresh)
+      io.emit("data:updated", { type: "bookings" });
+
       return response.json({
         message: "Booking status updated successfully",
         booking: finalBooking.toObject(),

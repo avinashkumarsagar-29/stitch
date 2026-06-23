@@ -48,6 +48,9 @@ export default function TrackingMap({
   const liveCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const [isSimulatingGps, setIsSimulatingGps] = useState(false);
 
+  const [tailorOnline, setTailorOnline] = useState<boolean>(false);
+  const [statusBanner, setStatusBanner] = useState<string | null>(null);
+
   // Generate stable coordinates based on location strings
   const hashString = (str: string) => {
     let hash = 0;
@@ -117,6 +120,9 @@ export default function TrackingMap({
     socket.on("connect", () => {
       console.log(`Socket connected. Joining room: booking-${bookingId}`);
       socket.emit("join-booking", bookingId);
+      if (role === "tailor") {
+        socket.emit("tailor:online", { tailorId: "tailor", bookingId });
+      }
     });
 
     if (role === "tailor") {
@@ -161,6 +167,7 @@ export default function TrackingMap({
 
         return () => {
           clearInterval(intervalId);
+          socket.emit("tailor:offline", { tailorId: "tailor", bookingId });
           socket.disconnect();
         };
       } else {
@@ -236,6 +243,7 @@ export default function TrackingMap({
         return () => {
           if (watchId !== null) navigator.geolocation.clearWatch(watchId);
           if (emitInterval !== null) clearInterval(emitInterval);
+          socket.emit("tailor:offline", { tailorId: "tailor", bookingId });
           socket.disconnect();
         };
       }
@@ -262,6 +270,23 @@ export default function TrackingMap({
         setEta(etaMins);
         setCourierSpeed(speed);
         setCourierStatus("Live coordinates updated in real-time");
+      });
+
+      socket.on("tailor:status", (data: { online: boolean; tailorId: string }) => {
+        setTailorOnline(data.online);
+      });
+
+      socket.on("booking:status-changed", (data: { bookingId: number; status: string }) => {
+        setStatusBanner(`Your booking status updated to: ${data.status}`);
+        setTimeout(() => setStatusBanner(null), 4000);
+      });
+
+      socket.on("disconnect", () => {
+        setStatusBanner("Connection lost. Reconnecting...");
+      });
+
+      socket.on("reconnect", () => {
+        setStatusBanner(null);
       });
 
       return () => {
@@ -486,12 +511,33 @@ export default function TrackingMap({
           <p className="text-[10px] text-purple-600 font-semibold uppercase mt-0.5">{courierStatus}</p>
         </div>
 
-        {showTransitStats && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-extrabold bg-purple-50 text-[#c322f4] border border-purple-100 animate-pulse">
-            ⚡ LIVE TRACKING ACTIVE
-          </div>
-        )}
+        <div className="flex flex-col items-end space-y-1">
+          {/* Tailor status badge for customers */}
+          {role !== "tailor" && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-slate-50 border border-slate-200">
+              <span className="relative flex h-1.5 w-1.5">
+                {tailorOnline && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${tailorOnline ? "bg-emerald-500" : "bg-gray-400"}`}></span>
+              </span>
+              <span className="text-gray-600">{tailorOnline ? "Tailor Online" : "Tailor Offline"}</span>
+            </div>
+          )}
+
+          {showTransitStats && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-extrabold bg-purple-50 text-[#c322f4] border border-purple-100 animate-pulse">
+              ⚡ LIVE TRACKING ACTIVE
+            </div>
+          )}
+        </div>
       </div>
+
+      {statusBanner && (
+        <div className="bg-[#c322f4] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md text-center transition-all">
+          {statusBanner}
+        </div>
+      )}
 
       {/* Map Container */}
       <div className="relative flex-1 min-h-[300px] rounded-xl border border-gray-100 shadow-inner overflow-hidden">
