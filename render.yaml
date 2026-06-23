@@ -1,0 +1,16 @@
+services:
+  # Backend Service (stitch-5)
+  - type: web
+    name: stitch-5
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+
+  # Frontend Service (stitch-6)
+  - type: web
+    name: stitch-6
+    env: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
