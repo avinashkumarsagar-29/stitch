@@ -22,6 +22,7 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 
 // In-memory push subscriptions store (use MongoDB for production)
 global.pushSubscriptions = new Map();
+// Map stores: { subscription, themeColors: { bg, accent, icon } }
 
 // Global Middlewares
 app.use(corsMiddleware);
@@ -134,9 +135,12 @@ app.get("/api/admin/generate-vapid", (req, res) => {
 // Save admin push subscription
 app.post("/api/admin/push-subscribe", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { subscription } = req.body;
+    const { subscription, themeColors } = req.body;
     const userId = req.user.id;
-    global.pushSubscriptions.set(String(userId), subscription);
+    global.pushSubscriptions.set(String(userId), {
+      subscription,
+      themeColors: themeColors || { bg: "#ffffff", accent: "#c322f4", icon: "/logo.png" }
+    });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: "Failed to save subscription" });
@@ -151,6 +155,21 @@ app.post("/api/admin/push-unsubscribe", requireAuth, requireAdmin, async (req, r
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: "Failed to remove subscription" });
+  }
+});
+
+// Update admin push theme
+app.post("/api/admin/push-update-theme", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const userId = String(req.user.id);
+    const existing = global.pushSubscriptions.get(userId);
+    if (existing) {
+      existing.themeColors = req.body.themeColors || existing.themeColors;
+      global.pushSubscriptions.set(userId, existing);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update theme" });
   }
 });
 
