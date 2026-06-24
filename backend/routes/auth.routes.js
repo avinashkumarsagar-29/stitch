@@ -108,6 +108,11 @@ module.exports = (io) => {
       });
       await mongoUser.save();
       io.emit("data:updated", { type: "users" });
+      io.emit("admin:new-user", {
+        fullName: mongoUser.fullName,
+        email: mongoUser.email,
+        createdAt: new Date().toISOString(),
+      });
 
       if (referrerUserId) {
         const referral = new Referral({

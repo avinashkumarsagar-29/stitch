@@ -17,6 +17,7 @@ import { API_URL } from "@/app/config";
 import Loader from "./Loader";
 import JoinDrawer from "./JoinDrawer";
 import { showToast } from "./Toast";
+import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 
 
 function playNotificationSound() {
@@ -329,6 +330,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     const interval = setInterval(checkNotifications, 10000);
     return () => clearInterval(interval);
   }, [isLoggedIn, isTailor, profile.address]);
+
+  useAdminNotifications();
+
   const isAdmin = userRole === "admin";
   const homeHref = isAdmin ? "/admin" : isTailor ? "/trailor/Home" : isLoggedIn ? "/Home" : "/";
   const links = isAdmin
