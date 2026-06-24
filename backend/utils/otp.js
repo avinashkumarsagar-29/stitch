@@ -85,15 +85,29 @@ async function sendOtpSms(phoneNumber, otpCode) {
   return { sent: true };
 }
 
-async function sendOtpEmail(userEmail, userName, otpCode) {
+// Singleton transporter — create once, reuse always
+let _smtpTransporter = null;
+function getSmtpTransporter() {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
+  if (!host || !port || !user || !pass) return null;
+  if (!_smtpTransporter) {
+    _smtpTransporter = nodemailer.createTransport({
+      host,
+      port: Number(port),
+      secure: port === "465",
+      pool: true,          // connection pool — reuse connections
+      maxConnections: 3,
+      auth: { user, pass },
+    });
+  }
+  return _smtpTransporter;
+}
+
+async function sendOtpEmail(userEmail, userName, otpCode) {
   const from = process.env.SMTP_FROM || "no-reply@stitch.com";
-
-  const isMailConfigured = host && port && user && pass;
-
   const subject = "Your Stitch Login OTP";
   const htmlContent = `
     <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
@@ -123,49 +137,23 @@ async function sendOtpEmail(userEmail, userName, otpCode) {
     </div>
   `;
 
-  if (!isMailConfigured) {
-    const logFilePath = path.join(__dirname, "../mock_emails.log");
-    const logEntry = `
-========================================
-TIMESTAMP: ${new Date().toISOString()}
-TO: ${userEmail}
-FROM: ${from}
-SUBJECT: ${subject}
-BODY:
-${htmlContent}
-========================================
-\n`;
-    try {
-      fs.appendFileSync(logFilePath, logEntry, "utf8");
-      console.log(`Mock OTP email logged successfully to ${logFilePath}`);
-    } catch (err) {
-      console.error("Failed to write mock OTP email to log file:", err);
-    }
-    return { sent: false, mock: true };
+  const transporter = getSmtpTransporter();
+  if (!transporter) {
+    console.log(`[MOCK OTP] To: ${userEmail} | OTP: ${otpCode}`);
+    return { sent: false, mock: true, otp: otpCode };
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port: Number(port),
-      secure: port === "465",
-      auth: {
-        user,
-        pass,
-      },
-    });
-
     const info = await transporter.sendMail({
       from,
       to: userEmail,
       subject,
       html: htmlContent,
     });
-
-    console.log("OTP Email sent successfully:", info.messageId);
+    console.log("OTP Email sent:", info.messageId);
     return { sent: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending OTP email via SMTP:", error);
+    console.error("Error sending OTP email:", error);
     throw error;
   }
 }

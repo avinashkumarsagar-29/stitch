@@ -160,44 +160,44 @@ module.exports = (io) => {
         });
       }
 
-      // Rate Limiting Check: Max 3 OTP requests in the last 10 minutes (only in production)
-      if (process.env.NODE_ENV === "production") {
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-        const requestCount = await LoginOtp.countDocuments({
-          email,
-          createdAt: { $gt: tenMinutesAgo }
-        });
-
-        if (requestCount >= 3) {
-          return response.status(429).json({
-            message: "Too many OTP requests. Please wait before requesting another OTP.",
-          });
-        }
-      }
-
-      const user = await User.findOne({ email });
+      // Parallel: fetch user + check rate limit simultaneously
+      const [user, requestCount] = await Promise.all([
+        User.findOne({ email }).lean(),
+        process.env.NODE_ENV === "production"
+          ? LoginOtp.countDocuments({
+              email,
+              createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
+            })
+          : Promise.resolve(0)
+      ]);
 
       if (!user) {
-        return response.status(404).json({
-          message: "Email is not registered",
-        });
+        return response.status(404).json({ message: "Email is not registered" });
       }
 
       if (user.isBanned) {
-        return response.status(403).json({
-          message: "Your account has been deactivated.",
+        return response.status(403).json({ message: "Your account has been deactivated." });
+      }
+
+      if (requestCount >= 3) {
+        return response.status(429).json({
+          message: "Too many OTP requests. Please wait before requesting another OTP."
         });
       }
 
       const otpCode = generateOtp();
+
+      // Parallel: save OTP + send email simultaneously
       const loginOtp = new LoginOtp({
         email,
         otpCode,
         expiresAt: new Date(Date.now() + otpExpiryMinutes * 60 * 1000)
       });
-      await loginOtp.save();
 
-      const emailResult = await sendOtpEmail(user.email, user.fullName, otpCode);
+      const [, emailResult] = await Promise.all([
+        loginOtp.save(),
+        sendOtpEmail(user.email, user.fullName, otpCode)
+      ]);
 
       return response.json({
         message: emailResult.sent
