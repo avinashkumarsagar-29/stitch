@@ -115,3 +115,23 @@ io.on("connection", (socket) => {
 server.listen(port, () => {
   console.log(`Stitch backend running at http://localhost:${port}`);
 });
+
+// fix: remove fs.appendFileSync crash on Render
+// Find this exact block (around line 509):
+//   if (!isMailConfigured) {
+//     const logFilePath = path.join(__dirname, "mock_emails.log");
+//     const logEntry = `...`;
+//     try {
+//       fs.appendFileSync(logFilePath, logEntry, "utf8");
+//       console.log(`Mock OTP email logged successfully to ${logFilePath}`);
+//     } catch (err) {
+//       console.error("Failed to write mock OTP email to log file:", err);
+//     }
+//     return { sent: false, mock: true };
+//   }
+// Replace with this:
+//   if (!isMailConfigured) {
+//     console.log(`[MOCK OTP] To: ${userEmail} | OTP: ${otpCode}`);
+//     return { sent: false, mock: true, otp: otpCode };
+//   }
+
