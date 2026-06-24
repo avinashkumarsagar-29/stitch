@@ -1,4 +1,5 @@
 const express = require("express");
+const webpush = require("web-push");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const LoginOtp = require("../models/LoginOtp");
@@ -113,6 +114,30 @@ module.exports = (io) => {
         email: mongoUser.email,
         createdAt: new Date().toISOString(),
       });
+
+      // Send push notification to all subscribed admins
+      if (global.pushSubscriptions && global.pushSubscriptions.size > 0) {
+        global.pushSubscriptions.forEach(async (data, adminId) => {
+          try {
+            const { subscription, themeColors } = data;
+            const themedPayload = JSON.stringify({
+              title: "New User Registered! 👤",
+              body: `${mongoUser.fullName} (${mongoUser.email}) just joined Stitch`,
+              icon: themeColors?.icon || "/logo.png",
+              badge: "/logo.png",
+              bgColor: themeColors?.bg || "#ffffff",
+              accentColor: themeColors?.accent || "#c322f4",
+              url: "/admin/users",
+              tag: "new-user-" + Date.now(),
+            });
+            await webpush.sendNotification(subscription, themedPayload);
+          } catch (err) {
+            if (err.statusCode === 410) {
+              global.pushSubscriptions.delete(adminId); // expired subscription
+            }
+          }
+        });
+      }
 
       if (referrerUserId) {
         const referral = new Referral({

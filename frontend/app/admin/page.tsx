@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { authFetch, getCurrentUserRole } from "../components/profileStorage";
 import { API_URL } from "../config";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 type ActivityItem = {
   id: string;
@@ -82,6 +83,7 @@ export default function AdminLandingPage() {
   const [summary, setSummary] = useState<AdminSummary>(emptySummary);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const { isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications();
 
   const loadSummary = useCallback(async () => {
     try {
@@ -139,6 +141,23 @@ export default function AdminLandingPage() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
+              {isSupported && (
+                <button
+                  onClick={isSubscribed ? unsubscribe : subscribe}
+                  style={{
+                    background: isSubscribed ? "#2ab5b5" : "#c322f4",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "8px 16px",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {isSubscribed ? "🔔 Notifications ON" : "🔕 Enable Notifications"}
+                </button>
+              )}
               <Link
                 href="/admin/settings"
                 className="inline-flex h-11 items-center justify-center rounded-md border border-gray-200 bg-white px-4 text-sm font-bold text-[#344054] transition hover:bg-[#f7f8fb]"
