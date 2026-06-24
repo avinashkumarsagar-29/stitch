@@ -3,12 +3,25 @@ require("dotenv").config();
 const express = require("express");
 const { connectMongo } = require("./db.mongo");
 const { corsMiddleware, allowedOrigins } = require("./middleware/cors");
+const webpush = require("web-push");
+const { requireAuth, requireAdmin } = require("./middleware/auth");
 
 // Initialize MongoDB Connection
 connectMongo();
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || "mailto:admin@stitch.org.in",
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
+
+// In-memory push subscriptions store (use MongoDB for production)
+global.pushSubscriptions = new Map();
 
 // Global Middlewares
 app.use(corsMiddleware);
@@ -110,6 +123,35 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("Client disconnected from Socket.IO:", socket.id);
   });
+});
+
+// Generate VAPID keys (temporary route)
+app.get("/api/admin/generate-vapid", (req, res) => {
+  const keys = webpush.generateVAPIDKeys();
+  res.json(keys);
+});
+
+// Save admin push subscription
+app.post("/api/admin/push-subscribe", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { subscription } = req.body;
+    const userId = req.user.id;
+    global.pushSubscriptions.set(String(userId), subscription);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to save subscription" });
+  }
+});
+
+// Delete admin push subscription
+app.post("/api/admin/push-unsubscribe", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    global.pushSubscriptions.delete(String(userId));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to remove subscription" });
+  }
 });
 
 server.listen(port, () => {

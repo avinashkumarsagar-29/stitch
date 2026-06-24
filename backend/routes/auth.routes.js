@@ -1,4 +1,5 @@
 const express = require("express");
+const webpush = require("web-push");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const LoginOtp = require("../models/LoginOtp");
@@ -113,6 +114,26 @@ module.exports = (io) => {
         email: mongoUser.email,
         createdAt: new Date().toISOString(),
       });
+
+      // Send push notification to all subscribed admins
+      if (global.pushSubscriptions && global.pushSubscriptions.size > 0) {
+        const payload = JSON.stringify({
+          title: "New User Registered! 👤",
+          body: `${mongoUser.fullName} (${mongoUser.email}) just joined Stitch`,
+          icon: "/logo.png",
+          badge: "/logo.png",
+          url: "/admin/users"
+        });
+        global.pushSubscriptions.forEach(async (subscription, adminId) => {
+          try {
+            await webpush.sendNotification(subscription, payload);
+          } catch (err) {
+            if (err.statusCode === 410) {
+              global.pushSubscriptions.delete(adminId); // expired subscription
+            }
+          }
+        });
+      }
 
       if (referrerUserId) {
         const referral = new Referral({
