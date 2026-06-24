@@ -1,8 +1,6 @@
 const mongoose = require("mongoose");
-const { getNextSequenceValue } = require("./Counter");
 
 const loginOtpSchema = new mongoose.Schema({
-  _id: { type: Number },
   email: { type: String, required: true },
   otpCode: { type: String, required: true },
   expiresAt: { type: Date, required: true },
@@ -42,11 +40,5 @@ loginOtpSchema.set("toObject", {
 loginOtpSchema.index({ email: 1 });
 loginOtpSchema.index({ createdAt: -1 });
 loginOtpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-loginOtpSchema.pre("save", async function () {
-  if (this.isNew && typeof this._id !== "number") {
-    this._id = await getNextSequenceValue("loginOtpId");
-  }
-});
 
 module.exports = mongoose.model("LoginOtp", loginOtpSchema);
