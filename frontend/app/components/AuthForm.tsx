@@ -372,7 +372,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     const apiUrl = API_URL;
 
     try {
-      const response = await authFetch(`${apiUrl}/api/auth/request-otp`, {
+      const response = await fetch(`${apiUrl}/api/auth/request-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
