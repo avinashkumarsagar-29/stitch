@@ -91,6 +91,12 @@ export default function PaymentPage() {
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
   const [referralDiscount, setReferralDiscount] = useState<number>(0);
   const [creditApplied, setCreditApplied] = useState<number>(0);
+  const [discountInfo, setDiscountInfo] = useState<{
+    eligible: boolean;
+    percent?: number;
+    minOrder?: number;
+    message?: string;
+  } | null>(null);
 
   const currentUser = useSyncExternalStore(
     subscribe,
@@ -165,6 +171,29 @@ export default function PaymentPage() {
         }
 
         setTailor(tailorData.tailor);
+
+        // Fetch first-order discount eligibility
+        const userStr = localStorage.getItem("stitch-user");
+        if (userStr) {
+          try {
+            const userObj = JSON.parse(userStr);
+            if (userObj && userObj.id) {
+              const discountRes = await authFetch(`${apiUrl}/api/discounts/check`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userId: userObj.id }),
+              });
+              if (discountRes.ok) {
+                const discountData = await discountRes.json();
+                setDiscountInfo(discountData);
+              }
+            }
+          } catch (e) {
+            console.error("Error fetching discount status:", e);
+          }
+        }
       } catch (err) {
         console.error(err);
         showToast("Error retrieving checkout data", "error");
@@ -409,7 +438,7 @@ export default function PaymentPage() {
       }
 
       // Explicitly update status to 'booked' since payment is completed
-      await authFetch(`${apiUrl}/api/bookings/${pendingBooking.bookingId}/status`, {
+      const statusRes = await authFetch(`${apiUrl}/api/bookings/${pendingBooking.bookingId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -417,13 +446,19 @@ export default function PaymentPage() {
         body: JSON.stringify({ status: "booked" }),
       });
 
+      const statusData = statusRes.ok ? await statusRes.json() : null;
+      const finalBookingObj = (statusData && statusData.booking) ? statusData.booking : { ...data.booking, status: "booked" };
+
       sessionStorage.removeItem("stitch-pending-booking");
-      setConfirmedBooking({
-        ...data.booking,
-        status: "booked"
-      });
+      setConfirmedBooking(finalBookingObj);
       setPaymentSuccess(true);
-      showToast("Payment verified and booking confirmed!", "success");
+
+      const discountVal = Number(finalBookingObj.discountAmount || 0);
+      if (discountVal > 0) {
+        showToast(`First order discount of ₹${discountVal} applied! 🎉`, "success");
+      } else {
+        showToast("Payment verified and booking confirmed!", "success");
+      }
     } catch (err) {
       console.error(err);
       showToast("Failed to finalise booking confirmation", "error");
@@ -478,9 +513,25 @@ export default function PaymentPage() {
                 <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Garment Detail:</span>
                 <span className="text-gray-800 font-semibold">{confirmedBooking.clothCategory} ({confirmedBooking.material})</span>
               </div>
+              {Number(confirmedBooking.discountAmount || 0) > 0 && (
+                <>
+                  <div className="flex justify-between pt-3 pb-3">
+                    <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Original Price:</span>
+                    <span className="text-gray-800 line-through">₹{confirmedBooking.originalTotal}</span>
+                  </div>
+                  <div className="flex justify-between pt-3 pb-3 text-emerald-600 font-bold animate-fade-in">
+                    <span className="font-bold uppercase tracking-wider text-[9px]">First Order Discount:</span>
+                    <span>-₹{confirmedBooking.discountAmount}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between pt-3">
                 <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Total Amount Paid:</span>
-                <span className="text-[#c322f4] font-black">₹{confirmedBooking.approxPrice}</span>
+                <span className="text-[#c322f4] font-black">₹{
+                  Number(confirmedBooking.discountAmount || 0) > 0
+                    ? Math.max(0, Number(confirmedBooking.finalTotal || 0) + Math.round(Number(confirmedBooking.finalTotal || 0) * 0.18) + 49 - Number(confirmedBooking.referralDiscount || 0) - Number(confirmedBooking.creditApplied || 0))
+                    : Math.max(0, Number(confirmedBooking.approxPrice || 0) + Math.round(Number(confirmedBooking.approxPrice || 0) * 0.18) + 49 - Number(confirmedBooking.referralDiscount || 0) - Number(confirmedBooking.creditApplied || 0))
+                }</span>
               </div>
             </div>
 
@@ -500,9 +551,12 @@ export default function PaymentPage() {
   }
 
   const subtotal = pendingBooking?.approxPrice || 0;
-  const gstFee = Math.round(subtotal * 0.18); // 18% GST standard simulation
+  const isDiscountApplied = Boolean(discountInfo?.eligible && subtotal >= 300);
+  const firstOrderDiscount = isDiscountApplied ? Math.floor(subtotal * 0.20) : 0;
+  const finalSubtotal = subtotal - firstOrderDiscount;
+  const gstFee = Math.round(finalSubtotal * 0.18); // 18% GST standard simulation
   const platformFee = 49;
-  const totalAmount = Math.max(0, subtotal + gstFee + platformFee - referralDiscount - creditApplied);
+  const totalAmount = Math.max(0, finalSubtotal + gstFee + platformFee - referralDiscount - creditApplied);
 
   return (
     <AuthGuard>
@@ -727,6 +781,28 @@ export default function PaymentPage() {
               )}
             </div>
 
+            {discountInfo?.eligible && (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm space-y-3 animate-fade-in">
+                {subtotal >= 300 ? (
+                  <>
+                    <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                      <span>🎉</span>
+                      <span>First Order Discount: 20% off applied!</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-gray-400">Tailoring Price:</span>
+                      <span className="text-gray-400 line-through">₹{subtotal}</span>
+                      <span className="text-emerald-600 font-extrabold text-sm">₹{finalSubtotal}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xs text-amber-700 font-medium leading-relaxed">
+                    💡 Add items worth <span className="font-bold">₹{300 - subtotal}</span> more to unlock 20% off on your first order.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Fee Breakdown Card */}
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Invoice</h3>
@@ -734,8 +810,21 @@ export default function PaymentPage() {
               <div className="space-y-2 text-xs divide-y divide-gray-50">
                 <div className="flex justify-between pb-2">
                   <span className="text-gray-400">Tailoring Fee:</span>
-                  <span className="text-gray-800 font-bold">₹{subtotal}</span>
+                  {firstOrderDiscount > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 line-through">₹{subtotal}</span>
+                      <span className="text-emerald-600 font-bold">₹{finalSubtotal}</span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-800 font-bold">₹{subtotal}</span>
+                  )}
                 </div>
+                {firstOrderDiscount > 0 && (
+                  <div className="flex justify-between pt-2 pb-2 text-emerald-600 font-bold">
+                    <span>First Order Discount (20%):</span>
+                    <span>-₹{firstOrderDiscount}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 pb-2">
                   <span className="text-gray-400">Service GST (18%):</span>
                   <span className="text-gray-800 font-bold">₹{gstFee}</span>
