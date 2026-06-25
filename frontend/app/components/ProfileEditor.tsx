@@ -336,16 +336,7 @@ export default function ProfileEditor() {
           </div>
         </div>
 
-        {isUser ? (
-          <button
-            type="button"
-            onClick={() => setShowStatus((current) => !current)}
-            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 bg-white px-7 text-xs font-bold text-emerald-600 shadow-sm hover:bg-emerald-50 hover:border-emerald-600 transition-all duration-200 cursor-pointer"
-          >
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            View Order Status
-          </button>
-        ) : null}
+
       </aside>
 
       {/* Right Panel: Editor Form */}
@@ -585,7 +576,7 @@ export default function ProfileEditor() {
           </div>
         </div>
 
-        {isUser && showStatus ? <UserOrderStatus /> : null}
+
       </div>
     </section>
   );
