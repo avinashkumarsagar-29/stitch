@@ -98,7 +98,7 @@ function getSmtpTransporter() {
       host,
       port: Number(port),
       secure: port === "465",
-      pool: true,          // connection pool — reuse connections
+      pool: true,
       maxConnections: 3,
       family: 4,           // force IPv4 — Render does not support IPv6 SMTP
       auth: { user, pass },
