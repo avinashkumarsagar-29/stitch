@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     description: "Book custom tailoring services online. Schedule pickup & drop-off with expert tailors.",
   },
   metadataBase: new URL("https://stitch.org.in"),
+  verification: {
+    google: "Bukbm9ED7vj6yEDk-F3Fa4wjN5SDDggIXJTgSw5JCgI",
+  },
 };
 
 export default function RootLayout({
