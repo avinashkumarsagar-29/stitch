@@ -5,6 +5,7 @@ const Referral = require("../models/Referral");
 const JoinApplication = require("../models/JoinApplication");
 const { requireAuth, canAccessUser } = require("../middleware/auth");
 const { logPayment, verifyPaymentHandler, isRazorpayConfigured, razorpayInstance } = require("../services/payment.service");
+const { checkFirstOrderDiscount, markFirstOrderDiscountUsed } = require("../utils/discount");
 
 module.exports = (io) => {
   const router = express.Router();
@@ -42,9 +43,21 @@ module.exports = (io) => {
         }
 
         const basePrice = Number(booking.approxPrice || 0);
-        const gstFee = Math.round(basePrice * 0.18);
+
+        // Calculate and apply first order discount
+        const discountCheck = await checkFirstOrderDiscount(userId);
+        let discountAmountApplied = 0;
+        let finalTailoringFee = basePrice;
+
+        if (discountCheck.eligible && basePrice >= 300) {
+          discountAmountApplied = Math.floor(basePrice * 0.20);
+          finalTailoringFee = basePrice - discountAmountApplied;
+          await markFirstOrderDiscountUsed(userId);
+        }
+
+        const gstFee = Math.round(finalTailoringFee * 0.18);
         const platformFee = 49;
-        const totalBasePrice = basePrice + gstFee + platformFee;
+        const totalBasePrice = finalTailoringFee + gstFee + platformFee;
 
         // Check if user is referred and has not had a booking confirmed yet
         const referral = await Referral.findOne({ referredUserId: userId });
@@ -71,10 +84,13 @@ module.exports = (io) => {
         finalPrice = tempPrice - creditApplied;
         if (finalPrice < 0) finalPrice = 0;
 
-        // Save referralDiscount and creditApplied back to booking
+        // Save referralDiscount, creditApplied, and discount fields back to booking
         await Booking.findByIdAndUpdate(bookingId, {
           referralDiscount: referralDiscountApplied,
-          creditApplied
+          creditApplied,
+          originalTotal: basePrice,
+          discountAmount: discountAmountApplied,
+          finalTotal: finalTailoringFee
         });
       }
 

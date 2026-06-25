@@ -41,6 +41,7 @@ module.exports = (app, io) => {
   app.use("/api/payments", require("./payments.routes")(io));
   app.use("/api/reviews", require("./reviews.routes")(io));
   app.use("/api/business-orders", require("./business-orders.routes")(io));
+  app.use("/api/discounts", require("./discounts.routes")(io));
 
   // Tailors routes (which contains /api/tailors, /api/tailors/:tailorId, and /api/join)
   app.use("/", require("./tailors.routes")(io));

@@ -20,6 +20,9 @@ const bookingSchema = new mongoose.Schema({
   trackingCode: { type: String, default: null },
   referralDiscount: { type: Number, default: 0.00 },
   creditApplied: { type: Number, default: 0.00 },
+  originalTotal: { type: Number, default: null },
+  discountAmount: { type: Number, default: 0.00 },
+  finalTotal: { type: Number, default: null },
 }, {
   timestamps: { createdAt: "createdAt", updatedAt: false },
   toJSON: { virtuals: true },
