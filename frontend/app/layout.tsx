@@ -4,8 +4,22 @@ import Toast from "./components/Toast";
 import LayoutWrapper from "./components/LayoutWrapper";
 
 export const metadata: Metadata = {
-  title: "Stitch | Tailoring & Design",
-  description: "Book tailoring pickup and drop-off services with Stitch.",
+  title: "Stitch — Custom Tailoring & Garment Booking",
+  description: "Book custom tailoring services online with Stitch. Schedule pickup & drop-off, get clothes stitched by expert tailors, and track your order in real-time.",
+  keywords: ["custom tailoring", "online darzi", "garment booking", "stitch", "tailor near me", "pickup dropoff tailoring"],
+  openGraph: {
+    title: "Stitch — Custom Tailoring & Garment Booking",
+    description: "Book custom tailoring services online. Schedule pickup & drop-off with expert tailors.",
+    url: "https://stitch.org.in",
+    siteName: "Stitch",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Stitch — Custom Tailoring & Garment Booking",
+    description: "Book custom tailoring services online. Schedule pickup & drop-off with expert tailors.",
+  },
+  metadataBase: new URL("https://stitch.org.in"),
 };
 
 export default function RootLayout({
