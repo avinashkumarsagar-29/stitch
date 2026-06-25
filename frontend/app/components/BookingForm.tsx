@@ -305,7 +305,7 @@ export default function BookingForm({ readOnly = false }: { readOnly?: boolean }
 
   return (
     <div className="mx-auto max-w-[1068px]">
-      <div className="grid overflow-hidden rounded-[7px] md:grid-cols-[1fr_1fr]">
+      <div className="grid gap-6 md:grid-cols-2">
         <BookingPanel
           mode="Pick - Up"
           tone="light"
@@ -556,7 +556,7 @@ function BookingPanel({
 
   return (
     <form
-      className={`flex min-h-[150px] flex-col gap-4 px-6 py-5 sm:px-10 ${isDark
+      className={`flex min-h-[150px] flex-col gap-4 px-6 py-5 sm:px-10 rounded-2xl ${isDark
         ? "bg-[#171d2a] text-white"
         : "bg-gradient-to-r from-[#c91cff] to-[#d72ff4] text-[#0c1020]"
         }`}
@@ -578,8 +578,8 @@ function BookingPanel({
         {mode}
       </label>
 
-      <div className="grid items-end gap-3 lg:grid-cols-[1.2fr_1fr_1fr_auto]">
-        <label className="text-sm font-bold relative block">
+      <div className="grid gap-4.5 sm:grid-cols-2 items-end">
+        <label className="text-sm font-bold relative block sm:col-span-2">
           Locations
           <div className="relative mt-2">
             <input
@@ -649,7 +649,7 @@ function BookingPanel({
           <button
             type="submit"
             disabled={isSubmitting || readOnly}
-            className="h-10 rounded-[4px] bg-white px-8 text-sm font-medium text-[#111827] disabled:opacity-70 cursor-pointer"
+            className="h-10 w-full sm:col-span-2 rounded-[4px] bg-white px-8 text-sm font-medium text-[#111827] disabled:opacity-70 cursor-pointer mt-2"
             suppressHydrationWarning
           >
             {isSubmitting ? "Finding Tailors..." : "Find Tailors"}
