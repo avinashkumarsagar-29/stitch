@@ -6,7 +6,27 @@ module.exports = (app, io) => {
   app.use("/api/auth", require("./auth.routes")(io));
 
   // Global authenticate middleware for protected API endpoints
-  app.use("/api", authenticateApiRequest);
+  app.use("/api", (req, res, next) => {
+    // Public routes — no auth needed
+    const publicRoutes = [
+      { method: "POST", path: "/api/auth/request-otp" },
+      { method: "POST", path: "/api/auth/verify-otp" },
+      { method: "POST", path: "/api/auth/register" },
+      { method: "POST", path: "/api/auth/login" },
+      { method: "GET",  path: "/api/auth/google" },
+      { method: "GET",  path: "/api/auth/google/callback" },
+      { method: "POST", path: "/api/auth/google-register" },
+      { method: "GET",  path: "/api/tailors" },
+    ];
+
+    const reqPath = req.baseUrl + req.path;
+    const isPublic = publicRoutes.some(
+      (r) => r.method === req.method && reqPath === r.path
+    ) || (req.method === "GET" && reqPath.startsWith("/api/tailors/"));
+
+    if (isPublic) return next();
+    return authenticateApiRequest(req, res, next);
+  });
 
   // Global maintenance mode check for protected API endpoints
   app.use("/api", async (request, response, next) => {
