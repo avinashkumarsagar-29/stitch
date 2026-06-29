@@ -11,7 +11,7 @@ const {
   isValidFullName,
   isValidPassword,
 } = require("../utils/validators");
-const { generateOtp, sendOtpEmail } = require("../utils/otp");
+const { generateOtp, sendOtpEmail, sendResetEmail } = require("../utils/otp");
 const { createAuthToken } = require("../utils/jwt");
 const { generateUniqueReferralCode } = require("../services/referral.service");
 const { getAppSettings } = require("../services/settings.service");
@@ -229,17 +229,11 @@ module.exports = (io) => {
         sendOtpEmail(user.email, user.fullName, otpCode)
       ]);
 
-      if (process.env.NODE_ENV === "production" && !emailResult.sent) {
-        return response.status(500).json({
-          message: "Unable to send OTP. Please check server logs or SMTP configuration.",
-        });
-      }
-
       return response.json({
         message: emailResult.sent
           ? "OTP sent successfully"
           : "OTP generated successfully. Configure email settings to send it.",
-        devOtp: emailResult.sent ? undefined : otpCode,
+        devOtp: (emailResult.sent || process.env.NODE_ENV === "production") ? undefined : otpCode,
       });
     } catch (error) {
       console.error("OTP request error:", error);
@@ -342,6 +336,125 @@ module.exports = (io) => {
       console.error("OTP verify error:", error);
       return response.status(500).json({
         message: "Unable to login",
+        detail:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error.message,
+      });
+    }
+  });
+
+  router.post("/login", async (request, response) => {
+    try {
+      const email = String(request.body.email || "").trim().toLowerCase();
+      const password = String(request.body.password || "");
+
+      if (!email || !password) {
+        return response.status(400).json({
+          message: "Email and password are required",
+        });
+      }
+
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        return response.status(401).json({
+          message: "Invalid email or password",
+        });
+      }
+
+      if (user.isBanned) {
+        return response.status(403).json({
+          message: "Your account has been deactivated.",
+        });
+      }
+
+      if (!user.passwordHash || user.passwordHash.startsWith("GOOGLE_AUTH_")) {
+        return response.status(401).json({
+          message: "Please sign in using Google for this account",
+        });
+      }
+
+      const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordMatch) {
+        return response.status(401).json({
+          message: "Invalid email or password",
+        });
+      }
+
+      return response.json({
+        message: "Login successful",
+        token: createAuthToken(user),
+        user: {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+          plan: user.plan || "Free",
+          firstName: user.firstName || "",
+          lastName: user.lastName || "",
+          address: user.address || "",
+          image: user.image || "",
+          referralCode: user.referralCode,
+          credit: user.credit !== undefined ? Number(user.credit) : 0,
+        },
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      return response.status(500).json({
+        message: "Unable to login",
+        detail:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error.message,
+      });
+    }
+  });
+
+  router.post("/reset-password", async (request, response) => {
+    try {
+      const email = String(request.body.email || "").trim().toLowerCase();
+      const newPassword = String(request.body.newPassword || "");
+
+      if (!email || !newPassword) {
+        return response.status(400).json({
+          message: "Email and new password are required",
+        });
+      }
+
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        return response.status(404).json({
+          message: "User not found",
+        });
+      }
+
+      if (user.isBanned) {
+        return response.status(403).json({
+          message: "Your account has been deactivated.",
+        });
+      }
+
+      if (!isValidPassword(newPassword)) {
+        return response.status(400).json({
+          message: "Password must be at least 6 characters, and contain at least one uppercase letter, one lowercase letter, one digit, and one special character (e.g. @, $, !, %, *, ?).",
+        });
+      }
+
+      user.passwordHash = await bcrypt.hash(newPassword, 12);
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+
+      return response.json({
+        message: "Password reset successful. Please sign in with your new password.",
+      });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      return response.status(500).json({
+        message: "Unable to reset password",
         detail:
           process.env.NODE_ENV === "production"
             ? undefined

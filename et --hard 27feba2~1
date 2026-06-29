@@ -1,0 +1,64 @@
+[33m94e50e9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m solve the issue of testing otp verifiaction
+[33mec4db0f[m solve the issue oe enable send otp
+[33meaa187f[m some backend change sin otp vewriv=cation
+[33mf76860f[m otp verfication error solve
+[33m8aca01a[m solve the issue of otp backend
+[33m27feba2[m Somne changes in the otp backend
+[33mbc80e42[m changing the configuration of the otp
+[33m09cada9[m Chnage the logo
+[33m524bd3c[m chnages in layout
+[33m7465bc5[m Changing the Meta Data of the google
+[33m56250a8[m Changeses in the booking ui
+[33md1ce38f[m Polish the Order Histrory page in the profile
+[33mbcf28b8[m Add the First Order Discount Feature
+[33m4883d9c[m Improve OTP functionality
+[33m5c4eae1[m Solving the otp varifaction
+[33m305790e[m solve otp problem
+[33m26d75a1[m Verify Otp of backend
+[33m81fd57a[m some changes in the backend of notifaction
+[33m41ab5e4[m Add Window Notifaction in admin
+[33mfd15ff4[m Add the notification in the admin for new user notication
+[33m4be5c01[m fix: remove fs.appendFileSync crash on Render
+[33m55b0291[m some chnabe in th otp
+[33mba4e101[m chore: add render.yaml Blueprint specification
+[33m584f608[m chore: setup branching strategy, PR template, and .gitignore
+[33m92d0384[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmaster[m[33m)[m Some chnages in the Ui and add auto refrsh in tracking status
+[33m912b21a[m solve the cotinue with google issue
+[33m8d02a28[m Add the download icon at the search bar
+[33mbf25f15[m Changes the architecture of backend
+[33m76b3df5[m Add validation in the register and login
+[33me252d4d[m Change the crete account pattern for conitue with google
+[33ma47cf82[m version hanges confilct solved
+[33mf760812[m Some changes in the baceknd and add the cloudingary for images
+[33m0f4eef1[m query optimation in mogodb
+[33m5280226[m intergration of razeorpar
+[33m947d468[m solve backend related issue in the backend
+[33m383333c[m deploye in the production
+[33me27ee53[m change the database from sql server to mogodb
+[33m4170ba0[m some another changes in the ui
+[33m014e183[m Adding the Ai in the Body Measurement
+[33m0a98c49[m change the Ui of the login and register
+[33m1faa150[m some changes in the Ui
+[33m9c82cbb[m some changes on the booking of map
+[33m517cfab[m Some Ui changes
+[33m79f0355[m Create the admin and there components
+[33m0858c33[m Add Functionality of the bussiness and blug order
+[33mdccbaa8[m Add Validation
+[33mff855e8[m loading adding
+[33mc485d71[m feat: implement full payment integration, booking workflow components, and application routing
+[33mabd7fbf[m some secruity major changes
+[33m944e45e[m some Major chnages
+[33m07c96b5[m some uI cahnges
+[33mf9a66ae[m add email functionality and change the fuctionality of the sending the order id to mail
+[33m54ecdb2[m Implement the Notification and And some changes in the Ui
+[33m4869642[m some Ui Changes in the Navar and side toogle is applied
+[33m86fdb60[m Some Major Ui Changes
+[33m5655d8b[m Some Ui changes
+[33m5ef4869[m some ui And Add new page in the booking
+[33md8121f4[m some ui chnages
+[33mc1fe8a5[m add the roles and ui fixed
+[33m3983eea[m some modification in the frontend and profile section
+[33mbf2ae29[m remove the underline
+[33m7ec5b77[m layout change in frontend and set the backend
+[33m0f4cbfa[m frontend changes
+[33me6f222f[m[33m ([m[1;32mbackend[m[33m)[m Initial commit from Create Next App

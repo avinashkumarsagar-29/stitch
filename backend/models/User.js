@@ -16,6 +16,8 @@ const userSchema = new mongoose.Schema({
   isBanned: { type: Boolean, default: false },
   referralCode: { type: String, default: null },
   credit: { type: Number, default: 0.00 },
+  resetPasswordToken: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
 }, {
   timestamps: { createdAt: "createdAt", updatedAt: false },
   toJSON: { virtuals: true },

@@ -206,11 +206,86 @@ ${htmlContent}
     try {
       fs.appendFileSync(logFilePath, logEntry, "utf8");
       console.log(`Mock OTP email logged to ${logFilePath}`);
+      console.log(`[SMTP FALLBACK] OTP for user ${userEmail} is: ${otpCode}`);
     } catch (err) {
       console.error("Failed to write mock OTP email to log file:", err);
+      console.log(`[SMTP FALLBACK] OTP for user ${userEmail} is: ${otpCode}`);
     }
 
     return { sent: false, mock: true, otp: otpCode };
+  }
+}
+
+async function sendResetEmail(userEmail, userName, code) {
+  const from = process.env.SMTP_FROM || "no-reply@stitch.com";
+  const subject = "Reset Your Stitch Account Password";
+  const htmlContent = `
+    <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Hi ${userName},</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        We received a request to reset your password. Please use the following 6-digit reset code to complete the process. This code is valid for 15 minutes.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Password Reset Code</p>
+        <p style="margin: 12px 0 0 0; font-size: 38px; font-weight: 900; color: #c322f4; letter-spacing: 6px; font-family: monospace;">${code}</p>
+      </div>
+
+      <p style="font-size: 12px; line-height: 1.6; color: #9ca3af; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
+        If you did not request this password reset, please ignore this email.
+      </p>
+
+      <div style="margin-top: 24px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">&copy; ${new Date().getFullYear()} Stitch Inc. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">You are receiving this because you requested a password reset on Stitch.</p>
+      </div>
+    </div>
+  `;
+
+  const transporter = await getSmtpTransporter();
+  if (!transporter) {
+    console.log(`[MOCK RESET] To: ${userEmail} | Code: ${code}`);
+    return { sent: false, mock: true, code };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from,
+      to: userEmail,
+      subject,
+      html: htmlContent,
+    });
+    console.log("Reset Email sent:", info.messageId);
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending Reset email via SMTP:", error);
+
+    const logFilePath = path.join(__dirname, "../mock_emails.log");
+    const logEntry = `
+========================================
+TIMESTAMP: ${new Date().toISOString()}
+TO: ${userEmail}
+FROM: ${from}
+SUBJECT: ${subject} (FALLBACK FROM SMTP FAILURE)
+BODY:
+${htmlContent}
+========================================
+\n`;
+    try {
+      fs.appendFileSync(logFilePath, logEntry, "utf8");
+      console.log(`Mock Reset email logged to ${logFilePath}`);
+      console.log(`[RESET FALLBACK] Reset code for user ${userEmail} is: ${code}`);
+    } catch (err) {
+      console.error("Failed to write mock reset email to log file:", err);
+      console.log(`[RESET FALLBACK] Reset code for user ${userEmail} is: ${code}`);
+    }
+
+    return { sent: false, mock: true, code };
   }
 }
 
@@ -218,6 +293,7 @@ module.exports = {
   generateOtp,
   sendOtpSms,
   sendOtpEmail,
+  sendResetEmail,
   postForm,
   isConfiguredSecret,
 };
