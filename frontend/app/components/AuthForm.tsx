@@ -277,10 +277,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
     return localStorage.getItem("stitch-last-email") || "";
   });
-  const [otp, setOtp] = useState("");
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [devOtp, setDevOtp] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -303,18 +305,28 @@ export default function AuthForm({ mode }: AuthFormProps) {
         showToast("Please fix the validation errors before registering.", "error");
         return;
       }
-    } else if (isOtpSent) {
-      const otpErr = validateOtp(otp);
-      if (otpErr) {
-        setErrors({ otp: otpErr });
-        showToast("Please enter a valid 6-digit OTP.", "error");
+    } else if (isForgotPassword) {
+      const emailErr = validateEmail(email);
+      const passErr = validatePassword(newPassword);
+
+      if (emailErr || passErr) {
+        setErrors({
+          email: emailErr,
+          password: passErr,
+        });
+        showToast("Please enter a valid email and a strong new password.", "error");
         return;
       }
     } else {
       const emailErr = validateEmail(email);
-      if (emailErr) {
-        setErrors({ email: emailErr });
-        showToast("Please enter a valid email address.", "error");
+      const passErr = password ? "" : "Password is required";
+
+      if (emailErr || passErr) {
+        setErrors({
+          email: emailErr,
+          password: passErr,
+        });
+        showToast("Please enter both email and password.", "error");
         return;
       }
     }
@@ -323,10 +335,10 @@ export default function AuthForm({ mode }: AuthFormProps) {
     try {
       if (isRegister) {
         await registerUser(event.currentTarget);
-      } else if (isOtpSent) {
-        await verifyOtp();
+      } else if (isForgotPassword) {
+        await resetUserPassword();
       } else {
-        await requestOtp();
+        await loginUser();
       }
     } finally {
       setIsSubmitting(false);
@@ -368,59 +380,32 @@ export default function AuthForm({ mode }: AuthFormProps) {
     }
   }
 
-  async function requestOtp() {
+  async function loginUser() {
     const apiUrl = API_URL;
 
     try {
-      const response = await fetch(`${apiUrl}/api/auth/request-otp`, {
+      const response = await authFetch(`${apiUrl}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        showToast(data.message || "Unable to send OTP", "error");
+        showToast(data.message || "Invalid email or password", "error");
         return;
       }
 
-      setIsOtpSent(true);
-      setDevOtp(data.devOtp || "");
-      showToast(
-        data.devOtp ? `OTP sent successfully. Test OTP: ${data.devOtp}` : data.message,
-        "success"
-      );
-    } catch {
-      showToast("Unable to connect to backend server", "error");
-    }
-  }
-
-  async function verifyOtp() {
-    const apiUrl = API_URL;
-
-    try {
-      const response = await authFetch(`${apiUrl}/api/auth/verify-otp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, otp }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        showToast(data.message || "Invalid OTP", "error");
-        return;
-      }
-
+      localStorage.setItem("stitch-last-email", email);
       localStorage.setItem("stitch-auth", "true");
       localStorage.setItem("stitch-token", data.token);
       safeSetLocalStorage("stitch-user", JSON.stringify(data.user));
       localStorage.setItem("stitch-role", data.user.role || "user");
       showToast(data.message, "success");
       window.dispatchEvent(new Event("stitch-auth-change"));
+
       const roleRedirects: Record<string, string> = {
         admin: "/admin",
         tailor: "/join",
@@ -431,6 +416,35 @@ export default function AuthForm({ mode }: AuthFormProps) {
       showToast("Unable to connect to backend server", "error");
     }
   }
+
+  async function resetUserPassword() {
+    const apiUrl = API_URL;
+
+    try {
+      const response = await authFetch(`${apiUrl}/api/auth/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, newPassword }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.message || "Failed to reset password", "error");
+        return;
+      }
+
+      showToast(data.message, "success");
+      setIsForgotPassword(false);
+      setNewPassword("");
+      setPassword("");
+    } catch {
+      showToast("Unable to connect to backend server", "error");
+    }
+  }
+
+
 
   return (
     <div className="w-full max-w-[440px] flex flex-col items-center justify-center">
@@ -584,47 +598,26 @@ export default function AuthForm({ mode }: AuthFormProps) {
           <div className="bg-white border border-gray-100 rounded-[28px] p-8 md:p-10 shadow-[0_10px_35px_rgba(0,0,0,0.06)] w-full">
             <form onSubmit={handleSubmit} className="animate-fade-in-up">
               <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#c322f4] block">
-                {isRegister ? "START YOUR JOURNEY" : "WELCOME BACK"}
+                {isRegister
+                  ? "START YOUR JOURNEY"
+                  : isForgotPassword
+                    ? "PASSWORD RECOVERY"
+                    : "WELCOME BACK"}
               </p>
               <h1 className="mt-2 font-serif text-[32px] font-extrabold leading-tight tracking-tight text-gray-900">
-                {isRegister ? "Create Account" : "Sign In"}
+                {isRegister
+                  ? "Create Account"
+                  : isForgotPassword
+                    ? "Reset Password"
+                    : "Sign In"}
               </h1>
               <p className="mt-2 text-xs leading-relaxed text-gray-500">
                 {isRegister
                   ? "Join India's leading sewing & custom tailoring platform."
-                  : "Sign in with your email address and verify using OTP."}
+                  : isForgotPassword
+                    ? "Enter your email address and new password to reset it."
+                    : "Sign in with your email address and password."}
               </p>
-
-              {/* Stepper only for sign in */}
-              {!isRegister && (
-                <div className="flex items-center justify-between mt-6 mb-7 text-[10px] font-extrabold uppercase tracking-widest">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`flex h-6.5 w-6.5 items-center justify-center rounded-full text-[10px] font-extrabold transition-all duration-300 ${!isOtpSent ? "bg-[#c322f4] text-white" : "bg-purple-100 text-[#c322f4]"
-                        }`}
-                    >
-                      1
-                    </span>
-                    <span className={!isOtpSent ? "text-gray-800 font-extrabold" : "text-gray-400"}>
-                      Email
-                    </span>
-                  </div>
-
-                  <div className="flex-1 mx-3.5 h-[1.5px] bg-gray-100" />
-
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`flex h-6.5 w-6.5 items-center justify-center rounded-full text-[10px] font-extrabold transition-all duration-300 ${isOtpSent ? "bg-[#c322f4] text-white" : "bg-gray-100 text-gray-400"
-                        }`}
-                    >
-                      2
-                    </span>
-                    <span className={isOtpSent ? "text-gray-800 font-extrabold" : "text-gray-400"}>
-                      Verify
-                    </span>
-                  </div>
-                </div>
-              )}
 
               <div className="mt-6 space-y-4">
                 {isRegister ? (
@@ -853,6 +846,121 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       </div>
                     </div>
                   </>
+                ) : isForgotPassword ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
+                        Email address
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <rect width="20" height="16" x="2" y="4" rx="2" />
+                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                          </svg>
+                        </div>
+                        <input
+                          name="email"
+                          type="email"
+                          value={email}
+                          onChange={(event) => {
+                            setEmail(event.target.value);
+                            setErrors(prev => ({ ...prev, email: validateEmail(event.target.value) }));
+                          }}
+                          placeholder="you@example.com"
+                          required
+                          suppressHydrationWarning
+                          className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${errors.email
+                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                              : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                            }`}
+                        />
+                      </div>
+                      {errors.email && (
+                        <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                          <span>⚠️</span> {errors.email}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                        </div>
+                        <input
+                          name="newPassword"
+                          type={showPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(event) => {
+                            setNewPassword(event.target.value);
+                            setErrors(prev => ({ ...prev, password: validatePassword(event.target.value) }));
+                          }}
+                          placeholder="Enter new strong password"
+                          required
+                          minLength={6}
+                          suppressHydrationWarning
+                          className={`block w-full h-12 pl-10 pr-12 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${errors.password
+                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                              : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
+                            }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          suppressHydrationWarning
+                          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          {showPassword ? (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {errors.password && (
+                        <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                          <span>⚠️</span> {errors.password}
+                        </p>
+                      )}
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div>
@@ -876,7 +984,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
                           name="email"
                           type="email"
                           value={email}
-                          disabled={isOtpSent}
                           onChange={(event) => {
                             setEmail(event.target.value);
                             setErrors(prev => ({ ...prev, email: validateEmail(event.target.value) }));
@@ -884,7 +991,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                           placeholder="you@example.com"
                           required
                           suppressHydrationWarning
-                          className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 disabled:opacity-60 ${errors.email
+                          className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${errors.email
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
                               : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
                             }`}
@@ -897,13 +1004,46 @@ export default function AuthForm({ mode }: AuthFormProps) {
                       )}
                     </div>
 
-                    {isOtpSent && (
-                      <div className="animate-fade-in">
-                        <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
-                          Verification OTP
-                        </label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block mb-2">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                        </div>
+                        <input
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(event) => {
+                            setPassword(event.target.value);
+                            setErrors(prev => ({ ...prev, password: event.target.value ? "" : "Password is required" }));
+                          }}
+                          placeholder="Enter your password"
+                          required
+                          suppressHydrationWarning
+                          className={`block w-full h-12 pl-10 pr-12 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${errors.password
+                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
+                              : "border-[#c322f4] focus:ring-[#c322f4]/10"
+                            }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          suppressHydrationWarning
+                          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          {showPassword ? (
                             <svg
                               className="w-5 h-5"
                               fill="none"
@@ -911,46 +1051,41 @@ export default function AuthForm({ mode }: AuthFormProps) {
                               stroke="currentColor"
                               strokeWidth="2"
                             >
-                              <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
                             </svg>
-                          </div>
-                          <input
-                            name="otp"
-                            type="text"
-                            value={otp}
-                            onChange={(event) => {
-                              setOtp(event.target.value);
-                              setErrors(prev => ({ ...prev, otp: validateOtp(event.target.value) }));
-                            }}
-                            placeholder="Enter 6-digit OTP"
-                            required
-                            maxLength={6}
-                            suppressHydrationWarning
-                            className={`block w-full h-12 pl-10 pr-4 rounded-xl border bg-gray-50/50 text-sm placeholder-gray-400 outline-none transition-all duration-200 focus:bg-white focus:ring-4 tracking-widest text-center font-mono text-lg ${errors.otp
-                                ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
-                                : "border-gray-200 focus:border-[#c322f4] focus:ring-[#c322f4]/10"
-                              }`}
-                          />
-                        </div>
-                        {errors.otp && (
-                          <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
-                            <span>⚠️</span> {errors.otp}
-                          </p>
-                        )}
-                        {devOtp && (
-                          <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2 text-[10px] font-semibold text-purple-700 border border-purple-100">
-                            <span>💡</span>
-                            <span>
-                              Testing OTP:{" "}
-                              <strong className="font-mono text-xs underline decoration-wavy decoration-[#c322f4]">
-                                {devOtp}
-                              </strong>
-                            </span>
-                          </div>
-                        )}
+                          ) : (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
                       </div>
-                    )}
+                      {errors.password && (
+                        <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1 animate-fade-in">
+                          <span>⚠️</span> {errors.password}
+                        </p>
+                      )}
+                      <div className="flex justify-end mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsForgotPassword(true);
+                            setErrors({});
+                          }}
+                          className="text-[10px] font-extrabold text-[#c322f4] hover:text-[#a81bd4] uppercase tracking-widest transition-colors cursor-pointer"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -982,27 +1117,28 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   </span>
                 ) : isRegister ? (
                   "Create Account"
-                ) : isOtpSent ? (
-                  "Verify OTP"
+                ) : isForgotPassword ? (
+                  "Reset Password"
                 ) : (
-                  "Send OTP"
+                  "Sign In"
                 )}
               </button>
 
-              {!isRegister && isOtpSent && (
+              {!isRegister && isForgotPassword && (
                 <button
                   type="button"
                   onClick={() => {
-                    setIsOtpSent(false);
-                    setOtp("");
-                    setDevOtp("");
+                    setIsForgotPassword(false);
+                    setNewPassword("");
+                    setErrors({});
                   }}
                   suppressHydrationWarning
                   className="mt-4 w-full text-[10px] font-extrabold text-gray-400 hover:text-gray-700 transition-colors uppercase tracking-widest text-center cursor-pointer"
                 >
-                  ← Change email address
+                  ← Back to Sign In
                 </button>
               )}
+
 
               <>
                 <div className="relative flex py-5 items-center">
