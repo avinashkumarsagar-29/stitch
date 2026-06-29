@@ -87,15 +87,26 @@ async function sendOtpSms(phoneNumber, otpCode) {
 
 // Singleton transporter — create once, reuse always
 let _smtpTransporter = null;
-function getSmtpTransporter() {
+async function getSmtpTransporter() {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   if (!host || !port || !user || !pass) return null;
   if (!_smtpTransporter) {
+    let resolvedHost = host;
+    try {
+      const dns = require("dns").promises;
+      const addresses = await dns.resolve4(host);
+      if (addresses && addresses.length > 0) {
+        resolvedHost = addresses[0];
+      }
+    } catch (error) {
+      console.error(`[SMTP] DNS resolution failed for ${host}:`, error);
+    }
+
     _smtpTransporter = nodemailer.createTransport({
-      host,
+      host: resolvedHost,
       port: Number(port),
       secure: port === "465",
       pool: true,
@@ -151,7 +162,7 @@ async function sendOtpEmail(userEmail, userName, otpCode) {
     </div>
   `;
 
-  const transporter = getSmtpTransporter();
+  const transporter = await getSmtpTransporter();
   if (!transporter) {
     console.log(`[MOCK OTP] To: ${userEmail} | OTP: ${otpCode}`);
     return { sent: false, mock: true, otp: otpCode };
@@ -171,14 +182,6 @@ async function sendOtpEmail(userEmail, userName, otpCode) {
     throw error;
   }
 }
-
-module.exports = {
-  generateOtp,
-  sendOtpSms,
-  sendOtpEmail,
-  postForm,
-  isConfiguredSecret,
-};
 
 module.exports = {
   generateOtp,
