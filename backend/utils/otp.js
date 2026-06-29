@@ -116,6 +116,9 @@ async function getSmtpTransporter() {
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,
+      tls: {
+        servername: host,
+      },
     });
 
     if (process.env.NODE_ENV === "production") {
