@@ -195,9 +195,9 @@ module.exports = (io) => {
         User.findOne({ email }).lean(),
         process.env.NODE_ENV === "production"
           ? LoginOtp.countDocuments({
-              email,
-              createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
-            })
+            email,
+            createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
+          })
           : Promise.resolve(0)
       ]);
 
