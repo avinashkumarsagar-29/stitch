@@ -189,18 +189,30 @@ async function sendOtpEmail(userEmail, userName, otpCode) {
     console.log("OTP Email sent:", info.messageId);
     return { sent: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending OTP email:", error);
-    throw error;
+    console.error("Error sending OTP email via SMTP:", error);
+
+    // Fall back to writing a mock email to log file so the login flow doesn't break on Render Free Tier
+    const logFilePath = path.join(__dirname, "../mock_emails.log");
+    const logEntry = `
+========================================
+TIMESTAMP: ${new Date().toISOString()}
+TO: ${userEmail}
+FROM: ${from}
+SUBJECT: ${subject} (FALLBACK FROM SMTP FAILURE)
+BODY:
+${htmlContent}
+========================================
+\n`;
+    try {
+      fs.appendFileSync(logFilePath, logEntry, "utf8");
+      console.log(`Mock OTP email logged to ${logFilePath}`);
+    } catch (err) {
+      console.error("Failed to write mock OTP email to log file:", err);
+    }
+
+    return { sent: false, mock: true, otp: otpCode };
   }
 }
-
-module.exports = {
-  generateOtp,
-  sendOtpSms,
-  sendOtpEmail,
-  postForm,
-  isConfiguredSecret,
-};
 
 module.exports = {
   generateOtp,
