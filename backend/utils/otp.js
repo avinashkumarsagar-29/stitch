@@ -102,7 +102,20 @@ function getSmtpTransporter() {
       maxConnections: 3,
       family: 4,           // force IPv4 — Render does not support IPv6 SMTP
       auth: { user, pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
+
+    if (process.env.NODE_ENV === "production") {
+      _smtpTransporter.verify((error, success) => {
+        if (error) {
+          console.error("[SMTP] Connection verification failed:", error);
+        } else {
+          console.log("[SMTP] Connection verified and pre-warmed successfully");
+        }
+      });
+    }
   }
   return _smtpTransporter;
 }
@@ -158,6 +171,14 @@ async function sendOtpEmail(userEmail, userName, otpCode) {
     throw error;
   }
 }
+
+module.exports = {
+  generateOtp,
+  sendOtpSms,
+  sendOtpEmail,
+  postForm,
+  isConfiguredSecret,
+};
 
 module.exports = {
   generateOtp,
