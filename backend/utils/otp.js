@@ -87,22 +87,30 @@ async function sendOtpSms(phoneNumber, otpCode) {
 
 // Singleton transporter — create once, reuse always
 let _smtpTransporter = null;
+let _resolvedSmtpHost = null;
+
 async function getSmtpTransporter() {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   if (!host || !port || !user || !pass) return null;
+
   if (!_smtpTransporter) {
     let resolvedHost = host;
-    try {
-      const dns = require("dns").promises;
-      const addresses = await dns.resolve4(host);
-      if (addresses && addresses.length > 0) {
-        resolvedHost = addresses[0];
+    if (!_resolvedSmtpHost) {
+      try {
+        const dns = require("dns").promises;
+        const addresses = await dns.resolve4(host);
+        if (addresses && addresses.length > 0) {
+          _resolvedSmtpHost = addresses[0];
+          resolvedHost = _resolvedSmtpHost;
+        }
+      } catch (error) {
+        console.error("[SMTP] DNS IPv4 resolution failed for host:", host, error);
       }
-    } catch (error) {
-      console.error(`[SMTP] DNS resolution failed for ${host}:`, error);
+    } else {
+      resolvedHost = _resolvedSmtpHost;
     }
 
     _smtpTransporter = nodemailer.createTransport({
@@ -111,7 +119,7 @@ async function getSmtpTransporter() {
       secure: port === "465",
       pool: true,
       maxConnections: 3,
-      family: 4,           // force IPv4 — Render does not support IPv6 SMTP
+      family: 4,
       auth: { user, pass },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
@@ -185,6 +193,14 @@ async function sendOtpEmail(userEmail, userName, otpCode) {
     throw error;
   }
 }
+
+module.exports = {
+  generateOtp,
+  sendOtpSms,
+  sendOtpEmail,
+  postForm,
+  isConfiguredSecret,
+};
 
 module.exports = {
   generateOtp,
