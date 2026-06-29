@@ -229,12 +229,6 @@ module.exports = (io) => {
         sendOtpEmail(user.email, user.fullName, otpCode)
       ]);
 
-      if (process.env.NODE_ENV === "production" && !emailResult.sent) {
-        return response.status(500).json({
-          message: "Unable to send OTP. Please check server logs or SMTP configuration.",
-        });
-      }
-
       return response.json({
         message: emailResult.sent
           ? "OTP sent successfully"
