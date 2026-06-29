@@ -87,24 +87,46 @@ async function sendOtpSms(phoneNumber, otpCode) {
 
 // Singleton transporter — create once, reuse always
 let _smtpTransporter = null;
-function getSmtpTransporter() {
+let _resolvedSmtpHost = null;
+
+async function getSmtpTransporter() {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   if (!host || !port || !user || !pass) return null;
+
   if (!_smtpTransporter) {
+    let resolvedHost = host;
+    if (!_resolvedSmtpHost) {
+      try {
+        const dns = require("dns").promises;
+        const addresses = await dns.resolve4(host);
+        if (addresses && addresses.length > 0) {
+          _resolvedSmtpHost = addresses[0];
+          resolvedHost = _resolvedSmtpHost;
+        }
+      } catch (error) {
+        console.error("[SMTP] DNS IPv4 resolution failed for host:", host, error);
+      }
+    } else {
+      resolvedHost = _resolvedSmtpHost;
+    }
+
     _smtpTransporter = nodemailer.createTransport({
-      host,
+      host: resolvedHost,
       port: Number(port),
       secure: port === "465",
       pool: true,
       maxConnections: 3,
-      family: 4,           // force IPv4 — Render does not support IPv6 SMTP
+      family: 4,
       auth: { user, pass },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,
+      tls: {
+        servername: host,
+      },
     });
 
     if (process.env.NODE_ENV === "production") {
@@ -151,7 +173,7 @@ async function sendOtpEmail(userEmail, userName, otpCode) {
     </div>
   `;
 
-  const transporter = getSmtpTransporter();
+  const transporter = await getSmtpTransporter();
   if (!transporter) {
     console.log(`[MOCK OTP] To: ${userEmail} | OTP: ${otpCode}`);
     return { sent: false, mock: true, otp: otpCode };
