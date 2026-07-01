@@ -21,8 +21,11 @@ type BookingRecord = {
   tailorPhoneNumber?: string | null;
   clothCategory?: string | null;
   clothImage?: string | null;
+  clothImages?: string[] | null;
   material?: string | null;
+  clothQuantity?: number | null;
   approxPrice?: number | null;
+  phoneNumber?: string | null;
   status: string;
   trackingCode?: string | null;
   createdAt: string;
@@ -535,6 +538,9 @@ function NotificationsContent() {
                   <div>
                     <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">Customer</span>
                     <span className="text-gray-800 font-bold">{b.fullName || "Stitch Customer"}</span>
+                    {b.phoneNumber && (
+                      <span className="text-gray-500 block text-[11px] mt-0.5 font-medium">📞 {b.phoneNumber}</span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -573,24 +579,39 @@ function NotificationsContent() {
                   {/* Garment Preview Section */}
                   <div>
                     <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block mb-1">Garment Preview</span>
-                    <div className="flex gap-4 items-center bg-purple-50/20 border border-purple-100/30 p-3 rounded-xl mt-1">
-                      {b.clothImage ? (
-                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-white">
-                          <Image
-                            src={b.clothImage}
-                            alt="Cloth Preview"
-                            fill
-                            sizes="64px"
-                            unoptimized
-                            className="object-cover rounded-lg"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-16 w-16 shrink-0 rounded-lg bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center p-1">
-                          <span className="text-xl">🧵</span>
-                          <span className="text-[7px] text-gray-400 font-bold mt-0.5">No Image</span>
-                        </div>
-                      )}
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-purple-50/20 border border-purple-100/30 p-3 rounded-xl mt-1">
+                      <div className="flex gap-2 overflow-x-auto max-w-full pb-1 shrink-0 scrollbar-thin">
+                        {b.clothImages && b.clothImages.length > 0 ? (
+                          b.clothImages.map((img, idx) => (
+                            <div key={idx} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-white">
+                              <Image
+                                src={img}
+                                alt={`Cloth Preview ${idx + 1}`}
+                                fill
+                                sizes="64px"
+                                unoptimized
+                                className="object-cover rounded-lg"
+                              />
+                            </div>
+                          ))
+                        ) : b.clothImage ? (
+                          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-white">
+                            <Image
+                              src={b.clothImage}
+                              alt="Cloth Preview"
+                              fill
+                              sizes="64px"
+                              unoptimized
+                              className="object-cover rounded-lg"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-16 w-16 shrink-0 rounded-lg bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center p-1">
+                            <span className="text-xl">🧵</span>
+                            <span className="text-[7px] text-gray-400 font-bold mt-0.5">No Image</span>
+                          </div>
+                        )}
+                      </div>
                       <div className="min-w-0 flex-1 space-y-0.5">
                         <span className="text-[10px] font-extrabold text-[#c322f4] uppercase tracking-wider block">
                           {b.clothCategory || "Details pending"}
@@ -598,6 +619,11 @@ function NotificationsContent() {
                         {b.material && (
                           <span className="text-xs font-bold text-gray-800 block">
                             Material: {b.material}
+                          </span>
+                        )}
+                        {b.clothQuantity && (
+                          <span className="text-xs font-bold text-gray-800 block">
+                            Quantity: {b.clothQuantity}
                           </span>
                         )}
                       </div>

@@ -45,8 +45,10 @@ module.exports = (io) => {
         tailorPhoneNumber: null,
         clothCategory: null,
         clothImage: null,
+        clothImages: [],
         material: null,
         approxPrice: null,
+        clothQuantity: 1,
         status: "pending",
         trackingCode: null
       });
@@ -118,6 +120,7 @@ module.exports = (io) => {
               userId: 1,
               fullName: "$user.fullName",
               email: "$user.email",
+              phoneNumber: "$user.phoneNumber",
               pickupLocation: 1,
               dropoffLocation: 1,
               bookingDate: 1,
@@ -128,8 +131,10 @@ module.exports = (io) => {
               tailorPhoneNumber: 1,
               clothCategory: 1,
               clothImage: 1,
+              clothImages: 1,
               material: 1,
               approxPrice: 1,
+              clothQuantity: 1,
               originalTotal: 1,
               discountAmount: 1,
               finalTotal: 1,
@@ -172,6 +177,7 @@ module.exports = (io) => {
               userId: 1,
               fullName: "$user.fullName",
               email: "$user.email",
+              phoneNumber: "$user.phoneNumber",
               pickupLocation: 1,
               dropoffLocation: 1,
               bookingDate: 1,
@@ -182,8 +188,10 @@ module.exports = (io) => {
               tailorPhoneNumber: 1,
               clothCategory: 1,
               clothImage: 1,
+              clothImages: 1,
               material: 1,
               approxPrice: 1,
+              clothQuantity: 1,
               originalTotal: 1,
               discountAmount: 1,
               finalTotal: 1,
@@ -260,6 +268,7 @@ module.exports = (io) => {
         userId: mongoBooking.userId,
         fullName: userDoc ? userDoc.fullName : null,
         email: userDoc ? userDoc.email : null,
+        phoneNumber: userDoc ? userDoc.phoneNumber : null,
         pickupLocation: mongoBooking.pickupLocation,
         dropoffLocation: mongoBooking.dropoffLocation,
         bookingDate: mongoBooking.bookingDate,
@@ -270,8 +279,10 @@ module.exports = (io) => {
         tailorPhoneNumber: mongoBooking.tailorPhoneNumber,
         clothCategory: mongoBooking.clothCategory,
         clothImage: mongoBooking.clothImage,
+        clothImages: mongoBooking.clothImages || [],
         material: mongoBooking.material,
         approxPrice: mongoBooking.approxPrice,
+        clothQuantity: mongoBooking.clothQuantity || 1,
         referralDiscount: mongoBooking.referralDiscount || 0.00,
         creditApplied: mongoBooking.creditApplied || 0.00,
         originalTotal: mongoBooking.originalTotal || null,
@@ -296,8 +307,8 @@ module.exports = (io) => {
           const userId = Number(bookingObj.userId);
           const bookingId = Number(bookingObj.id);
           const basePrice = Number(bookingObj.approxPrice || 0);
-          const gstFee = Math.round(basePrice * 0.18);
-          const platformFee = 49;
+          const gstFee = 0;
+          const platformFee = 0;
           const totalBasePrice = basePrice + gstFee + platformFee;
 
           let referralDiscountApplied = 0;
@@ -348,16 +359,39 @@ module.exports = (io) => {
     }
   });
 
-  router.post("/:bookingId/details", requireAuth, uploadCloth.single("clothImage"), async (request, response) => {
+  router.post("/:bookingId/details", requireAuth, uploadCloth.array("clothImages", 10), async (request, response) => {
     try {
       const bookingId = Number(request.params.bookingId);
       const tailorApplicationId = Number(request.body.tailorApplicationId);
       const clothCategory = String(request.body.clothCategory || "").trim();
       const material = String(request.body.material || "").trim();
+      const clothQuantity = request.body.clothQuantity !== undefined && request.body.clothQuantity !== null ? Number(request.body.clothQuantity) : 1;
       const approxPrice = request.body.approxPrice !== undefined && request.body.approxPrice !== null ? Number(request.body.approxPrice) : null;
-      const clothImage = request.file
-        ? await uploadClothImage(request.file.buffer)
-        : (request.body.clothImage || null);
+      
+      const clothImages = [];
+      if (request.files && request.files.length > 0) {
+        for (const file of request.files) {
+          const url = await uploadClothImage(file.buffer);
+          clothImages.push(url);
+        }
+      }
+      if (request.body.existingImages) {
+        let existing = [];
+        try {
+          existing = typeof request.body.existingImages === 'string'
+            ? JSON.parse(request.body.existingImages)
+            : request.body.existingImages;
+        } catch (e) {
+          existing = [request.body.existingImages];
+        }
+        if (Array.isArray(existing)) {
+          clothImages.push(...existing.filter(img => typeof img === 'string' && img.trim() !== ""));
+        }
+      }
+      const clothImage = clothImages.length > 0 ? clothImages[0] : (request.body.clothImage || null);
+      if (clothImage && !clothImages.includes(clothImage)) {
+        clothImages.unshift(clothImage);
+      }
 
       if (!bookingId || !tailorApplicationId) {
         return response.status(400).json({
@@ -368,6 +402,12 @@ module.exports = (io) => {
       if (!clothCategory || !material) {
         return response.status(400).json({
           message: "Cloth category and material are required",
+        });
+      }
+
+      if (clothQuantity <= 0 || !Number.isInteger(clothQuantity)) {
+        return response.status(400).json({
+          message: "Cloth quantity must be a positive integer",
         });
       }
 
@@ -445,8 +485,10 @@ module.exports = (io) => {
 
       mongoBooking.clothCategory = clothCategory;
       mongoBooking.clothImage = clothImage;
+      mongoBooking.clothImages = clothImages;
       mongoBooking.material = material;
       mongoBooking.approxPrice = approxPrice;
+      mongoBooking.clothQuantity = clothQuantity;
       mongoBooking.trackingCode = trackingCode;
       mongoBooking.tailorApplicationId = tailor.id;
       mongoBooking.tailorName = tailorName;
@@ -621,10 +663,20 @@ module.exports = (io) => {
             message: "You are not authorized to update this booking status",
           });
         }
-        const forbiddenTailorStatuses = ["pending", "pending-price", "pending-payment"];
+        const forbiddenTailorStatuses = ["pending", "pending-price", "pending-payment", "booked"];
         if (forbiddenTailorStatuses.includes(status)) {
           return response.status(400).json({
-            message: "Tailors cannot set status to pending, pending-price, or pending-payment",
+            message: "Tailors cannot set status to pending, pending-price, pending-payment, or booked",
+          });
+        }
+
+        const statusOrder = ["booked", "picked-up", "in-stitching", "ready", "out-for-delivery", "delivered"];
+        const newStatusIndex = statusOrder.indexOf(status);
+        const currentStatusIndex = statusOrder.indexOf(mongoBooking.status);
+
+        if (newStatusIndex !== -1 && currentStatusIndex !== -1 && newStatusIndex < currentStatusIndex) {
+          return response.status(400).json({
+            message: "Cannot transition status backward",
           });
         }
       } else if (userRole === "user") {
@@ -673,6 +725,12 @@ module.exports = (io) => {
 
       // Targeted emit to booking room (for TrackingMap live update)
       io.to(`booking-${bookingId}`).emit("booking:status-changed", {
+        bookingId,
+        status: finalBooking.status || status,
+      });
+
+      // Broadcast globally for general listeners (e.g. sound notifications)
+      io.emit("booking:status-changed", {
         bookingId,
         status: finalBooking.status || status,
       });

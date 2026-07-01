@@ -10,6 +10,7 @@ import { useEffect, useState, useSyncExternalStore, Suspense, useCallback } from
 import { showToast } from "../components/Toast";
 import TrackingMap from "../components/TrackingMap";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { getSocket } from "@/lib/socket";
 
 type BookingRecord = {
   id: number;
@@ -24,9 +25,12 @@ type BookingRecord = {
   clothCategory?: string | null;
   clothImage?: string | null;
   material?: string | null;
+  clothQuantity?: number | null;
+  clothImages?: string[] | null;
   approxPrice?: number | null;
   status: string;
   trackingCode?: string | null;
+  phoneNumber?: string | null;
   createdAt: string;
   reviewId?: number | null;
   reviewRating?: number | null;
@@ -157,7 +161,12 @@ function TrackContent() {
   const typeParam = searchParams.get("type") || "";
   const [searchId, setSearchId] = useState(bookingIdParam);
   const [activeBooking, setActiveBooking] = useState<BookingRecord | null>(null);
+  const [activeImage, setActiveImage] = useState<string | null>(null);
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
+  
+  useEffect(() => {
+    setActiveImage(null);
+  }, [activeBooking]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isListLoading, setIsListLoading] = useState(false);
@@ -330,6 +339,21 @@ function TrackContent() {
     fetchUserBookings();
   }, [fetchUserBookings]);
 
+  // Real-time listener for payment confirmations to play chime sound for tailors
+  useEffect(() => {
+    const socket = getSocket();
+    function handleStatusChange(data: { bookingId: number; status: string }) {
+      if (data.status === "booked" && currentUser?.role === "tailor") {
+        showToast("Payment of the order successfully done! Now you can change the status of order.", "success");
+        playNotificationSound();
+      }
+    }
+    socket.on("booking:status-changed", handleStatusChange);
+    return () => {
+      socket.off("booking:status-changed", handleStatusChange);
+    };
+  }, [currentUser]);
+
   // Auto-refresh when backend data changes via Socket.IO
   useAutoRefresh("bookings", () => {
     if (bookingIdParam) {
@@ -433,6 +457,40 @@ function TrackContent() {
     if (s === "out-for-delivery") return 4;
     if (s === "delivered") return 5;
     return -1;
+  }
+
+  function playNotificationSound() {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+      
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(587.33, now); // D5
+      gain1.gain.setValueAtTime(0.15, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(880, now + 0.1); // A5
+      gain2.gain.setValueAtTime(0.15, now + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      
+      osc1.start(now);
+      osc1.stop(now + 0.4);
+      osc2.start(now + 0.1);
+      osc2.stop(now + 0.5);
+    } catch (error) {
+      console.error("Failed to play synthesized sound:", error);
+    }
   }
 
   function getEstimatedDeliveryDate(bookingDateStr: string): string {
@@ -640,7 +698,7 @@ function TrackContent() {
                               </span>
                             </div>
                             <p className="mt-1 text-[11px] text-gray-500 truncate">
-                              {b.clothCategory || "Details pending"} {b.material ? `(${b.material})` : ""} {b.tailorName ? `• ${b.tailorName}` : ""}
+                              {b.clothCategory || "Details pending"} {b.material ? `(${b.material})` : ""} {b.clothQuantity ? `x ${b.clothQuantity}` : ""} {b.tailorName ? `• ${b.tailorName}` : ""}
                             </p>
                             <p className="text-[10px] text-gray-400 mt-0.5">
                               {b.isBusiness ? "Placed: " : "Booked: "}{new Date(b.bookingDate).toLocaleDateString()}
@@ -932,7 +990,49 @@ function TrackContent() {
                   Order Details
                 </h3>
 
-                {activeBooking.clothImage && (
+                {activeBooking.clothImages && activeBooking.clothImages.length > 0 ? (
+                  (() => {
+                    const images = activeBooking.clothImages;
+                    const firstImage = images[0] || "";
+                    return (
+                      <div className="space-y-2">
+                        <div className="relative h-44 overflow-hidden rounded-xl bg-gray-50 border border-gray-100">
+                          <Image
+                            src={activeImage || firstImage}
+                            alt="Cloth Preview"
+                            fill
+                            sizes="400px"
+                            unoptimized
+                            className="object-cover"
+                          />
+                        </div>
+                        {images.length > 1 && (
+                          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                            {images.map((img, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => setActiveImage(img)}
+                                className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border transition-all cursor-pointer ${
+                                  (activeImage || firstImage) === img
+                                    ? "border-[#c322f4] ring-2 ring-[#c322f4]/20"
+                                    : "border-gray-200 hover:border-gray-300"
+                                }`}
+                              >
+                                <Image
+                                  src={img}
+                                  alt={`Cloth Preview ${idx + 1}`}
+                                  fill
+                                  unoptimized
+                                  className="object-cover"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : activeBooking.clothImage ? (
                   <div className="relative h-44 overflow-hidden rounded-xl bg-gray-50 border border-gray-100">
                     <Image
                       src={activeBooking.clothImage}
@@ -943,7 +1043,7 @@ function TrackContent() {
                       className="object-cover"
                     />
                   </div>
-                )}
+                ) : null}
 
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
@@ -966,10 +1066,22 @@ function TrackContent() {
                     <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Current Status</p>
                     <p className="mt-1 font-semibold text-gray-800 uppercase tracking-wider text-[10px]">{activeBooking.status}</p>
                   </div>
+                  {!(activeBooking as any).isBusiness && activeBooking.clothQuantity !== undefined && (
+                    <div>
+                      <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Quantity</p>
+                      <p className="mt-1 font-semibold text-gray-800">{activeBooking.clothQuantity || 1}</p>
+                    </div>
+                  )}
                   {activeBooking.trackingCode && (
                     <div className="col-span-2">
                       <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Tracking Code</p>
                       <p className="mt-1 font-semibold text-gray-800 font-mono tracking-wider">{activeBooking.trackingCode}</p>
+                    </div>
+                  )}
+                  {activeBooking.phoneNumber && (
+                    <div className="col-span-2">
+                      <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Customer Phone Number</p>
+                      <p className="mt-1 font-semibold text-gray-800">📞 {activeBooking.phoneNumber}</p>
                     </div>
                   )}
                 </div>
@@ -1003,6 +1115,9 @@ function TrackContent() {
                       <div>
                         <p className="text-base font-bold text-gray-800">{activeBooking.tailorName}</p>
                         <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider mt-0.5">✂️ Expert Tailoring Partner</p>
+                        {activeBooking.tailorPhoneNumber && (
+                          <p className="text-xs text-gray-500 font-medium mt-1">📞 {activeBooking.tailorPhoneNumber}</p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1033,12 +1148,12 @@ function TrackContent() {
                       ].map((btn) => (
                         <button
                           key={btn.id}
-                          disabled={isSimulating}
+                          disabled={isSimulating || btn.id === "booked" || getStepIndex(btn.id) <= getStepIndex(activeBooking.status)}
                           onClick={() => simulateStatus(btn.id)}
                           suppressHydrationWarning
-                          className={`px-2 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${activeBooking.status === btn.id
-                            ? "bg-[#c322f4] text-white shadow-sm"
-                            : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                          className={`px-2 py-1.5 text-[10px] font-bold rounded-lg transition-all ${activeBooking.status === btn.id
+                            ? "bg-[#c322f4] text-white shadow-sm cursor-not-allowed opacity-90"
+                            : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-55 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
                             }`}
                         >
                           {btn.label}
@@ -1159,6 +1274,11 @@ function TailorOrderCard({
                 unoptimized
                 className="object-cover rounded-xl"
               />
+              {booking.clothImages && booking.clothImages.length > 1 && (
+                <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded leading-none">
+                  +{booking.clothImages.length - 1}
+                </span>
+              )}
             </div>
           ) : (
             <div className="h-20 w-20 shrink-0 rounded-xl bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center p-2">
@@ -1169,7 +1289,7 @@ function TailorOrderCard({
 
           <div className="min-w-0 flex-1 space-y-1 text-xs">
             <p className="font-bold text-gray-800 truncate">
-              {booking.clothCategory || "Details pending"} {booking.material ? `(${booking.material})` : ""}
+              {booking.clothCategory || "Details pending"} {booking.material ? `(${booking.material})` : ""} {booking.clothQuantity ? `x ${booking.clothQuantity}` : ""}
             </p>
             <p className="text-[10px] text-gray-500 font-medium">
               <span className="font-semibold text-gray-400 uppercase tracking-widest text-[8px] block">

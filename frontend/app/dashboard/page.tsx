@@ -7,6 +7,7 @@ import { showToast } from "../components/Toast";
 import { getProfileForCurrentUser, getCurrentUser, emptyProfile, authFetch } from "../components/profileStorage";
 import { API_URL } from "@/app/config";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { getSocket } from "@/lib/socket";
 
 type BookingRecord = {
   id: number;
@@ -22,6 +23,8 @@ type BookingRecord = {
   clothCategory?: string | null;
   clothImage?: string | null;
   material?: string | null;
+  clothQuantity?: number | null;
+  clothImages?: string[] | null;
   approxPrice?: number | null;
   status: string;
   trackingCode?: string | null;
@@ -118,6 +121,22 @@ function DashboardContent() {
   }, [currentUser, fetchBookings]);
 
   useAutoRefresh("bookings", fetchBookings);
+
+  // Real-time listener for payment confirmations to play chime sound for tailors
+  useEffect(() => {
+    const socket = getSocket();
+    function handleStatusChange(data: { bookingId: number; status: string }) {
+      if (data.status === "booked" && currentUser?.role === "tailor") {
+        showToast("Payment of the order successfully done! Now you can change the status of order.", "success");
+        playNotificationSound();
+        fetchBookings();
+      }
+    }
+    socket.on("booking:status-changed", handleStatusChange);
+    return () => {
+      socket.off("booking:status-changed", handleStatusChange);
+    };
+  }, [currentUser, fetchBookings]);
 
   if (!currentUser || currentUser.role !== "tailor") {
     return (
@@ -222,6 +241,40 @@ function DashboardContent() {
     }
   };
 
+  function playNotificationSound() {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+      
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(587.33, now); // D5
+      gain1.gain.setValueAtTime(0.15, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(880, now + 0.1); // A5
+      gain2.gain.setValueAtTime(0.15, now + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      
+      osc1.start(now);
+      osc1.stop(now + 0.4);
+      osc2.start(now + 0.1);
+      osc2.stop(now + 0.5);
+    } catch (error) {
+      console.error("Failed to play synthesized sound:", error);
+    }
+  }
+
   return (
     <div className="space-y-8 animate-fade-in font-sans">
       {/* Top Banner section */}
@@ -281,6 +334,11 @@ function DashboardContent() {
                     {b.clothImage ? (
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
                         <img src={b.clothImage} alt="Garment" className="h-full w-full object-cover" />
+                        {b.clothImages && b.clothImages.length > 1 && (
+                          <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded leading-none">
+                            +{b.clothImages.length - 1}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div className="h-14 w-14 shrink-0 rounded-xl bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-xl">
@@ -288,7 +346,7 @@ function DashboardContent() {
                       </div>
                     )}
                     <div className="space-y-1 text-xs">
-                      <p className="font-bold text-gray-900">Order #{b.trackingCode || `ST-${1000 + b.id}`} - {b.clothCategory || "Cloth details pending"}</p>
+                      <p className="font-bold text-gray-900">Order #{b.trackingCode || `ST-${1000 + b.id}`} - {b.clothCategory || "Cloth details pending"}{b.clothQuantity ? ` (Qty: ${b.clothQuantity})` : ""}</p>
                       <p className="text-gray-500">Customer: <strong className="text-gray-800 font-semibold">{b.fullName || "Guest"}</strong></p>
                       <p className="text-gray-400 font-semibold">{new Date(b.bookingDate).toLocaleDateString()} at {b.bookingTime.slice(0, 5)}</p>
                     </div>

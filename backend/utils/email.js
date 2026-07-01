@@ -231,7 +231,120 @@ ${htmlContent}
   }
 }
 
+async function sendPaymentSuccessEmailToTailor(tailorEmail, booking) {
+  const host = process.env.SMTP_HOST;
+  const port = process.env.SMTP_PORT;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || "no-reply@stitch.com";
+
+  const isMailConfigured = host && port && user && pass;
+
+  const subject = `Payment Successful for Stitch Booking - ${booking.trackingCode || booking.id}`;
+  const trackingLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/track?id=${booking.id}`;
+
+  const htmlContent = `
+    <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff; color: #1f2937;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f3f4f6; padding-bottom: 16px;">
+        <h1 style="color: #c322f4; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Stitch</h1>
+        <p style="color: #4b5563; margin: 4px 0 0 0; font-size: 14px;">Your Premium Custom Tailoring Partner</p>
+      </div>
+      
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0;">Hello ${booking.tailorName || 'Tailoring Partner'},</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
+        The payment of the order <strong>#${booking.trackingCode || booking.id}</strong> has been successfully done.
+      </p>
+
+      <div style="background: linear-gradient(135deg, #fbf7ff 0%, #f7efff 100%); border: 1px solid #e9d5ff; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed;">Order Status</p>
+        <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: 900; color: #c322f4;">PAYMENT RECEIVED</p>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">You can now update the status of the order to Picked Up, Stitching, etc.</p>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-top: 24px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">Order Details</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px;">
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af; width: 40%;">Cloth Category:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600;">${booking.clothCategory || ''}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Material:</td>
+          <td style="padding: 6px 0; color: #1f2937;">${booking.material || ''}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Quantity:</td>
+          <td style="padding: 6px 0; color: #1f2937;">${booking.clothQuantity || 1}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; font-weight: 600; color: #9ca3af;">Total Amount Paid:</td>
+          <td style="padding: 6px 0; color: #1f2937; font-weight: 600; color: #10b981;">₹${booking.approxPrice || 0}</td>
+        </tr>
+      </table>
+
+      <div style="text-align: center; margin-top: 32px;">
+        <a href="${trackingLink}" style="display: inline-block; background-color: #c322f4; color: #ffffff; padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(195, 34, 244, 0.2); transition: all 0.2s;">Open Order Tracking</a>
+      </div>
+
+      <div style="margin-top: 40px; border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center; font-size: 11px; color: #9ca3af;">
+        <p style="margin: 0;">This email is sent automatically. Do not reply to this email.</p>
+        <p style="margin: 4px 0 0 0;">Stitch tailors portal.</p>
+      </div>
+    </div>
+  `;
+
+  if (!isMailConfigured) {
+    const logFilePath = path.join(__dirname, "../mock_emails.log");
+    const logEntry = `
+========================================
+[MOCK EMAIL - TO TAILOR]
+TO: ${tailorEmail}
+SUBJECT: ${subject}
+BODY:
+Hi ${booking.tailorName || 'Tailor'},
+Payment of the order #${booking.trackingCode || booking.id} has been successfully done.
+Now you can change the status of the order.
+Total Paid: ₹${booking.approxPrice}
+Link: ${trackingLink}
+========================================
+`;
+    try {
+      fs.appendFileSync(logFilePath, logEntry, "utf8");
+      console.log(`Mock email to tailor logged successfully to ${logFilePath}`);
+      return { sent: true, mock: true };
+    } catch (err) {
+      console.error("Failed to write mock email to log file:", err);
+      return { sent: false };
+    }
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port: Number(port),
+      secure: Number(port) === 465,
+      auth: {
+        user,
+        pass,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from,
+      to: tailorEmail,
+      subject,
+      html: htmlContent,
+    });
+
+    console.log("Payment success email sent to tailor successfully:", info.messageId);
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending email via SMTP to tailor:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   sendBookingEmail,
   sendPriceQuoteEmail,
+  sendPaymentSuccessEmailToTailor,
 };

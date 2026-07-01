@@ -18,6 +18,13 @@ async function confirmBookingAndProcessReferrals(bookingId) {
     const userId = mongoBooking.userId;
     const creditApplied = Number(mongoBooking.creditApplied || 0);
 
+    if (mongoBooking.tailorEmail) {
+      const { sendPaymentSuccessEmailToTailor } = require("../utils/email");
+      sendPaymentSuccessEmailToTailor(mongoBooking.tailorEmail, mongoBooking).catch((err) => {
+        console.error("Failed to send payment success email to tailor:", err);
+      });
+    }
+
     if (creditApplied > 0) {
       const userDoc = await User.findById(userId);
       if (userDoc) {
