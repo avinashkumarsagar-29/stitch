@@ -1,3 +1,5 @@
-import TailorDashboardPage from "../../dashboard/page";
+import { redirect } from "next/navigation";
 
-export default TailorDashboardPage;
+export default function TrailorHomeRedirect() {
+  redirect("/dashboard");
+}

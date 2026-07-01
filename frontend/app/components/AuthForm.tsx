@@ -188,9 +188,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
       const roleRedirects: Record<string, string> = {
         admin: "/admin",
         tailor: "/join",
-        user: "/Home",
+        user: "/",
       };
-      router.push(roleRedirects[data.user.role] || "/Home");
+      router.push(roleRedirects[data.user.role] || "/");
     } catch (err) {
       console.error(err);
       showToast("Unable to connect to login server", "error");
@@ -260,9 +260,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
       const roleRedirects: Record<string, string> = {
         admin: "/admin",
         tailor: "/join",
-        user: "/Home",
+        user: "/",
       };
-      router.push(roleRedirects[data.user.role] || "/Home");
+      router.push(roleRedirects[data.user.role] || "/");
     } catch (err) {
       console.error(err);
       showToast("Unable to connect to registration server", "error");
@@ -409,9 +409,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
       const roleRedirects: Record<string, string> = {
         admin: "/admin",
         tailor: "/join",
-        user: "/Home",
+        user: "/",
       };
-      router.push(roleRedirects[data.user.role] || "/Home");
+      router.push(roleRedirects[data.user.role] || "/");
     } catch {
       showToast("Unable to connect to backend server", "error");
     }

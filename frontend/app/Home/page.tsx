@@ -1,3 +1,5 @@
-import Home from "../page";
+import { redirect } from "next/navigation";
 
-export default Home;
+export default function HomeRedirect() {
+  redirect("/");
+}
