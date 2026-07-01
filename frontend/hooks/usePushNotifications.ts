@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { authFetch } from "@/app/components/profileStorage";
+import { API_URL } from "@/app/config";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 
 function urlBase64ToUint8Array(base64String: string) {
