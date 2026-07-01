@@ -14,9 +14,9 @@ export default function JoinPage() {
     if (role === "admin") {
       router.push("/admin");
     } else if (role === "tailor") {
-      router.push("/trailor/Home");
+      router.push("/dashboard");
     } else {
-      router.push("/Home");
+      router.push("/");
     }
   };
 

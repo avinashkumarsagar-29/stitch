@@ -61,7 +61,7 @@ function playNotificationSound() {
 }
 
 const customerLinks = [
-  { label: "Home", href: "/Home" },
+  { label: "Home", href: "/" },
   { label: "Book Now", href: "/booking" },
   { label: "Track Order", href: "/track" },
   { label: "About us", href: "/about" },
@@ -334,7 +334,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   useAdminNotifications();
 
   const isAdmin = userRole === "admin";
-  const homeHref = isAdmin ? "/admin" : isTailor ? "/trailor/Home" : isLoggedIn ? "/Home" : "/";
+  const homeHref = isAdmin ? "/admin" : isTailor ? "/dashboard" : isLoggedIn ? "/" : "/";
   const links = isAdmin
     ? adminLinks
     : isTailor

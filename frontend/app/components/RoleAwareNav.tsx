@@ -6,7 +6,7 @@ import { getCurrentUserRole } from "./profileStorage";
 import AuthActions from "./AuthActions";
 
 const userLinks = [
-  { label: "Home", href: "/Home" },
+  { label: "Home", href: "/" },
   { label: "About us", href: "/about" },
   { label: "Collection", href: "/collection" },
   { label: "Careers", href: "/careers" },
@@ -14,7 +14,7 @@ const userLinks = [
 ];
 
 const tailorLinks = [
-  { label: "Home", href: "/trailor/Home" },
+  { label: "Home", href: "/dashboard" },
   { label: "About us", href: "/about" },
   { label: "Careers", href: "/careers" },
   { label: "Blog", href: "/blog" },

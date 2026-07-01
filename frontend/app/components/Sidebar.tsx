@@ -60,7 +60,7 @@ function playNotificationSound() {
 
 // Links configuration
 const userLinks = [
-  { label: "Home", href: "/Home", icon: "🏠" },
+  { label: "Home", href: "/", icon: "🏠" },
   { label: "Book Now", href: "/booking", icon: "✂️" },
   { label: "Notifications", href: "/notifications", icon: "🔔" },
   { label: "Business Orders", href: "/business", icon: "🏢" },
@@ -346,7 +346,7 @@ export default function Sidebar({
 
   const isTailor = userRole === "tailor";
   const isAdmin = userRole === "admin";
-  const homeHref = isAdmin ? "/admin" : isTailor ? "/trailor/Home" : isLoggedIn ? "/Home" : "/";
+  const homeHref = isAdmin ? "/admin" : isTailor ? "/dashboard" : isLoggedIn ? "/" : "/";
   const links = isAdmin
     ? adminLinks
     : isTailor
