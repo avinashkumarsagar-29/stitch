@@ -55,8 +55,8 @@ module.exports = (io) => {
           await markFirstOrderDiscountUsed(userId);
         }
 
-        const gstFee = Math.round(finalTailoringFee * 0.18);
-        const platformFee = 49;
+        const gstFee = 0;
+        const platformFee = 0;
         const totalBasePrice = finalTailoringFee + gstFee + platformFee;
 
         // Check if user is referred and has not had a booking confirmed yet
@@ -190,8 +190,31 @@ module.exports = (io) => {
     }
   });
 
-  router.post("/verify", requireAuth, verifyPaymentHandler);
-  router.post("/verify-payment", requireAuth, verifyPaymentHandler);
+  const wrapVerifyHandler = (handler) => {
+    return async (req, res, next) => {
+      const originalJson = res.json;
+      res.json = function (data) {
+        res.json = originalJson;
+        if (data && data.success && data.plan && data.plan.startsWith("booking_")) {
+          const bookingId = Number(data.plan.replace("booking_", ""));
+          io.to(`booking-${bookingId}`).emit("booking:status-changed", {
+            bookingId,
+            status: "booked",
+          });
+          io.emit("booking:status-changed", {
+            bookingId,
+            status: "booked",
+          });
+          io.emit("data:updated", { type: "bookings" });
+        }
+        return originalJson.call(this, data);
+      };
+      return handler(req, res, next);
+    };
+  };
+
+  router.post("/verify", requireAuth, wrapVerifyHandler(verifyPaymentHandler));
+  router.post("/verify-payment", requireAuth, wrapVerifyHandler(verifyPaymentHandler));
 
   router.post("/activate-free-plan", requireAuth, async (request, response) => {
     try {

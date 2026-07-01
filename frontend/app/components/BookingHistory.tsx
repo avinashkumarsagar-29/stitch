@@ -23,6 +23,7 @@ type BookingRecord = {
   trackingCode?: string | null;
   clothCategory?: string | null;
   material?: string | null;
+  clothQuantity?: number | null;
   approxPrice?: number | null;
   originalTotal?: number | null;
   discountAmount?: number | null;
@@ -172,8 +173,8 @@ export default function BookingHistory() {
             const hasPrice = booking.approxPrice !== null && booking.approxPrice !== undefined;
             const hasDiscount = Number(booking.discountAmount || 0) > 0;
             const finalFee = hasDiscount ? Number(booking.finalTotal || 0) : Number(booking.approxPrice || 0);
-            const gstFee = Math.round(finalFee * 0.18);
-            const platformFee = 49;
+            const gstFee = 0;
+            const platformFee = 0;
             const totalPayable = Math.max(0, finalFee + gstFee + platformFee - Number(booking.referralDiscount || 0) - Number(booking.creditApplied || 0));
 
             return (
@@ -207,6 +208,12 @@ export default function BookingHistory() {
                     </h3>
                     <p className="text-xs text-gray-500 font-medium">
                       Fabric: <span className="font-semibold text-gray-700">{booking.material || "Unspecified"}</span>
+                      {booking.clothQuantity !== undefined && booking.clothQuantity !== null && (
+                        <>
+                          <span className="mx-2">•</span>
+                          Qty: <span className="font-semibold text-gray-700">{booking.clothQuantity}</span>
+                        </>
+                      )}
                       {booking.tailorName && (
                         <>
                           <span className="mx-2">•</span>

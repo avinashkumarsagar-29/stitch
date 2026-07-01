@@ -15,6 +15,8 @@ type PendingBooking = {
   material: string;
   approxPrice: number;
   clothImage: string | null;
+  clothQuantity?: number | null;
+  clothImages?: string[] | null;
 };
 
 type BookingRecord = {
@@ -23,6 +25,8 @@ type BookingRecord = {
   dropoffLocation: string;
   bookingDate: string;
   bookingTime: string;
+  clothQuantity?: number | null;
+  clothImages?: string[] | null;
 };
 
 type Tailor = {
@@ -132,6 +136,8 @@ export default function PaymentPage() {
             material: dbBooking.material || "",
             approxPrice: Number(dbBooking.approxPrice || 0),
             clothImage: dbBooking.clothImage || null,
+            clothQuantity: dbBooking.clothQuantity || 1,
+            clothImages: dbBooking.clothImages || [],
           };
           setPendingBooking(pending);
           setBooking(dbBooking);
@@ -511,7 +517,7 @@ export default function PaymentPage() {
               </div>
               <div className="flex justify-between pt-3 pb-3">
                 <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Garment Detail:</span>
-                <span className="text-gray-800 font-semibold">{confirmedBooking.clothCategory} ({confirmedBooking.material})</span>
+                <span className="text-gray-800 font-semibold">{confirmedBooking.clothCategory} ({confirmedBooking.material}){confirmedBooking.clothQuantity ? ` x ${confirmedBooking.clothQuantity}` : ""}</span>
               </div>
               {Number(confirmedBooking.discountAmount || 0) > 0 && (
                 <>
@@ -554,8 +560,8 @@ export default function PaymentPage() {
   const isDiscountApplied = Boolean(discountInfo?.eligible && subtotal >= 300);
   const firstOrderDiscount = isDiscountApplied ? Math.floor(subtotal * 0.20) : 0;
   const finalSubtotal = subtotal - firstOrderDiscount;
-  const gstFee = Math.round(finalSubtotal * 0.18); // 18% GST standard simulation
-  const platformFee = 49;
+  const gstFee = 0;
+  const platformFee = 0;
   const totalAmount = Math.max(0, finalSubtotal + gstFee + platformFee - referralDiscount - creditApplied);
 
   return (
@@ -768,13 +774,18 @@ export default function PaymentPage() {
                           unoptimized
                           className="object-cover"
                         />
+                        {pendingBooking.clothImages && pendingBooking.clothImages.length > 1 && (
+                          <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[8px] font-black px-0.5 py-0.2 rounded leading-none">
+                            +{pendingBooking.clothImages.length - 1}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <span className="text-2xl">🧵</span>
                     )}
                     <div>
                       <p className="font-bold text-gray-900">{pendingBooking.clothCategory}</p>
-                      <p className="text-[10px] text-gray-400 font-semibold">{pendingBooking.material} Fabric</p>
+                      <p className="text-[10px] text-gray-400 font-semibold">{pendingBooking.material} Fabric {pendingBooking.clothQuantity ? `• Qty: ${pendingBooking.clothQuantity}` : ""}</p>
                     </div>
                   </div>
                 </div>
@@ -825,14 +836,18 @@ export default function PaymentPage() {
                     <span>-₹{firstOrderDiscount}</span>
                   </div>
                 )}
-                <div className="flex justify-between pt-2 pb-2">
-                  <span className="text-gray-400">Service GST (18%):</span>
-                  <span className="text-gray-800 font-bold">₹{gstFee}</span>
-                </div>
-                <div className="flex justify-between pt-2 pb-2">
-                  <span className="text-gray-400">Platform Handling Fee:</span>
-                  <span className="text-gray-800 font-bold">₹{platformFee}</span>
-                </div>
+                 {gstFee > 0 && (
+                   <div className="flex justify-between pt-2 pb-2">
+                     <span className="text-gray-400">Service GST (18%):</span>
+                     <span className="text-gray-800 font-bold">₹{gstFee}</span>
+                   </div>
+                 )}
+                {platformFee > 0 && (
+                  <div className="flex justify-between pt-2 pb-2">
+                    <span className="text-gray-400">Platform Handling Fee:</span>
+                    <span className="text-gray-800 font-bold">₹{platformFee}</span>
+                  </div>
+                )}
                 {referralDiscount > 0 && (
                   <div className="flex justify-between pt-2 pb-2 text-emerald-600 font-bold">
                     <span>Referral Discount:</span>

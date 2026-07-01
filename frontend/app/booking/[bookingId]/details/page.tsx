@@ -38,6 +38,7 @@ type OrderDetails = {
   material: string;
   approxPrice: string;
   clothImage: string;
+  clothQuantity: string;
 };
 
 const clothCategories = [
@@ -73,8 +74,10 @@ export default function BookingDetailsPage() {
     material: "",
     approxPrice: "",
     clothImage: "",
+    clothQuantity: "1",
   });
-  const [selectedClothFile, setSelectedClothFile] = useState<File | null>(null);
+  const [selectedClothFiles, setSelectedClothFiles] = useState<File[]>([]);
+  const [clothImagesPreviews, setClothImagesPreviews] = useState<string[]>([]);
   const [measurements, setMeasurements] = useState({
     chest: "",
     waist: "",
@@ -154,24 +157,33 @@ export default function BookingDetailsPage() {
   }
 
   function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-
-    if (!file) {
+    const files = event.target.files;
+    if (!files) {
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
-      showToast("Please choose an image file", "error");
-      return;
-    }
+    const newFiles: File[] = [];
 
-    setSelectedClothFile(file);
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith("image/")) {
+        showToast(`File ${file.name} is not an image`, "error");
+        return;
+      }
+      newFiles.push(file);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateDetails("clothImage", String(reader.result));
-    };
-    reader.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setClothImagesPreviews((prev) => [...prev, String(reader.result)]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setSelectedClothFiles((prev) => [...prev, ...newFiles]);
+  }
+
+  function removeImage(index: number) {
+    setSelectedClothFiles((prev) => prev.filter((_, i) => i !== index));
+    setClothImagesPreviews((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -212,11 +224,12 @@ export default function BookingDetailsPage() {
       formData.append("tailorApplicationId", String(tailorId));
       formData.append("clothCategory", details.clothCategory);
       formData.append("material", details.material);
+      formData.append("clothQuantity", details.clothQuantity);
 
-      if (selectedClothFile) {
-        formData.append("clothImage", selectedClothFile);
-      } else if (details.clothImage) {
-        formData.append("clothImage", details.clothImage);
+      if (selectedClothFiles.length > 0) {
+        selectedClothFiles.forEach((file) => {
+          formData.append("clothImages", file);
+        });
       }
 
       const response = await authFetch(`${apiUrl}/api/bookings/${bookingId}/details`, {
@@ -282,29 +295,54 @@ export default function BookingDetailsPage() {
                     onChange={(value) => updateDetails("material", value)}
                     options={materials}
                   />
-                  <label className="block rounded-xl border border-gray-200 bg-white p-5 col-span-2">
+                  <label className="block rounded-xl border border-gray-200 bg-white p-5">
                     <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">
-                      Cloth Image
+                      Quantity of Cloth
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={details.clothQuantity}
+                      onChange={(e) => updateDetails("clothQuantity", e.target.value)}
+                      className="mt-3 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-[#202635] outline-none focus:border-[#c322f4] focus:ring-4 focus:ring-[#c322f4]/10 transition-all duration-200"
+                    />
+                  </label>
+                  <label className="block rounded-xl border border-gray-200 bg-white p-5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">
+                      Cloth Images
                     </span>
                     <input
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={handleImageChange}
                       className="mt-3 block w-full text-xs text-gray-500 file:mr-4 file:h-10 file:rounded-xl file:border-0 file:bg-[#d779f4] file:px-4 file:text-xs file:font-bold file:text-[#151320] cursor-pointer"
                     />
                   </label>
                 </div>
 
-                {details.clothImage ? (
-                  <div className="relative h-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-[#f3f4f6]">
-                    <Image
-                      src={details.clothImage}
-                      alt="Selected cloth"
-                      fill
-                      sizes="(min-width: 1024px) 740px, 100vw"
-                      unoptimized
-                      className="object-cover"
-                    />
+                {clothImagesPreviews.length > 0 ? (
+                  <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 mt-2">
+                    {clothImagesPreviews.map((src, index) => (
+                      <div key={index} className="relative h-32 overflow-hidden rounded-xl border border-gray-200 bg-[#f3f4f6] group transition-all duration-300 hover:shadow-md">
+                        <Image
+                          src={src}
+                          alt={`Selected cloth ${index + 1}`}
+                          fill
+                          unoptimized
+                          className="object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-2 right-2 h-6 w-6 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center text-[10px] font-bold shadow-md transition-all cursor-pointer hover:scale-105 active:scale-95"
+                          title="Remove Image"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
 
