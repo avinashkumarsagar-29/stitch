@@ -841,6 +841,17 @@ module.exports = (io) => {
         }
       }
 
+      // Emit socket events to update clients in real-time
+      io.to(`booking-${bookingId}`).emit("booking:status-changed", {
+        bookingId,
+        status: "pending-payment",
+      });
+      io.emit("booking:status-changed", {
+        bookingId,
+        status: "pending-payment",
+      });
+      io.emit("data:updated", { type: "bookings" });
+
       return response.json({
         message: "Booking price updated successfully",
         booking: booking.toObject(),

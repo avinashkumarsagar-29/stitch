@@ -339,10 +339,21 @@ function TrackContent() {
     fetchUserBookings();
   }, [fetchUserBookings]);
 
-  // Real-time listener for payment confirmations to play chime sound for tailors
+  // Real-time listener for status changes
   useEffect(() => {
     const socket = getSocket();
     function handleStatusChange(data: { bookingId: number; status: string }) {
+      fetchUserBookings();
+
+      if (Number(data.bookingId) === Number(bookingIdParam)) {
+        fetchBooking(bookingIdParam, typeParam);
+
+        if (currentUser?.role !== "tailor") {
+          const displayStatus = data.status === "booked" ? "Confirmed" : data.status;
+          showToast(`Order status updated to: ${displayStatus.toUpperCase()}`, "success");
+        }
+      }
+
       if (data.status === "booked" && currentUser?.role === "tailor") {
         showToast("Payment of the order successfully done! Now you can change the status of order.", "success");
         playNotificationSound();
@@ -352,7 +363,7 @@ function TrackContent() {
     return () => {
       socket.off("booking:status-changed", handleStatusChange);
     };
-  }, [currentUser]);
+  }, [currentUser, bookingIdParam, typeParam, fetchBooking, fetchUserBookings]);
 
   // Auto-refresh when backend data changes via Socket.IO
   useAutoRefresh("bookings", () => {
@@ -688,13 +699,13 @@ function TrackContent() {
                               <span className="text-xs font-bold text-gray-900">
                                 {b.isBusiness ? `Bulk Inquiry #${b.id}` : `Booking #${b.id}`} {b.trackingCode && <span className="font-mono text-gray-400 font-normal">({b.trackingCode})</span>}
                               </span>
-                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${b.status === "delivered"
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${b.status === "delivered" || b.status === "booked"
                                 ? "bg-green-50 text-green-700 border border-green-200"
                                 : b.status === "pending" || b.status === "pending-price" || b.status === "pending-payment"
                                   ? "bg-amber-50 text-amber-700 border border-amber-200"
                                   : "bg-purple-50 text-purple-700 border border-purple-200"
                                 }`}>
-                                {b.status === "pending-price" ? "Price Quote Needed" : b.status === "pending-payment" ? "Payment Pending" : b.status}
+                                {b.status === "pending-price" ? "Price Quote Needed" : b.status === "pending-payment" ? "Payment Pending" : b.status === "booked" ? "Confirmed" : b.status}
                               </span>
                             </div>
                             <p className="mt-1 text-[11px] text-gray-500 truncate">
@@ -1064,7 +1075,9 @@ function TrackContent() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px]">Current Status</p>
-                    <p className="mt-1 font-semibold text-gray-800 uppercase tracking-wider text-[10px]">{activeBooking.status}</p>
+                    <p className="mt-1 font-semibold text-gray-800 uppercase tracking-wider text-[10px]">
+                      {activeBooking.status === "booked" ? "Confirmed" : activeBooking.status}
+                    </p>
                   </div>
                   {!(activeBooking as any).isBusiness && activeBooking.clothQuantity !== undefined && (
                     <div>
