@@ -5,6 +5,9 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
+  alternates: {
+    canonical: null,
+  },
 };
 
 export default function BookingLayout({ children }: { children: React.ReactNode }) {
