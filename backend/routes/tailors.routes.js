@@ -253,7 +253,7 @@ module.exports = (io) => {
 
         const resolvedTailors = await Promise.all(tailorsWithDistancePromises);
         tailors = resolvedTailors
-          .filter((t) => t.distance !== null)
+          .filter((t) => t.distance !== null && t.distance >= 0 && t.distance <= 2)
           .sort((a, b) => {
             if (a.distance !== b.distance) {
               return a.distance - b.distance;
