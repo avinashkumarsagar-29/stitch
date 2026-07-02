@@ -128,12 +128,13 @@ export default function JoinDrawer({ isOpen, onClose }: JoinDrawerProps) {
           navigator.geolocation.getCurrentPosition(successCallback, errorCallback, {
             enableHighAccuracy: false,
             timeout: 15000,
+            maximumAge: 300000,
           });
         } else {
           errorCallback(error);
         }
       },
-      { enableHighAccuracy: true, timeout: 5000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
     );
   };
 
