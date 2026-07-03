@@ -105,6 +105,9 @@ export const metadata: Metadata = {
   },
   verification: {
     google: "Bukbm9ED7vj6yEDk-F3Fa4wjN5SDDggIXJTgSw5JCgI",
+     other: {
+       "msvalidate.01": "3F7AF91306504B67BB285C07121564E3"
+     },
   },
 };
 
