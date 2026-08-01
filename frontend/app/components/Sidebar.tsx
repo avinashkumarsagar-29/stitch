@@ -67,7 +67,8 @@ const userLinks = [
   { label: "Track Order", href: "/track", icon: "📦" },
   { label: "Collection", href: "/collection", icon: "🧵" },
   { label: "About us", href: "/about", icon: "✨" },
-  { label: "Pricing", href: "/pricing", icon: "🏷️ ️" }
+  { label: "Pricing", href: "/pricing", icon: "🏷️ ️" },
+  { label: "Install Stitch", href: "/install", icon: "📲" }
 ];
 
 const tailorLinks = [
@@ -77,7 +78,8 @@ const tailorLinks = [
   { label: "Update Order", href: "/track", icon: "📦" },
   { label: "My Dashboard", href: "/dashboard", icon: "📊" },
   { label: "About us", href: "/about", icon: "✨" },
-  { label: "Pricing", href: "/pricing", icon: "🏷️" }
+  { label: "Pricing", href: "/pricing", icon: "🏷️" },
+  { label: "Install Stitch", href: "/install", icon: "📲" }
 ];
 
 const adminLinks = [
@@ -90,6 +92,7 @@ const adminLinks = [
   { label: "Reviews & Ratings", href: "/admin/reviews", icon: "⭐" },
   { label: "Referral Credits", href: "/admin/referrals", icon: "🎁" },
   { label: "Settings", href: "/admin/settings", icon: "⚙️" },
+  { label: "Install Stitch", href: "/install", icon: "📲" }
 ];
 
 const communityLinks = [
@@ -148,6 +151,13 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(true);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches) {
+      setIsStandalone(true);
+    }
+  }, []);
 
   const isLoggedIn = useSyncExternalStore(subscribe, getSnapshot, () => false);
   const userRole = useSyncExternalStore(subscribe, getUserRole, () => "user");
@@ -347,13 +357,15 @@ export default function Sidebar({
   const isTailor = userRole === "tailor";
   const isAdmin = userRole === "admin";
   const homeHref = isAdmin ? "/admin" : isTailor ? "/dashboard" : isLoggedIn ? "/" : "/";
-  const links = isAdmin
-    ? adminLinks
-    : isTailor
-      ? tailorLinks
-      : isLoggedIn
-        ? userLinks
-        : userLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order" && link.label !== "Notifications");
+  const filteredLinks = (
+    isAdmin
+      ? adminLinks
+      : isTailor
+        ? tailorLinks
+        : isLoggedIn
+          ? userLinks
+          : userLinks.filter((link) => link.label !== "Book Now" && link.label !== "Track Order" && link.label !== "Notifications")
+  ).filter((link) => !isStandalone || link.href !== "/install");
   const profileImage = profile.image || placeholderProfileImage;
 
   const handleLinkClick = () => {
@@ -567,7 +579,7 @@ export default function Sidebar({
                 Core Analysis / Services
               </p>
               <nav className="flex flex-col gap-1 text-xs font-bold">
-                {links.map((link, idx) => {
+                {filteredLinks.map((link, idx) => {
                   const active = pathname === link.href;
                   const isNotif = link.href === "/notifications";
                   const themeClasses = getLinkColorClasses(idx);
@@ -641,7 +653,7 @@ export default function Sidebar({
               <nav className="flex flex-col gap-1 text-xs font-bold">
                 {communityLinks.map((link, idx) => {
                   const active = pathname === link.href;
-                  const delayIndex = links.length + idx;
+                  const delayIndex = filteredLinks.length + idx;
                   const themeClasses = getLinkColorClasses(delayIndex);
                   return (
                     <Link
@@ -697,6 +709,7 @@ export default function Sidebar({
                 })}
               </nav>
             </div>
+
           </LayoutGroup>
         </div>
       </aside>
