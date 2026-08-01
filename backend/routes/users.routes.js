@@ -130,6 +130,79 @@ module.exports = (io) => {
     }
   });
 
+  router.put("/:userId/measurements/calibrate", async (request, response) => {
+    try {
+      const userId = Number(request.params.userId);
+      if (!userId) {
+        return response.status(400).json({ message: "User ID is required" });
+      }
+
+      if (!canAccessUser(request, userId)) {
+        return response.status(403).json({ message: "You can only update your own measurements" });
+      }
+
+      const { aiEstimates, actualValues } = request.body;
+      if (!aiEstimates || !actualValues) {
+        return response.status(400).json({ message: "aiEstimates and actualValues are required" });
+      }
+
+      let mongoMeasurement = await Measurement.findOne({ userId });
+      if (!mongoMeasurement) {
+        mongoMeasurement = new Measurement({
+          userId,
+          calibrationFactors: {
+            chest: 1.0,
+            waist: 1.0,
+            hip: 1.0,
+            shoulder: 1.0,
+            inseam: 1.0,
+            sleeve: 1.0
+          }
+        });
+      }
+
+      if (!mongoMeasurement.calibrationFactors) {
+        mongoMeasurement.calibrationFactors = {
+          chest: 1.0,
+          waist: 1.0,
+          hip: 1.0,
+          shoulder: 1.0,
+          inseam: 1.0,
+          sleeve: 1.0
+        };
+      }
+
+      const keys = ["chest", "waist", "hip", "shoulder", "inseam", "sleeve"];
+      for (const key of keys) {
+        if (aiEstimates[key] !== undefined && actualValues[key] !== undefined) {
+          const aiVal = Number(aiEstimates[key]);
+          const actVal = Number(actualValues[key]);
+          if (aiVal > 0 && actVal > 0) {
+            let factor = actVal / aiVal;
+            // Clamp factor to [0.7, 1.3]
+            if (factor < 0.7) factor = 0.7;
+            if (factor > 1.3) factor = 1.3;
+            mongoMeasurement.calibrationFactors[key] = Number(factor.toFixed(4));
+          }
+        }
+      }
+
+      mongoMeasurement.markModified("calibrationFactors");
+      await mongoMeasurement.save();
+
+      return response.json({
+        message: "Calibration saved",
+        calibrationFactors: mongoMeasurement.calibrationFactors
+      });
+    } catch (error) {
+      console.error("Calibrate measurements error:", error);
+      return response.status(500).json({
+        message: "Unable to save calibration",
+        detail: error.message,
+      });
+    }
+  });
+
   router.put("/:userId/profile", uploadProfile.single("image"), async (request, response) => {
     try {
       const userId = Number(request.params.userId);

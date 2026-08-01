@@ -148,9 +148,22 @@ module.exports = (io) => {
     }
   });
 
-  router.get("/api/join", requireAuth, requireAdmin, async (_request, response) => {
+  router.get("/api/join", requireAuth, async (request, response) => {
     try {
-      const applications = await JoinApplication.find().sort({ createdAt: -1 });
+      let applications;
+      if (request.user?.role === "admin") {
+        applications = await JoinApplication.find().sort({ createdAt: -1 });
+      } else {
+        const query = {
+          $or: [
+            { email: request.user?.email ? request.user.email.toLowerCase().trim() : undefined },
+            { phoneNumber: request.user?.phoneNumber ? request.user.phoneNumber.trim() : undefined }
+          ].filter(Boolean)
+        };
+        applications = (query.$or && query.$or.length > 0)
+          ? await JoinApplication.find(query).sort({ createdAt: -1 })
+          : [];
+      }
 
       return response.json({
         applications,
